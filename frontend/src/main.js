@@ -6,6 +6,7 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import App from './App.vue';
 import router from './router';
 import vuetify from './plugins/vuetify';
+import i18n from './plugins/i18n';
 
 import '@mdi/font/css/materialdesignicons.css';
 import './assets/style/main.scss';
@@ -20,6 +21,7 @@ pinia.use(piniaPluginPersistedstate);
 app.use(pinia);
 app.use(router);
 app.use(vuetify);
+app.use(i18n);
 
 app.config.errorHandler = (err, instance, info) => {
     console.error('Global error:', err);

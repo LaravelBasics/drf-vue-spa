@@ -1,0 +1,75 @@
+{
+    "app": {
+        "title": "テスト環境",
+        "loading": "読み込み中...",
+        "ready": "準備完了"
+    },
+    "auth": {
+        "login": "ログイン",
+        "logout": "ログアウト",
+        "loginTitle": "ログイン画面",
+        "loginFailed": "ログインに失敗しました",
+        "invalidCredentials": "ユーザー名またはパスワードが正しくありません",
+        "sessionExpired": "セッションの有効期限が切れました。再度ログインしてください"
+    },
+    "nav": {
+        "home": "ホーム",
+        "dashboard": "ダッシュボード",
+        "profile": "プロフィール",
+        "settings": "設定",
+        "menu": "メニュー"
+    },
+    "form": {
+        "fields": {
+            "username": "ユーザー名",
+            "password": "パスワード",
+            "email": "メールアドレス",
+            "name": "名前",
+            "phone": "電話番号"
+        },
+        "placeholders": {
+            "enterUsername": "{field}を入力してください",
+            "enterPassword": "{field}を入力してください"
+        },
+        "validation": {
+            "required": "{field}は必須です",
+            "maxLength": "{field}は{max}文字以内で入力してください",
+            "minLength": "{field}は{min}文字以上で入力してください",
+            "email": "正しいメールアドレスの形式で入力してください",
+            "alphaNumeric": "英数字のみで入力してください"
+        }
+    },
+    "actions": {
+        "add": "新規",
+        "edit": "編集",
+        "delete": "削除",
+        "save": "保存",
+        "cancel": "キャンセル",
+        "search": "検索",
+        "filter": "フィルター",
+        "refresh": "更新",
+        "export": "エクスポート",
+        "download": "ダウンロード"
+    },
+    "status": {
+        "success": "成功",
+        "error": "エラー",
+        "warning": "警告",
+        "info": "情報"
+    },
+    "pages": {
+        "home": {
+            "title": "ホーム画面",
+            "orderList": "受注一覧"
+        },
+        "settings": {
+            "title": "設定",
+            "general": "一般設定",
+            "account": "アカウント設定",
+            "theme": "テーマ設定",
+            "language": "言語設定",
+            "selectLanguage": "言語を選択",
+            "generalDescription": "一般的な設定項目がここに表示されます。"
+        }
+    }
+}

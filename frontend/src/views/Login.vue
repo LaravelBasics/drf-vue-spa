@@ -1,14 +1,17 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '@/stores/auth';
 import { useValidation } from '@/composables/useValidation';
-import { messages } from '@/constants/messages';
+import { useDesignSystem } from '@/composables/useDesignSystem';
 
 const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
+const { t } = useI18n();
 const { createRules } = useValidation();
+const { colors, getIcon, getSize } = useDesignSystem();
 
 const username = ref('');
 const password = ref('');
@@ -44,7 +47,7 @@ async function onSubmit() {
         isVisible.value = false;
 
         setTimeout(async () => {
-            const redirect = route.query.next || '/home';
+            const redirect = route.query.next || '/';
             await router.push(redirect);
         }, 300); // フェードアウト時間と合わせる
     } else {
@@ -59,16 +62,16 @@ async function onSubmit() {
     <div class="login-page">
         <transition name="login-fade" appear>
             <div v-show="isVisible" class="login-center">
-                <v-card rounded="lg" elevation="12" class="login-card">
+                <v-card rounded="lg" :elevation="12" class="login-card">
                     <v-toolbar
-                        color="blue-darken-3"
+                        :color="colors.current.primary"
                         dark
                         flat
                         class="rounded-t-lg"
                     >
                         <div class="d-flex w-100 justify-center align-center">
                             <span class="text-h5 font-weight-bold text-white">
-                                ログイン画面
+                                {{ t('auth.loginTitle') }}
                             </span>
                         </div>
                     </v-toolbar>
@@ -77,17 +80,27 @@ async function onSubmit() {
                         <v-form @submit.prevent="onSubmit" ref="form">
                             <v-text-field
                                 v-model="username"
-                                :label="`${messages.fields.username}を入力してください`"
-                                prepend-inner-icon="mdi-account"
+                                :label="
+                                    t('form.placeholders.enterUsername', {
+                                        field: t('form.fields.username'),
+                                    })
+                                "
+                                :prepend-inner-icon="getIcon('form', 'user')"
                                 variant="outlined"
                                 class="mt-1 mb-2"
                                 :rules="nameRules"
                             />
                             <v-text-field
                                 v-model="password"
-                                :label="`${messages.fields.password}を入力してください`"
+                                :label="
+                                    t('form.placeholders.enterPassword', {
+                                        field: t('form.fields.password'),
+                                    })
+                                "
                                 type="password"
-                                prepend-inner-icon="mdi-lock"
+                                :prepend-inner-icon="
+                                    getIcon('form', 'password')
+                                "
                                 variant="outlined"
                                 class="mb-3"
                                 :rules="passwordRules"
@@ -96,13 +109,13 @@ async function onSubmit() {
                             <v-btn
                                 type="submit"
                                 :loading="loading"
-                                color="blue-darken-3"
+                                :color="colors.current.primary"
                                 block
                                 size="large"
                                 rounded
                                 class="text-none"
                             >
-                                ログイン
+                                {{ t('auth.login') }}
                             </v-btn>
                         </v-form>
                     </v-card-text>
@@ -111,7 +124,7 @@ async function onSubmit() {
                     <transition name="error-slide">
                         <v-card-actions v-if="error" class="pt-0 px-6 pb-6">
                             <v-alert
-                                :icon="false"
+                                :icon="getIcon('status', 'error')"
                                 type="error"
                                 variant="tonal"
                                 class="w-100 text-center"

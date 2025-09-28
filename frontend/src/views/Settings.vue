@@ -15,12 +15,12 @@ const headerButtons = [
 ];
 
 function openOrderSearch() {
-    console.log('検索する');
+    // console.log('検索する');
 }
 function exportToCSV() {
-    console.log('CSV出力処理');
+    // console.log('CSV出力処理');
 }
 function createNewOrder() {
-    console.log('新規受注画面へ遷移');
+    // console.log('新規受注画面へ遷移');
 }
 </script>

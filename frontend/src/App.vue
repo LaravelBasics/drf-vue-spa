@@ -14,21 +14,7 @@
         </div>
 
         <!-- ⭐ 準備中は最小限のローディング（または完全に白画面） -->
-        <div v-show="!appReady" class="loading-screen">
-            <!-- コメントアウトすれば完全に白画面 -->
-            <!-- <v-main>
-                <v-container class="fill-height" fluid>
-                    <v-row align="center" justify="center">
-                        <v-progress-circular
-                            indeterminate
-                            size="32"
-                            color="primary"
-                            width="2"
-                        ></v-progress-circular>
-                    </v-row>
-                </v-container>
-            </v-main> -->
-        </div>
+        <div v-show="!appReady" class="loading-screen"></div>
     </v-app>
 </template>
 
@@ -40,14 +26,6 @@ import SideBar from '@/components/SideBar.vue';
 
 const auth = useAuthStore();
 const appReady = ref(false);
-
-// ⭐ ルートに応じた遷移パターンを決定
-function getTransitionName(route) {
-    if (route.name === 'Login') {
-        return 'login-page-transition';
-    }
-    return 'page-transition';
-}
 
 const waitForFontsAndIcons = () => {
     return new Promise((resolve) => {

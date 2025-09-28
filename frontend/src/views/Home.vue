@@ -1,24 +1,35 @@
 <template>
+    <!-- ヘッダーコンポーネント -->
+    <Header :app-title="t('pages.home.title')" :page-buttons="headerButtons">
+    </Header>
+
+    <!-- メインコンテンツ -->
     <v-container>
-        <Header app-title="カスタムアプリ名"></Header>
         <v-row>
-            <v-col>
-                <v-card class="pa-6" color="blue-grey-lighten-5">
-                    <v-row justify="center">
-                        <v-col
-                            cols="auto"
-                            class="d-flex flex-column align-center"
+            <v-col cols="12">
+                <h1>{{ t('pages.home.orderList') }}</h1>
+            </v-col>
+        </v-row>
+
+        <!-- デモ用カード -->
+        <v-row>
+            <v-col cols="12" md="6" lg="4">
+                <v-card
+                    :elevation="getComponentConfig('card', 'elevation')"
+                    :rounded="getComponentConfig('card', 'borderRadius')"
+                >
+                    <v-card-title class="d-flex align-center">
+                        <v-icon
+                            :color="colors.current.success"
+                            :size="getSize('md')"
+                            class="me-2"
                         >
-                            <v-icon size="64" color="indigo-darken-2">
-                                mdi-atom
-                            </v-icon>
-                            <v-card-title class="text-h5 font-weight-bold mt-2">
-                                ログイン成功！
-                            </v-card-title>
-                        </v-col>
-                    </v-row>
-                    <v-card-text class="text-center text-body-1">
-                        このページから、各種サービスをご利用いただけます。
+                            {{ getIcon('status', 'success') }}
+                        </v-icon>
+                        {{ t('status.success') }}
+                    </v-card-title>
+                    <v-card-text>
+                        Lorem ipsum dolor sit amet consectetur.
                     </v-card-text>
                 </v-card>
             </v-col>
@@ -27,5 +38,43 @@
 </template>
 
 <script setup>
+import { useI18n } from 'vue-i18n';
+import { useDesignSystem } from '@/composables/useDesignSystem';
 import Header from '@/components/Header.vue';
+
+const { t } = useI18n();
+const { colors, getIcon, getSize, getComponentConfig } = useDesignSystem();
+
+const headerButtons = [
+    {
+        name: t('actions.search'),
+        action: openOrderSearch,
+        icon: 'mdi-magnify',
+        type: 'primary',
+    },
+    {
+        name: t('actions.export'),
+        action: exportToCSV,
+        icon: 'mdi-file-excel',
+        type: 'success',
+    },
+    {
+        name: t('actions.add'),
+        action: createNewOrder,
+        icon: 'mdi-plus',
+        type: 'primary',
+    },
+];
+
+function openOrderSearch() {
+    console.log('Search orders');
+}
+
+function exportToCSV() {
+    console.log('Export to CSV');
+}
+
+function createNewOrder() {
+    console.log('Create new order');
+}
 </script>

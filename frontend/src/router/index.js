@@ -17,27 +17,9 @@ const router = createRouter({
 
         // ⭐ その他の認証が必要なページ
         {
-            path: routes.SAMPLE, // '/sample'
-            name: 'Sample',
-            component: () => import('@/views/Sample.vue'),
-            meta: { requiresAuth: true },
-        },
-        {
-            path: routes.PROFILE, // '/profile'
-            name: 'Profile',
-            component: () => import('@/views/Profile.vue'),
-            meta: { requiresAuth: true },
-        },
-        {
             path: routes.SETTINGS, // '/settings'
             name: 'Settings',
             component: () => import('@/views/Settings.vue'),
-            meta: { requiresAuth: true },
-        },
-        {
-            path: routes.DASHBOARD, // '/dashboard'
-            name: 'Dashboard',
-            component: () => import('@/views/Dashboard.vue'),
             meta: { requiresAuth: true },
         },
 

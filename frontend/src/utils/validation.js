@@ -1,101 +1,83 @@
-// =====================================
-// src/utils/validation.js
-// =====================================
+// src/utils/validation.js - 更新版（i18n対応）
 
-import { messages } from '@/constants/messages';
+import { useI18n } from 'vue-i18n';
 
-// メッセージのプレースホルダーを置換するヘルパー関数
-function formatMessage(template, params = {}) {
-    return template.replace(/{(\w+)}/g, (match, key) => {
-        return params[key] !== undefined ? params[key] : match;
-    });
-}
+// i18n対応バリデーションルール
+export const createValidationRules = () => {
+    const { t } = useI18n();
 
-// 基本的なバリデーションルール
-export const validationRules = {
-    // 必須チェック
-    required(fieldName) {
-        return (value) => {
-            return (
-                !!value ||
-                formatMessage(messages.required, {
-                    name: messages.fields[fieldName] || fieldName,
-                })
-            );
-        };
-    },
+    return {
+        // 必須チェック
+        required(fieldKey) {
+            return (value) => {
+                return (
+                    !!value ||
+                    t('form.validation.required', {
+                        field: t(`form.fields.${fieldKey}`),
+                    })
+                );
+            };
+        },
 
-    // 最大文字数
-    maxLength(fieldName, max) {
-        return (value) => {
-            if (!value) return true; // 空の場合はスキップ（requiredと組み合わせて使用）
-            return (
-                value.length <= max ||
-                formatMessage(messages.maxLength, {
-                    name: messages.fields[fieldName] || fieldName,
-                    max: max,
-                })
-            );
-        };
-    },
+        // 最大文字数
+        maxLength(fieldKey, max) {
+            return (value) => {
+                if (!value) return true;
+                return (
+                    value.length <= max ||
+                    t('form.validation.maxLength', {
+                        field: t(`form.fields.${fieldKey}`),
+                        max: max,
+                    })
+                );
+            };
+        },
 
-    // 最小文字数
-    minLength(fieldName, min) {
-        return (value) => {
-            if (!value) return true;
-            return (
-                value.length >= min ||
-                formatMessage(messages.minLength, {
-                    name: messages.fields[fieldName] || fieldName,
-                    min: min,
-                })
-            );
-        };
-    },
+        // 最小文字数
+        minLength(fieldKey, min) {
+            return (value) => {
+                if (!value) return true;
+                return (
+                    value.length >= min ||
+                    t('form.validation.minLength', {
+                        field: t(`form.fields.${fieldKey}`),
+                        min: min,
+                    })
+                );
+            };
+        },
 
-    // メールアドレス形式
-    email(fieldName = 'email') {
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return (value) => {
-            if (!value) return true;
-            return emailPattern.test(value) || messages.pattern.email;
-        };
-    },
+        // メールアドレス
+        email() {
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return (value) => {
+                if (!value) return true;
+                return emailPattern.test(value) || t('form.validation.email');
+            };
+        },
 
-    // 英数字のみ
-    alphaNumeric(fieldName) {
-        const pattern = /^[a-zA-Z0-9]+$/;
-        return (value) => {
-            if (!value) return true;
-            return pattern.test(value) || messages.pattern.alphaNumeric;
-        };
-    },
+        // 英数字のみ
+        alphaNumeric() {
+            const pattern = /^[a-zA-Z0-9]+$/;
+            return (value) => {
+                if (!value) return true;
+                return pattern.test(value) || t('form.validation.alphaNumeric');
+            };
+        },
 
-    // カスタムパターン
-    pattern(regex, message) {
-        return (value) => {
-            if (!value) return true;
-            return regex.test(value) || message;
-        };
-    },
+        // カスタムパターン
+        pattern(regex, messageKey, params = {}) {
+            return (value) => {
+                if (!value) return true;
+                return regex.test(value) || t(messageKey, params);
+            };
+        },
 
-    // 値の範囲チェック
-    range(fieldName, min, max) {
-        return (value) => {
-            if (!value) return true;
-            const num = Number(value);
-            if (isNaN(num)) return '数値を入力してください';
-            return (
-                (num >= min && num <= max) ||
-                `${min}から${max}の間で入力してください`
-            );
-        };
-    },
-
-    // カスタム関数
-    custom(validatorFn, message) {
-        return (value) => {
-            return validatorFn(value) || message;
-        };
-    },
+        // カスタム関数
+        custom(validatorFn, messageKey, params = {}) {
+            return (value) => {
+                return validatorFn(value) || t(messageKey, params);
+            };
+        },
+    };
 };

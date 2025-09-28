@@ -1,0 +1,75 @@
+{
+    "app": {
+        "title": "Test Environment",
+        "loading": "Loading...",
+        "ready": "Ready"
+    },
+    "auth": {
+        "login": "Login",
+        "logout": "Logout",
+        "loginTitle": "Login",
+        "loginFailed": "Login failed",
+        "invalidCredentials": "Invalid username or password",
+        "sessionExpired": "Session expired. Please login again"
+    },
+    "nav": {
+        "home": "Home",
+        "dashboard": "Dashboard",
+        "profile": "Profile",
+        "settings": "Settings",
+        "menu": "Menu"
+    },
+    "form": {
+        "fields": {
+            "username": "Username",
+            "password": "Password",
+            "email": "Email",
+            "name": "Name",
+            "phone": "Phone"
+        },
+        "placeholders": {
+            "enterUsername": "Enter {field}",
+            "enterPassword": "Enter {field}"
+        },
+        "validation": {
+            "required": "{field} is required",
+            "maxLength": "{field} must be {max} characters or less",
+            "minLength": "{field} must be {min} characters or more",
+            "email": "Please enter a valid email address",
+            "alphaNumeric": "Only alphanumeric characters allowed"
+        }
+    },
+    "actions": {
+        "add": "Add New",
+        "edit": "Edit",
+        "delete": "Delete",
+        "save": "Save",
+        "cancel": "Cancel",
+        "search": "Search",
+        "filter": "Filter",
+        "refresh": "Refresh",
+        "export": "Export",
+        "download": "Download"
+    },
+    "status": {
+        "success": "Success",
+        "error": "Error",
+        "warning": "Warning",
+        "info": "Info"
+    },
+    "pages": {
+        "home": {
+            "title": "Order Management System",
+            "orderList": "Order List"
+        },
+        "settings": {
+            "title": "Settings",
+            "general": "General Settings",
+            "account": "Account Settings",
+            "theme": "Theme Settings",
+            "language": "Language Settings",
+            "selectLanguage": "Select Language",
+            "generalDescription": "General configuration options will be displayed here."
+        }
+    }
+}
