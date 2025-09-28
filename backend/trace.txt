@@ -1,0 +1,48 @@
+== Info: Host localhost:8000 was resolved.
+== Info: IPv6: ::1
+== Info: IPv4: 127.0.0.1
+== Info:   Trying [::1]:8000...
+== Info:   Trying 127.0.0.1:8000...
+== Info: Connected to localhost (127.0.0.1) port 8000
+== Info: using HTTP/1.x
+=> Send header, 240 bytes (0xf0)
+0000: POST /api/login/ HTTP/1.1
+001b: Host: localhost:8000
+0031: User-Agent: curl/8.14.1
+004a: Accept: */*
+0057: Cookie: csrftoken=WhyJJVOmqadtD3bKwm74rg7NfxNL8Yqc
+008b: Content-Type: application/json
+00ab: X-CSRFToken: xVd6khu2reFTqppvCvaR1vQLUGSIyfOg
+00da: Content-Length: 38
+00ee: 
+=> Send data, 38 bytes (0x26)
+0000: ...{"username":"your","password":"pw"}
+== Info: upload completely sent off: 38 bytes
+<= Recv header, 26 bytes (0x1a)
+0000: HTTP/1.1 400 Bad Request
+<= Recv header, 37 bytes (0x25)
+0000: Date: Sun, 07 Sep 2025 08:46:33 GMT
+<= Recv header, 39 bytes (0x27)
+0000: Server: WSGIServer/0.2 CPython/3.11.9
+<= Recv header, 32 bytes (0x20)
+0000: Content-Type: application/json
+<= Recv header, 30 bytes (0x1e)
+0000: Vary: Accept, Cookie, origin
+<= Recv header, 22 bytes (0x16)
+0000: Allow: OPTIONS, POST
+<= Recv header, 23 bytes (0x17)
+0000: X-Frame-Options: DENY
+<= Recv header, 21 bytes (0x15)
+0000: Content-Length: 103
+<= Recv header, 33 bytes (0x21)
+0000: X-Content-Type-Options: nosniff
+<= Recv header, 30 bytes (0x1e)
+0000: Referrer-Policy: same-origin
+<= Recv header, 41 bytes (0x29)
+0000: Cross-Origin-Opener-Policy: same-origin
+<= Recv header, 2 bytes (0x2)
+0000: 
+<= Recv data, 103 bytes (0x67)
+0000: {"detail":"JSON parse error - Unexpected UTF-8 BOM (decode using
+0040:  utf-8-sig): line 1 column 1 (char 0)"}
+== Info: Connection #0 to host localhost left intact

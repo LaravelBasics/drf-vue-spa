@@ -1,0 +1,579 @@
+簡単なsession認証やつ9/15
+
+
+プルに言うと、ユーザーがブラウザで最初にアクセスしたときに読み込まれるのは index.html です。そして、その index.html がVue.jsアプリケーションを起動し、その中でVue Routerが動く、という流れです。
+
+フロントエンドの起動プロセス
+具体的な流れを、あなたが提供してくれたコードと関連付けながら見ていきましょう。
+
+ブラウザからのリクエスト: ユーザーが http://localhost:8080/ にアクセスします。
+
+index.html の読み込み: Webサーバー（開発サーバー）は、そのリクエストに対して、C:\Users\pvufx\Desktop\template\frontend\index.html を返します。
+
+JavaScriptファイルの読み込み: ブラウザは index.html を解析し、<body> タグの中にある以下の <script> タグを見つけます。
+
+HTML
+
+<script type="module" src="/src/main.js"></script>
+
+この <script> タグは、src/main.js ファイルを読み込むようにブラウザに指示しています。
+
+Vue.jsアプリケーションの起動: src/main.js が実行されます。このファイルでは、Vue.jsのアプリケーションインスタンスが作成され、あなたの router/index.js で定義されたルーターがアプリケーションに組み込まれます。
+
+Vue Routerの動作: アプリケーションが起動すると、Vue Routerは現在のURL（この場合は /）を見て、どのコンポーネントを表示すべきか判断します。そして、あなたの router/index.js の設定に従って、Home.vue コンポーネントが index.html の <div id="app"></div> の中にレンダリングされます。
+
+main.js の役割
+main.js は、アプリケーションのすべての部品を結びつけ、Vue.jsアプリケーションを初期化する役割を担っています。
+
+createApp (Vue.jsのインスタンスを作成)、createPinia (状態管理)、App.vue (ルートコンポーネント)、そしてあなたが作成したルーター（router） などを、このファイルで使えるように読み込んでいます。
+
+アプリケーションインスタンスの作成
+
+JavaScript
+
+const app = createApp(App);
+ここで、Vue.jsの新しいアプリケーションインスタンスが作成されます。App コンポーネントが、このアプリケーションの「親」コンポーネントとなります。
+
+プラグインの組み込み
+
+JavaScript
+
+app.use(createPinia().use(piniaPluginPersistedstate));
+app.use(router); // 👈 ここでルーターをアプリケーションに組み込む
+app.use(vuetify);
+
+app.use() は、作成したアプリケーションインスタンスに、ルーターや状態管理ライブラリ（Pinia）、UIフレームワーク（Vuetify）といった機能を追加する役割を担います。この時点で、アプリケーションはルート（URL）の変更を認識し、それに応じて画面を切り替える準備が整います。
+
+DOMへのマウント
+
+JavaScript
+
+app.mount('#app');
+この最後の行が、アプリケーションをHTMLに表示する魔法です。index.html の <div id="app"></div> を探し、そこにVue.jsアプリケーション全体をレンダリングします。これにより、画面にコンポーネントが表示されるようになります。
+
+したがって、index.html → main.js → router/index.js という流れで処理が進みます。
+
+main.js が、アプリケーションのすべての部品（ルーター、状態管理、UI）を集めて、最終的にブラウザの画面に表示するための「司令塔」のような役割を果たしているわけです。
+
+router/index.js の役割
+main.js がアプリケーションにルーターを組み込むと、Vue Routerはナビゲーション（ページの遷移）を管理し始めます。その際、各ページにアクセスする前に特別な処理を実行するように設定できます。
+
+あなたのコードでは、その特殊な処理として**router.beforeEach(authGuard)** が設定されています。これは、「すべてのルートにアクセスする前に、必ず authGuard 関数を実行しなさい」 という命令です。
+
+auth-guard.js の役割
+この authGuard.js こそが、認証の要となる部分です。ユーザーがログイン済みか、これからアクセスしようとしているページが認証を必要とするかをチェックし、適切なナビゲーションを決定します。
+
+/ (ルート) にアクセスした場合の authGuard の具体的な動作は以下の通りです。
+
+setCsrfToken() の実行: ページ遷移が始まる前に、DjangoからのCSRFトークンを非同期で取得します。これはセキュリティ上の理由で必要です。
+
+ログインページかどうかのチェック: if (to.path === '/login') の条件をチェックします。この場合は / へのアクセスなので、この条件は満たされません。
+
+認証が必要かどうかのチェック: if (to.meta.requiresAuth) の条件をチェックします。router/index.js の設定で、/ のルートには meta: { requiresAuth: true } が定義されているため、この条件は満たされます。
+
+ユーザー情報の有無をチェック: if (!auth.user) をチェックします。ユーザーがまだログインしていない場合（auth.user がnull）、auth.fetchUser() を実行してユーザー情報を取得しようとします。
+
+認証成功の場合: auth.fetchUser() でユーザー情報が取得できた場合、auth.user に値が入り、次の if (!auth.user) の条件は満たされず、ナビゲーションはそのまま続行され、Home.vue コンポーネントが表示されます。
+
+認証失敗の場合: auth.fetchUser() でユーザー情報が取得できなかった場合、auth.user はnull のままで、次の if (!auth.user) の条件が満たされます。その結果、return { path: '/login', ... } が実行され、ユーザーはログインページ(/login)にリダイレクトされます。
+
+ナビゲーションの完了: 上記のチェックをすべてパスした場合、return true が実行され、Vue Routerはナビゲーションを続行し、/ に対応するコンポーネント（この場合は Home.vue）をブラウザに表示します。
+
+このように、router/index.js と auth-guard.js は協力して、ユーザーが適切な権限を持っていない限り、認証が必要なページにはアクセスさせないという、重要なセキュリティ上の役割を果たしています。
+
+
+***************************************************************************
+
+1. auth.fetchUser() の呼び出し
+auth-guard.js の中で await auth.fetchUser(); が実行されます。
+
+これは、Piniaのストアである useAuthStore 内の fetchUser メソッドを呼び出します。このメソッドの役割は、バックエンドにユーザー情報を尋ねることです。
+
+2. plugins/axios.js の利用
+fetchUser() メソッドの中には const res = await api.get('me/'); という行があります。
+
+これは、あなたが共通化した api インスタンス（plugins/axios.js で定義）を使って、me/ エンドポイントにGETリクエストを送ることを意味します。この api インスタンスには、baseURL: 'http://localhost:8000/api/' が設定されているため、実際には http://localhost:8000/api/me/ というURLへのリクエストが生成されます。
+
+このとき、plugins/axios.js に設定されているリクエストインターセプターが動き、withCredentials: true のおかげで、ブラウザに保存されているセッションクッキー（sessionid）が自動的にリクエストに含まれます。
+
+3. Djangoバックエンドでの処理
+リクエストは、あなたのDjangoプロジェクトのURL設定に従ってルーティングされます。
+
+backend/config/urls.py: /api/ へのリクエストが api.urls に転送されます。
+
+Python
+
+path('api/', include('api.urls'))
+backend/api/urls.py: me/ のパスが me_api ビューに転送されます。
+
+Python
+
+path('me/', me_api, name='me')
+backend/api/views.py: me_api 関数が実行されます。
+
+if not request.user.is_authenticated: で、リクエストに有効なセッションクッキーが含まれているかをチェックします。
+
+セッションが有効な場合: request.user にログインユーザーの情報が設定されています。return Response({'username': request.user.username, 'email': request.user.email}) によって、ユーザー情報を含むJSONデータがレスポンスとして返されます。
+
+セッションが無効な場合: 認証されていないため、return Response({'detail':'unauthenticated'}, status=401) が返されます。このとき、HTTPステータスコードは 401 Unauthorized となります。
+
+4. フロントエンドでのレスポンス処理
+フロントエンドでは、plugins/axios.js に設定されているレスポンスインターセプターが、Djangoからのレスポンスを受け取ります。
+
+認証成功の場合: HTTPステータスコードは 200 OK です。const res = await api.get('me/'); の res.data には、Djangoから返されたユーザー情報（{username: '...', email: '...'}）が入ります。auth.user.value = res.data; で、Piniaストアのユーザー情報が更新されます。
+
+認証失敗の場合: HTTPステータスコードは 401 Unauthorized です。Promise.reject(error) が呼び出され、エラーハンドリングに移ります。このとき、onAuthErrorCallback() が実行されます。これは auth.js で登録されている logout() 関数を呼び出し、ユーザー情報をクリアし、/login へリダイレクトする処理です。
+
+5. ナビゲーションの完了
+認証成功: auth.user にユーザー情報がセットされ、auth-guard.js で return true; が実行されます。これにより、router/index.js の親ルートである / に対応する Home.vue が表示されます。
+
+認証失敗: auth-guard.js の if (!auth.user) の条件が満たされ、return { path: '/login', ... } が実行されます。これにより、Vue Routerがユーザーを /login へリダイレクトします。あなたの設定では /login にリダイレクトされた後、router/index.js のワイルドカードルートのredirect: routes.LOGIN にはマッチせず、明確に定義された /login ルートにナビゲーションします。
+
+
+
+*******************************************************************************
+
+あなたのコードの各行は、以下の役割を担っています。
+
+import 'vuetify/styles';:
+
+この行は、Vuetifyのスタイルシート（CSS）をプロジェクトに読み込んでいます。これにより、すべてのVuetifyコンポーネントに適切なデザインが適用されます。
+
+import { createVuetify } from 'vuetify';:
+
+Vuetifyインスタンスを作成するための createVuetify 関数をインポートしています。
+
+import * as components from 'vuetify/components';:
+
+Vuetifyが提供するすべてのコンポーネント（VBtn, VCard, VTextFieldなど）をcomponentsという名前でまとめてインポートしています。
+
+import * as directives from 'vuetify/directives';:
+
+Vuetifyのディレクティブ（v-modelのような特別な属性）をdirectivesという名前でまとめてインポートしています。
+
+export default createVuetify({...});:
+
+最後に、createVuetify 関数を使ってVuetifyのインスタンスを作成し、それをエクスポートしています。このインスタンスが、main.js でアプリケーションに組み込まれることで、プロジェクト全体でVuetifyのコンポーネントや機能が使えるようになります。
+
+この設定ファイルを main.js が読み込み、app.use(vuetify) でアプリケーションに適用することで、あなたはどのVueコンポーネントからでもVuetifyのUI部品を呼び出して使うことができます。
+
+SCSSファイルの作成:
+frontend/src/assets/style/main.scss のような場所にファイルを作成し、Vuetifyのデフォルトスタイルを上書きしたいセレクター（クラスやIDなど）を記述します。
+
+SCSS
+
+// 例：Vuetifyのボタンの色を上書きする
+.v-btn {
+  background-color: #ff5722 !important; // 好きな色に変更
+}
+
+// 特定のコンポーネントにのみ適用する
+.my-custom-card {
+  background-color: #f5f5f5;
+  box-shadow: none;
+}
+main.js へのインポート:
+このSCSSファイルをアプリケーション全体に適用するため、main.js ファイルでインポートします。
+
+JavaScript
+
+// src/main.js
+
+import { createApp } from 'vue';
+import App from './App.vue';
+// ...その他のインポート
+import vuetify from './plugins/vuetify';
+
+// 作成したSCSSファイルをここでインポート
+import './assets/style/main.scss'; 
+
+const app = createApp(App);
+
+app.use(vuetify);
+app.mount('#app');
+このようにすることで、アプリケーション起動時にVuetifyのスタイルが読み込まれ、その後にカスタムCSSが上書きされるため、狙った通りのデザインを適用できます。
+
+*************************************************************************
+
+// src/router/auth-guard.js
+
+import { useAuthStore } from '@/stores/auth';
+import { setCsrfToken } from '@/plugins/axios';
+
+// beforeEachで使う認証ロジックを関数としてエクスポート
+export const authGuard = async (to) => {
+    const auth = useAuthStore();
+
+    // ページ遷移時にCSRFトークンを事前に取得
+    await setCsrfToken();
+
+    // ログインページへのアクセスの場合の処理
+    if (to.path === '/login') {
+        if (auth.user) {
+            return { path: '/' };
+        }
+        return true;
+    }
+
+    // ルートが認証を要求する場合の処理
+    if (to.meta.requiresAuth) {
+        if (!auth.user) {
+            await auth.fetchUser();
+        }
+
+        if (!auth.user) {
+            return { path: '/login', query: { next: to.fullPath } };
+        }
+    }
+
+    // 問題なければ何もしない（次のナビゲーションへ進む）
+    return true;
+};
+
+// src/router/index.js
+
+import { createRouter, createWebHistory } from 'vue-router';
+// 💡 分離した認証ロジックをインポート
+import { authGuard } from './auth-guard.js';
+import { routes } from '@/constants/routes';
+
+const router = createRouter({
+    history: createWebHistory(),
+    routes: [
+        {
+            // 💡 認証が必要なルートをまとめるための親ルート
+            path: '/',
+            meta: { requiresAuth: true }, // 👈 ここにまとめて定義
+            children: [
+                {
+                    path: routes.HOME, // 💡 パスは '/home' のまま
+                    name: 'Home',
+                    component: () =>
+                        import(
+                            /* webpackChunkName: "home" */ '@/views/Home.vue'
+                        ),
+                },
+                // {
+                //     path: routes.PROFILE, // 💡 プロフィールページも追加
+                //     name: 'Profile',
+                //     component: () =>
+                //         import(
+                //             /* webpackChunkName: "login" */ '@/views/Login.vue'
+                //         ),
+                // },
+            ],
+        },
+        {
+            path: routes.LOGIN,
+            name: 'Login',
+            component: () => import('@/views/Login.vue'),
+        },
+        {
+            path: '/:pathMatch(.*)*',
+            redirect: routes.LOGIN,
+        },
+    ],
+});
+
+// 💡 呼び出しはシンプルに
+router.beforeEach(authGuard);
+
+export default router;
+
+C:\Users\pvufx\Desktop\template\frontend\src\plugins\axios.js
+
+import axios from 'axios';
+import Cookies from 'js-cookie';
+
+// axios インスタンスを共通化
+const api = axios.create({
+    baseURL: 'http://localhost:8000/api/',
+    withCredentials: true,
+});
+
+// CSRFトークン設定関数
+export async function setCsrfToken() {
+    try {
+        await api.get('csrf/');
+    } catch (error) {
+        console.error('CSRFトークンの取得に失敗しました:', error);
+    }
+}
+
+// リクエストインターセプター（CSRFトークン用）
+api.interceptors.request.use((config) => {
+    const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
+    if (methodsRequiringCsrf.includes(config.method)) {
+        const csrfToken = Cookies.get('csrftoken');
+        if (csrfToken) {
+            config.headers['X-CSRFToken'] = csrfToken;
+        }
+    }
+    return config;
+});
+
+// レスポンスインターセプター（認証エラー用）
+// **この関数がauth.jsから呼び出されるようになります**
+let onAuthErrorCallback = null;
+export const setOnAuthErrorCallback = (callback) => {
+    onAuthErrorCallback = callback;
+};
+
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (
+            error.response &&
+            (error.response.status === 401 || error.response.status === 403)
+        ) {
+            // ログアウトAPIへのリクエストからのエラーは無視する
+            const isLogoutRequest = error.config.url.endsWith('logout/');
+            if (!isLogoutRequest && onAuthErrorCallback) {
+                // 認証エラー発生時、コールバック関数を実行
+                onAuthErrorCallback();
+            }
+        }
+        return Promise.reject(error);
+    },
+);
+
+export default api;
+
+C:\Users\pvufx\Desktop\template\frontend\src\stores\auth.js
+
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
+import api, { setOnAuthErrorCallback } from '@/plugins/axios';
+import router from '@/router';
+
+export const useAuthStore = defineStore(
+    'auth',
+    () => {
+        const user = ref(null);
+        const loading = ref(false);
+
+        // Axiosインターセプターにログアウト処理を登録
+        // これにより、循環依存が解消される
+        setOnAuthErrorCallback(() => {
+            logout();
+        });
+
+        async function loginSession(username, password) {
+            loading.value = true;
+            try {
+                await api.post('login/', { username, password });
+                await fetchUser();
+                return true;
+            } catch (e) {
+                console.error('login failed', e);
+                return false;
+            } finally {
+                loading.value = false;
+            }
+        }
+
+        async function fetchUser() {
+            try {
+                const res = await api.get('me/');
+                user.value = res.data;
+            } catch (e) {
+                user.value = null;
+                console.error('fetchUser failed', e);
+            }
+        }
+
+        async function logout() {
+            // user.valueがnullでない（＝フロントエンドでログイン状態と認識されている）場合のみ、
+            // logout APIを呼び出す。これにより、セッション切れ後の無駄なAPI呼び出しを防ぐ。
+            if (user.value) {
+                try {
+                    await api.post('logout/');
+                } catch (e) {
+                    console.error('logout failed', e);
+                }
+            }
+
+            // API呼び出しの成功・失敗に関わらず、ユーザーの状態をクリアしてリダイレクト
+            user.value = null;
+            router.push('/login');
+        }
+
+        // `router.beforeEach`で呼び出すための関数として返す
+        return { user, loading, loginSession, fetchUser, logout };
+    },
+    {
+        // 💡 ここに永続化設定を追加
+        persist: true,
+    },
+);
+
+main.js
+// main.js
+
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import App from './App.vue';
+import router from './router';
+import vuetify from './plugins/vuetify';
+import '@mdi/font/css/materialdesignicons.css';
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
+
+const app = createApp(App);
+
+app.use(createPinia().use(piniaPluginPersistedstate));
+app.use(router);
+app.use(vuetify);
+app.mount('#app');
+
+
+
+
+// src/constants/routes.js
+
+export const routes = {
+    HOME: '/',
+    LOGIN: '/login',
+    // PROFILE: '/profile',
+    // DASHBOARD: '/dashboard',
+};
+
+
+
+C:\Users\pvufx\Desktop\template\frontend\src\views\Login.vue
+<script setup>
+import { ref } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
+
+const auth = useAuthStore();
+const router = useRouter();
+const route = useRoute();
+
+const username = ref('');
+const password = ref('');
+const error = ref('');
+const loading = ref(false);
+
+async function onSubmit() {
+    error.value = '';
+    loading.value = true;
+    const ok = await auth.loginSession(username.value, password.value);
+    loading.value = false;
+
+    if (ok) {
+        const redirect = route.query.next || '/';
+        router.push(redirect);
+    } else {
+        error.value =
+            'ログインに失敗しました。ユーザー名かパスワードが違います。';
+    }
+}
+</script>
+
+<template>
+    <v-container>
+        <v-row justify="center">
+            <v-col class="fixed-col">
+                <v-card rounded="lg" elevation="10">
+                    <v-toolbar
+                        color="blue-darken-3"
+                        dark
+                        flat
+                        class="rounded-t-lg"
+                    >
+                        <div class="d-flex w-100 justify-center align-center">
+                            <span class="text-h5 font-weight-bold text-white">
+                                ログイン画面
+                            </span>
+                        </div>
+                    </v-toolbar>
+                    <v-card-text class="py-6 px-4">
+                        <v-form @submit.prevent="onSubmit">
+                            <v-text-field
+                                v-model="username"
+                                label="ユーザー名"
+                                required
+                                prepend-inner-icon="mdi-account"
+                            />
+                            <v-text-field
+                                v-model="password"
+                                label="パスワード"
+                                type="password"
+                                required
+                                prepend-inner-icon="mdi-lock"
+                            />
+                            <v-btn
+                                type="submit"
+                                :loading="loading"
+                                color="blue-darken-3"
+                                class="mt-6"
+                                block
+                                size="large"
+                            >
+                                ログイン
+                            </v-btn>
+                        </v-form>
+                    </v-card-text>
+                    <v-card-actions v-if="error" class="justify-center">
+                        <v-alert
+                            type="error"
+                            dense
+                            outlined
+                            class="text-center w-100"
+                            >{{ error }}</v-alert
+                        >
+                    </v-card-actions>
+                </v-card>
+            </v-col>
+        </v-row>
+    </v-container>
+</template>
+
+<style scoped></style>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

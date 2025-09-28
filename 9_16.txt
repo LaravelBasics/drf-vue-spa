@@ -1,0 +1,605 @@
+C:\Users\pvufx\Desktop\template\frontend\src\views\Login.vue
+
+<script setup>
+import { ref } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
+
+const auth = useAuthStore();
+const router = useRouter();
+const route = useRoute();
+
+const username = ref('');
+const password = ref('');
+const error = ref('');
+const loading = ref(false);
+
+async function onSubmit() {
+    error.value = '';
+    loading.value = true;
+
+    // ⭐ 修正: オブジェクト形式の戻り値に対応
+    const result = await auth.loginSession(username.value, password.value);
+    loading.value = false;
+
+    console.log('🚀 ログイン結果:', result); // デバッグ用
+
+    // ⭐ 修正: result.success をチェック
+    if (result.success) {
+        console.log('✅ ログイン成功 - リダイレクト開始');
+        const redirect = route.query.next || '/home'; // ⭐ '/' → '/home' に変更
+        console.log('🔄 リダイレクト先:', redirect);
+
+        try {
+            await router.push(redirect);
+            console.log('✅ 画面遷移完了');
+        } catch (routerError) {
+            console.error('❌ 画面遷移エラー:', routerError);
+        }
+    } else {
+        console.error('❌ ログイン失敗:', result.error);
+        // ⭐ 修正: サーバーからのエラーメッセージを表示
+        error.value =
+            result.error ||
+            'ログインに失敗しました。ユーザー名かパスワードが違います。';
+    }
+}
+</script>
+
+<template>
+    <v-container>
+        <v-row justify="center">
+            <v-col class="fixed-col">
+                <v-card rounded="lg" elevation="10">
+                    <v-toolbar
+                        color="blue-darken-3"
+                        dark
+                        flat
+                        class="rounded-t-lg"
+                    >
+                        <div class="d-flex w-100 justify-center align-center">
+                            <span class="text-h5 font-weight-bold text-white">
+                                ログイン画面
+                            </span>
+                        </div>
+                    </v-toolbar>
+                    <v-card-text class="py-6 px-4">
+                        <v-form @submit.prevent="onSubmit">
+                            <v-text-field
+                                v-model="username"
+                                label="ユーザー名"
+                                required
+                                prepend-inner-icon="mdi-account"
+                            />
+                            <v-text-field
+                                v-model="password"
+                                label="パスワード"
+                                type="password"
+                                required
+                                prepend-inner-icon="mdi-lock"
+                            />
+                            <v-btn
+                                type="submit"
+                                :loading="loading"
+                                color="blue-darken-3"
+                                class="mt-6"
+                                block
+                                size="large"
+                            >
+                                ログイン
+                            </v-btn>
+                        </v-form>
+                    </v-card-text>
+                    <v-card-actions v-if="error" class="justify-center">
+                        <v-alert
+                            type="error"
+                            dense
+                            outlined
+                            class="text-center w-100"
+                            >{{ error }}</v-alert
+                        >
+                    </v-card-actions>
+                </v-card>
+            </v-col>
+        </v-row>
+    </v-container>
+</template>
+
+
+// src/main.js
+
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
+import App from './App.vue';
+import router from './router';
+import vuetify from './plugins/vuetify';
+
+// Styles
+import '@mdi/font/css/materialdesignicons.css';
+import './assets/style/main.scss';
+
+// ⭐ Auth store（初期化用）
+import { useAuthStore } from '@/stores/auth';
+
+const app = createApp(App);
+
+// ⭐ Pinia setup
+const pinia = createPinia();
+pinia.use(piniaPluginPersistedstate);
+
+app.use(pinia);
+app.use(router);
+app.use(vuetify);
+
+// ⭐ グローバルエラーハンドラー
+app.config.errorHandler = (err, instance, info) => {
+    console.error('Global error:', err);
+    console.error('Component:', instance);
+    console.error('Error info:', info);
+
+    // 必要に応じてエラー報告サービスに送信
+    // reportError(err, { component: instance, info });
+};
+
+// ⭐ アプリ初期化処理
+const initializeApp = async () => {
+    try {
+        // 認証状態の初期化（永続化されたデータがある場合の同期）
+        const authStore = useAuthStore();
+        await authStore.initialize();
+
+        console.log('アプリケーションの初期化完了');
+    } catch (error) {
+        console.error('アプリケーション初期化エラー:', error);
+    }
+};
+
+// ⭐ アプリのマウント
+app.mount('#app');
+
+// ⭐ 初期化処理を実行
+initializeApp();
+
+
+// src/constants/routes.js
+
+// ⭐ Object.freezeで不変オブジェクトにして安全性向上
+export const routes = Object.freeze({
+    // 認証関連
+    LOGIN: '/login',
+    LOGOUT: '/logout',
+    // REGISTER: '/register',
+
+    // メインページ
+    HOME: '/home',
+    // DASHBOARD: '/dashboard',
+
+    // // ユーザー関連
+    // PROFILE: '/profile',
+    // SETTINGS: '/settings',
+
+    // // その他
+    // ABOUT: '/about',
+    // CONTACT: '/contact',
+
+    // // 管理者用（必要に応じて）
+    // ADMIN: '/admin',
+    // USERS: '/admin/users',
+});
+
+// ⭐ ルートのメタ情報も定義
+// export const routeMetadata = Object.freeze({
+//     [routes.HOME]: {
+//         title: 'ホーム',
+//         requiresAuth: true,
+//         icon: 'mdi-home',
+//     },
+//     [routes.PROFILE]: {
+//         title: 'プロフィール',
+//         requiresAuth: true,
+//         icon: 'mdi-account',
+//     },
+//     [routes.LOGIN]: {
+//         title: 'ログイン',
+//         hideForAuth: true,
+//         icon: 'mdi-login',
+//     },
+//     [routes.SETTINGS]: {
+//         title: '設定',
+//         requiresAuth: true,
+//         icon: 'mdi-cog',
+//     },
+// });
+
+// ⭐ ナビゲーション用のルート配列
+// export const navigationRoutes = [
+//     {
+//         path: routes.HOME,
+//         name: 'ホーム',
+//         icon: 'mdi-home',
+//         requiresAuth: true,
+//     },
+//     {
+//         path: routes.PROFILE,
+//         name: 'プロフィール',
+//         icon: 'mdi-account',
+//         requiresAuth: true,
+//     },
+//     {
+//         path: routes.SETTINGS,
+//         name: '設定',
+//         icon: 'mdi-cog',
+//         requiresAuth: true,
+//     },
+// ];
+
+// ⭐ ルート検証用のヘルパー関数
+// export const isValidRoute = (path) => {
+//     return Object.values(routes).includes(path);
+// };
+
+// export const getRouteMetadata = (path) => {
+//     return routeMetadata[path] || {};
+// };
+
+
+
+// src/router/index.js
+
+import { createRouter, createWebHistory } from 'vue-router';
+import { authGuard } from './auth-guard.js';
+import { routes } from '@/constants/routes';
+
+const router = createRouter({
+    history: createWebHistory(),
+    routes: [
+        {
+            path: '/',
+            meta: { requiresAuth: true },
+            children: [
+                {
+                    path: routes.HOME,
+                    name: 'Home',
+                    component: () =>
+                        import(
+                            /* webpackChunkName: "home" */ '@/views/Home.vue'
+                        ),
+                },
+                // {
+                //     path: routes.PROFILE,
+                //     name: 'Profile',
+                //     component: () =>
+                //         import(
+                //             /* webpackChunkName: "profile" */ '@/views/Profile.vue' // ⭐ チャンク名修正
+                //         ),
+                // },
+            ],
+        },
+        {
+            path: routes.LOGIN,
+            name: 'Login',
+            component: () =>
+                import(
+                    /* webpackChunkName: "auth" */ '@/views/Login.vue' // ⭐ チャンク名をauthに変更
+                ),
+            meta: { hideForAuth: true }, // ⭐ ログイン済みユーザーには表示しない
+        },
+        {
+            path: '/:pathMatch(.*)*',
+            name: 'NotFound', // ⭐ name追加
+            redirect: routes.LOGIN,
+        },
+    ],
+});
+
+router.beforeEach(authGuard);
+
+export default router;
+
+
+
+// src/router/auth-guard.js
+
+import { useAuthStore } from '@/stores/auth';
+
+export const authGuard = async (to, from) => {
+    const auth = useAuthStore();
+
+    // ⭐ ログイン済みユーザーがログインページにアクセスした場合の処理改善
+    if (to.meta.hideForAuth && auth.user) {
+        // 前のページがある場合はそこに戻る、なければホームへ
+        return { path: from.path || '/', replace: true };
+    }
+
+    // 認証が必要なページの場合
+    if (to.meta.requiresAuth) {
+        // ⭐ パフォーマンス改善：ユーザー情報がなく、かつロード中でない場合のみfetchUser実行
+        if (!auth.user && !auth.loading) {
+            try {
+                await auth.fetchUser();
+            } catch (error) {
+                console.error('認証チェック中にエラーが発生:', error);
+            }
+        }
+
+        // ⭐ ログイン状態をチェック
+        if (!auth.user) {
+            return {
+                path: '/login',
+                query: { next: to.fullPath },
+                replace: true, // ⭐ 履歴を残さない
+            };
+        }
+    }
+
+    return true;
+};
+
+
+
+// src/plugins/axios.js
+
+import axios from 'axios';
+import Cookies from 'js-cookie';
+
+// ⭐ Environment-based configuration
+const API_BASE_URL =
+    import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/';
+
+const api = axios.create({
+    baseURL: API_BASE_URL,
+    withCredentials: true,
+    timeout: 5000, // ⭐ 10秒タイムアウト追加
+});
+
+// ⭐ CSRF管理クラスでパフォーマンス改善
+class CSRFManager {
+    constructor() {
+        this.tokenFetched = false;
+        this.fetchingPromise = null;
+    }
+
+    async ensureToken() {
+        if (this.tokenFetched) return;
+
+        // ⭐ 重複リクエスト防止：既に取得中の場合は同じPromiseを返す
+        if (this.fetchingPromise) {
+            return this.fetchingPromise;
+        }
+
+        this.fetchingPromise = this._fetchToken();
+        try {
+            await this.fetchingPromise;
+        } finally {
+            this.fetchingPromise = null;
+        }
+    }
+
+    async _fetchToken() {
+        try {
+            await api.get('csrf/');
+            this.tokenFetched = true;
+        } catch (error) {
+            console.error('CSRFトークンの取得に失敗:', error);
+            throw error;
+        }
+    }
+
+    // ⭐ トークンリセット機能
+    reset() {
+        this.tokenFetched = false;
+        this.fetchingPromise = null;
+    }
+}
+
+const csrfManager = new CSRFManager();
+
+// リクエストインターセプター
+api.interceptors.request.use(async (config) => {
+    const method = config.method?.toLowerCase();
+    const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
+
+    if (methodsRequiringCsrf.includes(method)) {
+        try {
+            await csrfManager.ensureToken();
+            const csrfToken = Cookies.get('csrftoken');
+            if (csrfToken) {
+                config.headers['X-CSRFToken'] = csrfToken;
+            }
+        } catch (error) {
+            console.warn('CSRFトークンの設定をスキップ:', error);
+        }
+    }
+
+    return config;
+});
+
+// 認証エラーコールバック
+let onAuthErrorCallback = null;
+export const setOnAuthErrorCallback = (callback) => {
+    onAuthErrorCallback = callback;
+};
+
+// ⭐ CSRFトークンリセット関数をエクスポート
+export const resetCSRFToken = () => {
+    csrfManager.reset();
+};
+
+// レスポンスインターセプター
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        const { response, config } = error;
+
+        if (response) {
+            // ⭐ 401/403エラーハンドリング改善
+            if ([401, 403].includes(response.status)) {
+                const isLogoutRequest = config.url?.endsWith('logout/');
+
+                if (!isLogoutRequest && onAuthErrorCallback) {
+                    onAuthErrorCallback();
+                }
+            }
+
+            // ⭐ CSRFエラーの場合はトークンをリセット
+            if (
+                response.status === 403 &&
+                response.data?.detail?.toLowerCase().includes('csrf')
+            ) {
+                console.warn('CSRFトークンエラー - リセットします');
+                csrfManager.reset();
+            }
+        }
+
+        return Promise.reject(error);
+    },
+);
+
+export default api;
+
+
+
+// src/stores/auth.js
+
+import { defineStore } from 'pinia';
+import { ref, computed } from 'vue';
+import api, { setOnAuthErrorCallback, resetCSRFToken } from '@/plugins/axios';
+import router from '@/router';
+
+export const useAuthStore = defineStore(
+    'auth',
+    () => {
+        const user = ref(null);
+        const loading = ref(false);
+        const error = ref(null); // ⭐ エラー状態追加
+
+        // ⭐ Computed properties追加
+        const isAuthenticated = computed(() => !!user.value);
+        const isLoading = computed(() => loading.value);
+
+        // ⭐ 初期化時にコールバックを設定
+        setOnAuthErrorCallback(() => {
+            handleAuthError();
+        });
+
+        async function loginSession(username, password) {
+            loading.value = true;
+            error.value = null; // ⭐ エラーリセット
+
+            try {
+                await api.post('login/', { username, password });
+                await fetchUser();
+                return { success: true }; // ⭐ 戻り値を統一
+            } catch (e) {
+                const errorMessage =
+                    e.response?.data?.message ||
+                    e.response?.data?.detail ||
+                    'ログインに失敗しました';
+                error.value = errorMessage;
+                console.error('Login failed:', e);
+                return { success: false, error: errorMessage };
+            } finally {
+                loading.value = false;
+            }
+        }
+
+        async function fetchUser() {
+            // ⭐ パフォーマンス改善：既に実行中の場合はスキップ
+            if (loading.value) return;
+
+            loading.value = true;
+            try {
+                const response = await api.get('me/');
+                user.value = response.data;
+                error.value = null; // ⭐ 成功時はエラーをクリア
+            } catch (err) {
+                if (err.response?.status === 403) {
+                    // 未ログイン状態（想定内）
+                    user.value = null;
+                } else {
+                    console.error('ユーザー情報の取得に失敗:', err);
+                    error.value = 'ユーザー情報の取得に失敗しました';
+                }
+            } finally {
+                loading.value = false;
+            }
+        }
+
+        async function logout(redirect = true) {
+            // ⭐ リダイレクト制御可能に
+            loading.value = true;
+
+            try {
+                // フロントエンドでログイン状態と認識されている場合のみAPI呼び出し
+                if (user.value) {
+                    await api.post('logout/');
+                }
+            } catch (e) {
+                console.error('Logout API failed:', e);
+                // エラーでも続行（ローカル状態はクリアする）
+            } finally {
+                // ⭐ 状態のクリーンアップ
+                user.value = null;
+                error.value = null;
+                loading.value = false;
+
+                // ⭐ CSRFトークンもリセット
+                resetCSRFToken();
+
+                // ⭐ リダイレクト処理改善
+                if (redirect && router.currentRoute.value.path !== '/login') {
+                    router.push('/login').catch((err) => {
+                        console.warn('リダイレクトエラー:', err);
+                    });
+                }
+            }
+        }
+
+        // ⭐ 認証エラー時の処理（インターセプターから呼び出される）
+        function handleAuthError() {
+            if (user.value) {
+                // ログイン状態の場合のみログアウト処理
+                console.warn('認証エラーが発生しました - 自動ログアウトします');
+                logout(true);
+            }
+        }
+
+        // ⭐ エラーをクリアする関数
+        function clearError() {
+            error.value = null;
+        }
+
+        // ⭐ 初期化処理（アプリ起動時に呼び出し推奨）
+        async function initialize() {
+            if (user.value && !loading.value) {
+                // 永続化されたユーザー情報がある場合、サーバーと同期
+                await fetchUser();
+            }
+        }
+
+        return {
+            // State
+            user,
+            loading,
+            error,
+
+            // Computed
+            isAuthenticated,
+            isLoading,
+
+            // Actions
+            loginSession,
+            fetchUser,
+            logout,
+            clearError,
+            initialize,
+        };
+    },
+    // {
+    //     persist: {
+    //         // ⭐ ユーザー情報のみ永続化（loading, errorは除外）
+    //         paths: ['user'],
+    //     },
+    // },
+);

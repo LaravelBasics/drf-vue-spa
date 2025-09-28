@@ -1,0 +1,11 @@
+# テキストファイルは自動でLFに統一
+* text=auto eol=lf
+
+# バイナリは自動変換しない
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
