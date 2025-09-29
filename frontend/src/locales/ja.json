@@ -17,7 +17,8 @@
         "dashboard": "ダッシュボード",
         "profile": "プロフィール",
         "settings": "設定",
-        "menu": "メニュー"
+        "menu": "メニュー",
+        "management": "管理"
     },
     "form": {
         "fields": {
@@ -25,7 +26,11 @@
             "password": "パスワード",
             "email": "メールアドレス",
             "name": "名前",
-            "phone": "電話番号"
+            "phone": "電話番号",
+            "employeeId": "社員番号",
+            "isAdmin": "管理者権限",
+            "isActive": "有効状態",
+            "createdAt": "登録日"
         },
         "placeholders": {
             "enterUsername": "{field}を入力してください",
@@ -36,7 +41,8 @@
             "maxLength": "{field}は{max}文字以内で入力してください",
             "minLength": "{field}は{min}文字以上で入力してください",
             "email": "正しいメールアドレスの形式で入力してください",
-            "alphaNumeric": "英数字のみで入力してください"
+            "alphaNumeric": "英数字のみで入力してください",
+            "employeeIdFormat": "社員番号は10桁以内の数字で入力してください"
         }
     },
     "actions": {
@@ -57,6 +63,18 @@
         "warning": "警告",
         "info": "情報"
     },
+    "common": {
+        "yes": "はい",
+        "no": "いいえ",
+        "actions": "操作",
+        "create": "作成",
+        "edit": "編集",
+        "delete": "削除",
+        "cancel": "キャンセル",
+        "back": "戻る",
+        "refresh": "更新",
+        "save": "保存"
+    },
     "pages": {
         "home": {
             "title": "ホーム画面",
@@ -70,6 +88,25 @@
             "language": "言語設定",
             "selectLanguage": "言語を選択",
             "generalDescription": "一般的な設定項目がここに表示されます。"
+        },
+        "userManagement": {
+            "title": "ユーザー管理",
+            "searchPlaceholder": "ユーザー名で検索",
+            "createUser": "新規ユーザー",
+            "deleteConfirm": "ユーザー削除確認",
+            "deleteMessage": "ユーザー「{username}」を削除しますか？"
+        },
+        "userCreate": {
+            "title": "ユーザー新規作成"
+        },
+        "userEdit": {
+            "title": "ユーザー編集"
+        },
+        "userDelete": {
+            "title": "ユーザー削除確認",
+            "warningMessage": "このユーザーを削除すると、元に戻すことはできません。削除する前に、本当に削除してよいか確認してください。",
+            "confirmMessage": "ユーザー「{username}」を削除してもよろしいですか？",
+            "lastAdminError": "管理者は最低1人必要です。最後の管理者を削除することはできません。"
         }
     }
 }

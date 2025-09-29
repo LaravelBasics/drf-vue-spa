@@ -20,6 +20,9 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # 💡 アプリごとの urls.py をインクルード
-    path('api/', include('api.urls')),
+    # 認証系API（accounts/）
+    path('api/auth/', include('accounts.urls')),
+    
+    # ユーザー管理API
+    path('api/', include('users.urls')),   
 ]

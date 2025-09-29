@@ -12,4 +12,11 @@ export const routes = Object.freeze({
     DASHBOARD: '/dashboard',
     PROFILE: '/profile',
     SETTINGS: '/settings',
+
+    // 管理機能
+    MANAGEMENT: '/management',
+    USERS: '/users',
+    USER_CREATE: '/users/create',
+    USER_EDIT: '/users/:id/edit',
+    USER_DELETE: '/users/:id/delete',
 });

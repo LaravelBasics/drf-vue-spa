@@ -1,4 +1,3 @@
-<!-- src/components/Header.vue - 修正版（防御的コーディング） -->
 <template>
     <v-app-bar
         :color="safeColors.surface"
@@ -10,12 +9,32 @@
             <span class="text-h6 font-weight-bold">{{ props.appTitle }}</span>
         </v-app-bar-title>
 
+        <!-- パンくずリスト -->
+        <v-breadcrumbs
+            v-if="breadcrumbs && breadcrumbs.length > 0"
+            :items="breadcrumbs"
+            class="pa-0 mx-4"
+            density="compact"
+        >
+            <template v-slot:item="{ item }">
+                <v-breadcrumbs-item
+                    :to="item.to"
+                    :disabled="item.disabled"
+                    class="text-subtitle-2"
+                >
+                    {{ item.title }}
+                </v-breadcrumbs-item>
+            </template>
+        </v-breadcrumbs>
+
+        <v-spacer></v-spacer>
+
         <v-btn
             v-for="(button, index) in props.pageButtons"
             :key="index"
             variant="outlined"
             :color="getButtonColor(button.type)"
-            class="mx-3 px-2 text-subtitle-2"
+            class="mx-1 px-2 text-subtitle-2"
             @click="button.action"
         >
             <v-icon :icon="button.icon" :size="safeIconSize"></v-icon>
@@ -35,9 +54,13 @@ const props = defineProps({
     },
     headerHeight: {
         type: [String, Number],
-        default: 56,
+        default: 64, // パンくず分少し高く
     },
     pageButtons: {
+        type: Array,
+        default: () => [],
+    },
+    breadcrumbs: {
         type: Array,
         default: () => [],
     },
@@ -45,7 +68,6 @@ const props = defineProps({
 
 const { colors, getSize, getComponentConfig } = useDesignSystem();
 
-// 防御的コーディング: 安全な値を計算
 const safeColors = computed(() => ({
     surface:
         colors.value.current?.surface ||
@@ -68,9 +90,8 @@ const safeIconSize = computed(() => {
 });
 
 function getButtonColor(type = 'primary') {
-    // colors.current が存在するかチェック
     if (!colors.value.current) {
-        return 'grey-darken-3'; // フォールバック色
+        return 'grey-darken-3';
     }
 
     const colorMap = {

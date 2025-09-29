@@ -1,4 +1,4 @@
-// src/stores/auth.js (初期化処理改善版)
+// src/stores/auth.js
 
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
@@ -21,7 +21,7 @@ export const useAuthStore = defineStore(
             error.value = null;
 
             try {
-                await api.post('login/', { username, password });
+                await api.post('auth/login/', { username, password });
                 await fetchUser();
                 return { success: true };
             } catch (e) {
@@ -42,7 +42,7 @@ export const useAuthStore = defineStore(
 
             loading.value = true;
             try {
-                const response = await api.get('me/');
+                const response = await api.get('auth/me/');
                 user.value = response.data;
                 error.value = null;
                 console.log('✅ ユーザー情報取得成功:', user.value);
@@ -66,7 +66,7 @@ export const useAuthStore = defineStore(
 
             try {
                 if (user.value) {
-                    await api.post('logout/');
+                    await api.post('auth/logout/');
                 }
             } catch (e) {
                 console.error('Logout API failed:', e);

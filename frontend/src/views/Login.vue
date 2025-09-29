@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '@/stores/auth';
 import { useValidation } from '@/composables/useValidation';
 import { useDesignSystem } from '@/composables/useDesignSystem';
+import { messages } from '@/constants/messages';
 
 const auth = useAuthStore();
 const router = useRouter();

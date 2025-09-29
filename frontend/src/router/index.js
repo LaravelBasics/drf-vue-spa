@@ -30,6 +30,39 @@ const router = createRouter({
             component: () => import('@/views/Login.vue'),
             meta: { hideForAuth: true, transition: 'fade' },
         },
+        // ユーザー管理（一覧）
+        {
+            path: routes.MANAGEMENT,
+            name: 'Management',
+            component: () => import('@/views/UserManagement.vue'),
+            meta: { requiresAuth: true },
+        },
+
+        // ユーザー新規作成
+        {
+            path: routes.USER_CREATE,
+            name: 'UserCreate',
+            component: () => import('@/views/UserCreate.vue'),
+            meta: { requiresAuth: true, transition: 'fade' },
+        },
+
+        // ユーザー編集
+        {
+            path: routes.USER_EDIT,
+            name: 'UserEdit',
+            component: () => import('@/views/UserEdit.vue'),
+            meta: { requiresAuth: true, transition: 'fade' },
+            props: true,
+        },
+
+        // ユーザー削除
+        {
+            path: '/users/:id/delete',
+            name: 'UserDelete',
+            component: () => import('@/views/UserDelete.vue'),
+            meta: { requiresAuth: true, transition: 'fade' },
+            props: true,
+        },
 
         // ⭐ 404ページ
         {

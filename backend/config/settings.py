@@ -37,10 +37,18 @@ INSTALLED_APPS = [
     "django.contrib.sessions",     # セッション機能
     "django.contrib.messages",     # フラッシュメッセージ
     "django.contrib.staticfiles",  # 静的ファイル
+     # サードパーティ
     "rest_framework",
     "corsheaders",
-    "api",
+    "django_filters",
+    
+    # 自作アプリ
+    "accounts",  # api/ から accounts/ に変更
+    "users",
 ]
+
+# 💡 小文字で指定します
+AUTH_USER_MODEL = 'users.CustomUser'
 
 REST_FRAMEWORK = {
     # APIを叩いたときに「誰がアクセスしているか」を判定する方法を指定
@@ -53,6 +61,13 @@ REST_FRAMEWORK = {
     # 必要に応じて AllowAny にすると誰でもアクセス可能
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
     ],
 }
 
@@ -140,9 +155,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
+LANGUAGE_CODE = 'ja'  # 日本語に変更
+TIME_ZONE = 'Asia/Tokyo'  # 日本時間に変更
 
 USE_I18N = True
 
