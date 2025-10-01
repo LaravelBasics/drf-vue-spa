@@ -9,6 +9,7 @@ export const ICONS = Object.freeze({
         settings: 'mdi-cog',
         profile: 'mdi-account',
         logout: 'mdi-power',
+        divider: 'mdi-chevron-right',
     },
 
     // アクション
@@ -33,6 +34,9 @@ export const ICONS = Object.freeze({
         warning: 'mdi-alert',
         info: 'mdi-information',
         loading: 'mdi-loading',
+        admin: 'mdi-shield-check',
+        check: 'mdi-check-bold',
+        minus: 'mdi-minus',
     },
 
     // フォーム

@@ -7,14 +7,14 @@
 
         <v-container fluid class="pa-6">
             <!-- 検索・操作エリア -->
-            <v-row class="mb-4">
+            <v-row class="mb-1">
                 <v-col>
                     <v-text-field
                         v-model="searchQuery"
                         :label="t('pages.users.searchPlaceholder')"
                         prepend-inner-icon="mdi-magnify"
                         variant="outlined"
-                        density="comfortable"
+                        density="compact"
                         clearable
                         hide-details
                         @update:model-value="handleSearchInput"
@@ -33,7 +33,7 @@
                 <v-col class="d-flex align-end justify-end">
                     <v-btn
                         color="primary"
-                        size="large"
+                        size="default"
                         prepend-icon="mdi-plus"
                         @click="goToCreate"
                     >
@@ -50,7 +50,10 @@
                 :items-per-page="itemsPerPage"
                 :items-length="totalItems"
                 :page="currentPage"
-                class="elevation-2 user-table"
+                class="elevation-2"
+                density="compact"
+                hide-default-footer
+                hover
                 @update:page="handlePageChange"
                 @update:items-per-page="handleItemsPerPageChange"
             >
@@ -63,24 +66,16 @@
 
                 <!-- 管理者フラグ -->
                 <template v-slot:item.is_admin="{ item }">
-                    <v-chip
-                        :color="item.is_admin ? 'success' : 'default'"
-                        size="small"
-                        variant="flat"
+                    <v-icon
+                        :color="item.is_admin ? 'success' : 'grey'"
+                        :size="item.is_admin ? 'default' : 'small'"
                     >
-                        <v-icon
-                            :icon="
-                                item.is_admin
-                                    ? 'mdi-shield-check'
-                                    : 'mdi-account'
-                            "
-                            size="small"
-                            class="mr-1"
-                        />
                         {{
-                            item.is_admin ? t('common.admin') : t('common.user')
+                            item.is_admin
+                                ? ICONS.status.check
+                                : ICONS.status.minus
                         }}
-                    </v-chip>
+                    </v-icon>
                 </template>
 
                 <!-- 登録日 -->
@@ -89,41 +84,50 @@
                 </template>
 
                 <!-- アクション列 -->
-                <template v-slot:item.actions="{ item }">
-                    <div class="d-flex gap-2">
-                        <v-btn
-                            icon="mdi-pencil"
-                            size="small"
-                            variant="text"
-                            color="primary"
-                            @click="goToEdit(item.id)"
-                        >
-                            <v-icon>mdi-pencil</v-icon>
-                            <v-tooltip activator="parent" location="top">
-                                {{ t('common.edit') }}
-                            </v-tooltip>
-                        </v-btn>
+                <template v-slot:item.actions-edit="{ item }">
+                    <v-btn
+                        icon="mdi-pencil"
+                        size="small"
+                        variant="text"
+                        color="primary"
+                        @click="goToEdit(item.id)"
+                    >
+                        <v-icon>mdi-pencil</v-icon>
+                        <v-tooltip activator="parent" location="top">
+                            {{ t('common.edit') }}
+                        </v-tooltip>
+                    </v-btn>
+                </template>
 
-                        <v-btn
-                            icon="mdi-delete"
-                            size="small"
-                            variant="text"
-                            color="error"
-                            @click="goToDelete(item.id)"
-                            :disabled="!canDelete(item)"
-                        >
-                            <v-icon>mdi-delete</v-icon>
-                            <v-tooltip activator="parent" location="top">
-                                {{
-                                    canDelete(item)
-                                        ? t('common.delete')
-                                        : t('pages.users.cannotDeleteLastAdmin')
-                                }}
-                            </v-tooltip>
-                        </v-btn>
-                    </div>
+                <template v-slot:item.actions-delete="{ item }">
+                    <v-btn
+                        icon="mdi-delete"
+                        size="small"
+                        variant="text"
+                        color="error"
+                        @click="goToDelete(item.id)"
+                        :disabled="!canDelete(item)"
+                    >
+                        <v-icon>mdi-delete</v-icon>
+                        <v-tooltip activator="parent" location="top">
+                            {{
+                                canDelete(item)
+                                    ? t('common.delete')
+                                    : t('pages.users.cannotDeleteLastAdmin')
+                            }}
+                        </v-tooltip>
+                    </v-btn>
                 </template>
             </v-data-table>
+
+            <!-- <div class="d-flex justify-center mt-2">
+                <v-pagination
+                    :length="Math.ceil(totalItems / itemsPerPage)"
+                    v-model="currentPage"
+                    :total-visible="3"
+                    @update:model-value="handlePageChange"
+                />
+            </div> -->
         </v-container>
     </div>
 </template>
@@ -135,6 +139,7 @@ import { useI18n } from 'vue-i18n';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
 import { routes } from '@/constants/routes';
+import { ICONS } from '@/constants/icons.js';
 
 const router = useRouter();
 const route = useRoute();
@@ -167,7 +172,7 @@ const breadcrumbs = computed(() => [
 // テーブルヘッダー
 const headers = computed(() => [
     {
-        title: 'ID',
+        title: t('common.number'),
         key: 'id',
         sortable: false,
         width: 80,
@@ -193,10 +198,16 @@ const headers = computed(() => [
         sortable: false,
     },
     {
-        title: t('common.actions'),
-        key: 'actions',
+        title: t('common.edit'),
+        key: 'actions-edit',
         sortable: false,
-        width: 120,
+        width: 60,
+    },
+    {
+        title: t('common.delete'),
+        key: 'actions-delete',
+        sortable: false,
+        width: 60,
     },
 ]);
 
@@ -339,14 +350,3 @@ onMounted(() => {
     fetchUsers();
 });
 </script>
-
-<style scoped>
-.gap-2 {
-    gap: 8px;
-}
-
-.user-table {
-    /* データが少なくても、最低でも300pxの高さを確保する */
-    min-height: 425px;
-}
-</style>

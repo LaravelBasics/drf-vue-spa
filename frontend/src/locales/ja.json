@@ -66,6 +66,7 @@
     "common": {
         "yes": "はい",
         "no": "いいえ",
+        "number": "No",
         "actions": "操作",
         "create": "作成",
         "edit": "編集",

@@ -16,6 +16,10 @@
             class="pa-0 mx-4"
             density="compact"
         >
+            <template v-slot:divider>
+                <v-icon :size="ICON_SIZES.md">{{ ICONS.nav.divider }}</v-icon>
+            </template>
+
             <template v-slot:item="{ item }">
                 <v-breadcrumbs-item
                     :to="item.to"
@@ -46,6 +50,8 @@
 <script setup>
 import { computed } from 'vue';
 import { useDesignSystem } from '@/composables/useDesignSystem';
+import { ICONS } from '@/constants/icons.js';
+import { ICON_SIZES } from '../constants/theme';
 
 const props = defineProps({
     appTitle: {
