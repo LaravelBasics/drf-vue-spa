@@ -370,3 +370,7 @@ class Migration(migrations.Migration):
     ]
 
 python manage.py migrate users
+
+論理削除に変更した場合のコマンド
+python manage.py makemigrations
+python manage.py migrate
