@@ -1,11 +1,11 @@
-// Vuetify 3 + Vite 用初期設定
+// src/plugins/vuetify.js - 日本語ロケール対応版
 import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { aliases, mdi } from 'vuetify/iconsets/mdi';
+import { ja } from 'vuetify/locale';
 import { THEME_CONFIG } from '@/constants/theme';
 
-// Vuetify CSSを読み込む
 import 'vuetify/styles';
 
 export default createVuetify({
@@ -28,4 +28,9 @@ export default createVuetify({
         },
     },
     defaults: THEME_CONFIG.defaults,
+    locale: {
+        locale: 'ja',
+        fallback: 'ja',
+        messages: { ja },
+    },
 });

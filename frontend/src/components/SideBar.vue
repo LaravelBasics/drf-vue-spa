@@ -55,6 +55,11 @@ const navItems = computed(() => [
     },
     { title: t('nav.profile'), icon: 'mdi-account', to: routes.PROFILE },
     { title: t('nav.settings'), icon: 'mdi-cog', to: routes.SETTINGS },
+    {
+        title: t('nav.management'),
+        icon: 'mdi-account-group',
+        to: routes.USERS,
+    },
 ]);
 
 // 言語表示テキスト（日本語/English）

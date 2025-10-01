@@ -17,15 +17,31 @@
         "dashboard": "Dashboard",
         "profile": "Profile",
         "settings": "Settings",
-        "menu": "Menu"
+        "menu": "Menu",
+        "management": "Management"
+    },
+    "common": {
+        "yes": "Yes",
+        "no": "No",
+        "actions": "Actions",
+        "create": "Create",
+        "edit": "Edit",
+        "delete": "Delete",
+        "cancel": "Cancel",
+        "back": "Back",
+        "refresh": "Refresh",
+        "save": "Save",
+        "admin": "Admin",
+        "user": "User"
     },
     "form": {
         "fields": {
             "username": "Username",
             "password": "Password",
-            "email": "Email",
-            "name": "Name",
-            "phone": "Phone"
+            "employeeId": "Employee ID",
+            "isAdmin": "Admin",
+            "isActive": "Active",
+            "createdAt": "Created At"
         },
         "placeholders": {
             "enterUsername": "Enter {field}",
@@ -61,6 +77,15 @@
         "home": {
             "title": "Order Management System",
             "orderList": "Order List"
+        },
+        "users": {
+            "title": "User Management",
+            "searchPlaceholder": "Search by username",
+            "createButton": "New User",
+            "createTitle": "Create User",
+            "editTitle": "Edit User",
+            "deleteTitle": "Delete User",
+            "cannotDeleteLastAdmin": "Cannot delete last admin"
         },
         "settings": {
             "title": "Settings",

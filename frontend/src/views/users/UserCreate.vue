@@ -1,0 +1,161 @@
+<template>
+    <div>
+        <Header
+            :app-title="t('pages.users.createTitle')"
+            :breadcrumbs="breadcrumbs"
+        />
+
+        <v-container class="pa-6">
+            <v-row justify="center">
+                <v-col cols="12" md="8" lg="6">
+                    <v-card elevation="2">
+                        <v-card-title class="text-h5 pa-6 bg-grey-lighten-4">
+                            {{ t('pages.users.createTitle') }}
+                        </v-card-title>
+
+                        <v-card-text class="pa-6">
+                            <v-form ref="form" @submit.prevent="submitForm">
+                                <v-text-field
+                                    v-model="formData.username"
+                                    :label="t('form.fields.username')"
+                                    :rules="usernameRules"
+                                    variant="outlined"
+                                    class="mb-4"
+                                    required
+                                />
+
+                                <v-text-field
+                                    v-model="formData.employee_id"
+                                    :label="t('form.fields.employeeId')"
+                                    :rules="employeeIdRules"
+                                    variant="outlined"
+                                    type="number"
+                                    class="mb-4"
+                                    required
+                                    hint="10桁以内の数字"
+                                    persistent-hint
+                                />
+
+                                <v-text-field
+                                    v-model="formData.password"
+                                    :label="t('form.fields.password')"
+                                    :rules="passwordRules"
+                                    variant="outlined"
+                                    type="password"
+                                    class="mb-4"
+                                    required
+                                    hint="8文字以上、英字と数字を含む"
+                                    persistent-hint
+                                />
+
+                                <v-checkbox
+                                    v-model="formData.is_admin"
+                                    :label="t('form.fields.isAdmin')"
+                                    class="mb-2"
+                                    hide-details
+                                />
+
+                                <v-divider class="my-4" />
+
+                                <div class="d-flex gap-2">
+                                    <v-btn
+                                        type="submit"
+                                        color="primary"
+                                        size="large"
+                                        :loading="submitting"
+                                        prepend-icon="mdi-content-save"
+                                    >
+                                        {{ t('common.create') }}
+                                    </v-btn>
+
+                                    <v-btn
+                                        variant="outlined"
+                                        size="large"
+                                        prepend-icon="mdi-arrow-left"
+                                        @click="goBack"
+                                    >
+                                        {{ t('common.back') }}
+                                    </v-btn>
+                                </div>
+                            </v-form>
+                        </v-card-text>
+                    </v-card>
+                </v-col>
+            </v-row>
+        </v-container>
+    </div>
+</template>
+
+<script setup>
+import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import { useValidation } from '@/composables/useValidation';
+import { useNotificationStore } from '@/stores/notification';
+import Header from '@/components/Header.vue';
+import { usersAPI } from '@/api/users';
+import { routes } from '@/constants/routes';
+
+const router = useRouter();
+const { t } = useI18n();
+const { createRules } = useValidation();
+const notification = useNotificationStore();
+
+const submitting = ref(false);
+const form = ref(null);
+
+const formData = ref({
+    username: '',
+    employee_id: '',
+    password: '',
+    is_admin: false,
+});
+
+const breadcrumbs = computed(() => [
+    { title: t('nav.home'), to: routes.HOME, disabled: false },
+    { title: t('pages.users.title'), to: routes.USERS, disabled: false },
+    { title: t('pages.users.createTitle'), disabled: true },
+]);
+
+const usernameRules = createRules.username();
+const employeeIdRules = [
+    (v) =>
+        !!v ||
+        t('form.validation.required', { field: t('form.fields.employeeId') }),
+    (v) => /^\d{1,10}$/.test(v) || t('form.validation.employeeIdFormat'),
+];
+const passwordRules = createRules.newPassword();
+
+async function submitForm() {
+    const { valid } = await form.value.validate();
+    if (!valid) return;
+
+    submitting.value = true;
+    try {
+        await usersAPI.create(formData.value);
+        // ⭐ 成功通知
+        notification.success(
+            t('pages.users.createSuccess', {
+                username: formData.value.username,
+            }),
+        );
+        router.push(routes.USERS);
+    } catch (error) {
+        console.error('ユーザー作成エラー:', error);
+
+        // ⭐ エラー通知
+        const errorMessage =
+            error.response?.data?.detail ||
+            error.response?.data?.error ||
+            t('pages.users.createError');
+
+        notification.error(errorMessage);
+    } finally {
+        submitting.value = false;
+    }
+}
+
+function goBack() {
+    router.push(routes.USERS);
+}
+</script>

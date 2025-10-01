@@ -1,6 +1,3 @@
-
-
-検索
 <template>
     <div>
         <Header
@@ -11,7 +8,7 @@
         <v-container fluid class="pa-6">
             <!-- 検索・操作エリア -->
             <v-row class="mb-4">
-                <v-col cols="12" md="7">
+                <v-col>
                     <v-text-field
                         v-model="searchQuery"
                         :label="t('pages.users.searchPlaceholder')"
@@ -20,22 +17,20 @@
                         density="comfortable"
                         clearable
                         hide-details
-                        @keyup.enter="handleSearch"
-                    />
-                </v-col>
-                <v-col cols="12" md="2" class="d-flex align-end">
-                    <v-btn
-                        color="primary"
-                        size="large"
-                        block
-                        prepend-icon="mdi-magnify"
-                        @click="handleSearch"
-                        :loading="loading"
+                        @update:model-value="handleSearchInput"
                     >
-                        {{ t('common.search') }}
-                    </v-btn>
+                        <!-- 検索中インジケーター -->
+                        <template v-slot:append-inner v-if="searching">
+                            <v-progress-circular
+                                indeterminate
+                                size="20"
+                                width="2"
+                                color="primary"
+                            />
+                        </template>
+                    </v-text-field>
                 </v-col>
-                <v-col cols="12" md="3" class="d-flex align-end justify-end">
+                <v-col class="d-flex align-end justify-end">
                     <v-btn
                         color="primary"
                         size="large"
@@ -55,7 +50,7 @@
                 :items-per-page="itemsPerPage"
                 :items-length="totalItems"
                 :page="currentPage"
-                class="elevation-2"
+                class="elevation-2 user-table"
                 @update:page="handlePageChange"
                 @update:items-per-page="handleItemsPerPageChange"
             >
@@ -134,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import Header from '@/components/Header.vue';
@@ -147,10 +142,14 @@ const { t } = useI18n();
 
 const users = ref([]);
 const loading = ref(false);
+const searching = ref(false);
 const searchQuery = ref('');
 const currentPage = ref(1);
 const itemsPerPage = ref(10);
 const totalItems = ref(0);
+
+// デバウンス用タイマー
+let searchTimer = null;
 
 // パンくずリスト
 const breadcrumbs = computed(() => [
@@ -168,7 +167,7 @@ const breadcrumbs = computed(() => [
 // テーブルヘッダー
 const headers = computed(() => [
     {
-        title: 'No',
+        title: 'ID',
         key: 'id',
         sortable: false,
         width: 80,
@@ -230,14 +229,25 @@ async function fetchUsers() {
         console.error('ユーザー一覧取得エラー:', error);
     } finally {
         loading.value = false;
+        searching.value = false;
     }
 }
 
-// 検索ボタンクリック
-function handleSearch() {
-    currentPage.value = 1; // 検索時はページをリセット
-    fetchUsers();
-    updateURLParams();
+// 検索入力ハンドラー（デバウンス）
+function handleSearchInput(value) {
+    searching.value = true;
+
+    // 既存のタイマーをクリア
+    if (searchTimer) {
+        clearTimeout(searchTimer);
+    }
+
+    // 500ms 待機してから検索実行
+    searchTimer = setTimeout(() => {
+        currentPage.value = 1; // 検索時はページをリセット
+        fetchUsers();
+        updateURLParams();
+    }, 500);
 }
 
 // ページ変更ハンドラー
@@ -334,39 +344,9 @@ onMounted(() => {
 .gap-2 {
     gap: 8px;
 }
+
+.user-table {
+    /* データが少なくても、最低でも300pxの高さを確保する */
+    min-height: 425px;
+}
 </style>
-
-
-
-0002_create_initial_superuser.py
-
-from django.db import migrations
-
-def create_initial_superuser(apps, schema_editor):
-    # 'users' アプリの 'CustomUser' モデルを取得
-    CustomUser = apps.get_model('users', 'CustomUser')
-    
-    # ユーザーがまだ存在しない場合のみ作成
-    if not CustomUser.objects.filter(username='admin').exists():
-        CustomUser.objects.create_superuser(
-            username='admin',
-            email='admin@example.com',
-            # ★ パスワードは後で変更してください
-            password='testtastaoL1!', 
-            # ★ 必須フィールドである employee_id にユニークな値を設定
-            employee_id=9999
-        )
-
-class Migration(migrations.Migration):
-
-    dependencies = [
-        # 1つ前のマイグレーションファイルを指定 (通常は initial)
-        ('users', '0001_initial'), 
-    ]
-
-    operations = [
-        # データ投入関数を実行
-        migrations.RunPython(create_initial_superuser, reverse_code=migrations.RunPython.noop),
-    ]
-
-python manage.py migrate users

@@ -32,9 +32,9 @@ const router = createRouter({
         },
         // ユーザー管理（一覧）
         {
-            path: routes.MANAGEMENT,
-            name: 'Management',
-            component: () => import('@/views/UserManagement.vue'),
+            path: routes.USERS,
+            name: 'Users',
+            component: () => import('@/views/users/UserList.vue'),
             meta: { requiresAuth: true },
         },
 
@@ -42,7 +42,7 @@ const router = createRouter({
         {
             path: routes.USER_CREATE,
             name: 'UserCreate',
-            component: () => import('@/views/UserCreate.vue'),
+            component: () => import('@/views/users/UserCreate.vue'),
             meta: { requiresAuth: true, transition: 'fade' },
         },
 
@@ -50,16 +50,16 @@ const router = createRouter({
         {
             path: routes.USER_EDIT,
             name: 'UserEdit',
-            component: () => import('@/views/UserEdit.vue'),
+            component: () => import('@/views/users/UserEdit.vue'),
             meta: { requiresAuth: true, transition: 'fade' },
             props: true,
         },
 
         // ユーザー削除
         {
-            path: '/users/:id/delete',
+            path: routes.USER_DELETE,
             name: 'UserDelete',
-            component: () => import('@/views/UserDelete.vue'),
+            component: () => import('@/views/users/UserDelete.vue'),
             meta: { requiresAuth: true, transition: 'fade' },
             props: true,
         },

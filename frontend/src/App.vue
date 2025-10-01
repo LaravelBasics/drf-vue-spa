@@ -1,5 +1,6 @@
 <template>
     <v-app>
+        <Notification></Notification>
         <!-- ⭐ 準備完了後に一気表示 -->
         <div
             v-show="appReady"
@@ -23,6 +24,7 @@ import { ref, onMounted, nextTick } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import NavBar from '@/components/NavBar.vue';
 import SideBar from '@/components/SideBar.vue';
+import Notification from '@/components/Notification.vue';
 
 const auth = useAuthStore();
 const appReady = ref(false);

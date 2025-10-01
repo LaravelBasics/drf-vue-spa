@@ -9,7 +9,7 @@ const API_BASE_URL =
 const api = axios.create({
     baseURL: API_BASE_URL,
     withCredentials: true,
-    timeout: 1000,
+    timeout: 5000,
 });
 
 class CSRFManager {

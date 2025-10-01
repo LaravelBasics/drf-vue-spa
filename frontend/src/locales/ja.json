@@ -28,8 +28,8 @@
             "name": "名前",
             "phone": "電話番号",
             "employeeId": "社員番号",
-            "isAdmin": "管理者権限",
-            "isActive": "有効状態",
+            "isAdmin": "管理者",
+            "isActive": "アカウント有効",
             "createdAt": "登録日"
         },
         "placeholders": {
@@ -73,7 +73,9 @@
         "cancel": "キャンセル",
         "back": "戻る",
         "refresh": "更新",
-        "save": "保存"
+        "save": "保存",
+        "admin": "管理",
+        "user": "一般"
     },
     "pages": {
         "home": {
@@ -89,12 +91,21 @@
             "selectLanguage": "言語を選択",
             "generalDescription": "一般的な設定項目がここに表示されます。"
         },
-        "userManagement": {
+        "users": {
             "title": "ユーザー管理",
             "searchPlaceholder": "ユーザー名で検索",
-            "createUser": "新規ユーザー",
-            "deleteConfirm": "ユーザー削除確認",
-            "deleteMessage": "ユーザー「{username}」を削除しますか？"
+            "createButton": "新規ユーザー",
+            "createTitle": "ユーザー新規作成",
+            "editTitle": "ユーザー編集",
+            "deleteTitle": "ユーザー削除",
+            "cannotDeleteLastAdmin": "最後の管理者は削除できません",
+            "createSuccess": "ユーザー「{username}」を作成しました",
+            "updateSuccess": "ユーザー「{username}」を更新しました",
+            "deleteSuccess": "ユーザー「{username}」を削除しました",
+            "createError": "ユーザーの作成に失敗しました",
+            "updateError": "ユーザーの更新に失敗しました",
+            "deleteError": "ユーザーの削除に失敗しました",
+            "fetchError": "ユーザー情報の取得に失敗しました"
         },
         "userCreate": {
             "title": "ユーザー新規作成"
@@ -104,7 +115,7 @@
         },
         "userDelete": {
             "title": "ユーザー削除確認",
-            "warningMessage": "このユーザーを削除すると、元に戻すことはできません。削除する前に、本当に削除してよいか確認してください。",
+            "warningMessage": "このユーザーを削除すると、元に戻すことはできません。",
             "confirmMessage": "ユーザー「{username}」を削除してもよろしいですか？",
             "lastAdminError": "管理者は最低1人必要です。最後の管理者を削除することはできません。"
         }

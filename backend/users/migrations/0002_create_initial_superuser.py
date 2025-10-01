@@ -1,5 +1,3 @@
-# users/migrations/0002_auto_20250929_2249.py (ファイル名は合わせること)
-
 from django.db import migrations
 
 def create_initial_superuser(apps, schema_editor):
