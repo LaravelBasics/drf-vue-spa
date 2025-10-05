@@ -1,8 +1,5 @@
 <template>
-    <Header app-title="受注管理システム" :page-buttons="headerButtons">
-    </Header>
-
-    <h1>受注一覧</h1>
+    <Header app-title="設定" :page-buttons="headerButtons"> </Header>
 </template>
 
 <script setup>

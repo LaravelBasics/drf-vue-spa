@@ -74,7 +74,7 @@ class LoginAPIView(APIView):
             })
         
         return Response(
-            {'detail': '社員コードまたはパスワードが正しくありません'}, 
+            {'detail': '社員番号またはパスワードが正しくありません'}, 
             status=status.HTTP_401_UNAUTHORIZED
         )
 

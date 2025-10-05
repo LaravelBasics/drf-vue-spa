@@ -3,46 +3,20 @@
     <Header :app-title="t('pages.home.title')" :page-buttons="headerButtons">
     </Header>
 
-    <!-- メインコンテンツ -->
-    <v-container>
-        <v-row>
-            <v-col cols="12">
-                <h1>{{ t('pages.home.orderList') }}</h1>
-            </v-col>
-        </v-row>
-
-        <!-- デモ用カード -->
-        <v-row>
-            <v-col cols="12" md="6" lg="4">
-                <v-card
-                    :elevation="getComponentConfig('card', 'elevation')"
-                    :rounded="getComponentConfig('card', 'borderRadius')"
-                >
-                    <v-card-title class="d-flex align-center">
-                        <v-icon
-                            :color="colors.current.success"
-                            :size="getSize('md')"
-                            class="me-2"
-                        >
-                            {{ getIcon('status', 'success') }}
-                        </v-icon>
-                        {{ t('status.success') }}
-                    </v-card-title>
-                    <v-card-text>
-                        Lorem ipsum dolor sit amet consectetur.
-                    </v-card-text>
-                </v-card>
-            </v-col>
-        </v-row>
-    </v-container>
+    <!-- メニューカードグリッド -->
+    <MenuCardGrid :items="menuItems" />
 </template>
 
 <script setup>
 import { useI18n } from 'vue-i18n';
+import { useRouter } from 'vue-router';
 import { useDesignSystem } from '@/composables/useDesignSystem';
 import Header from '@/components/Header.vue';
+import MenuCardGrid from '@/components/MenuCardGrid.vue';
+import { routes } from '@/constants/routes';
 
 const { t } = useI18n();
+const router = useRouter();
 const { colors, getIcon, getSize, getComponentConfig } = useDesignSystem();
 
 const headerButtons = [
@@ -63,6 +37,61 @@ const headerButtons = [
         action: createNewOrder,
         icon: 'mdi-plus',
         type: 'primary',
+    },
+];
+
+// メニューカードの定義
+const menuItems = [
+    {
+        icon: 'mdi-account-cog',
+        title: '管理者メニュー',
+        to: routes.ADMIN,
+        color: 'primary',
+    },
+    {
+        icon: 'mdi-account-group',
+        title: 'ユーザー管理',
+        to: '/users',
+        color: 'blue',
+    },
+    {
+        icon: 'mdi-shopping',
+        title: '注文',
+        to: '/orders',
+        color: 'success',
+    },
+    {
+        icon: 'mdi-package-variant',
+        title: '商品',
+        to: '/products',
+        color: 'orange',
+    },
+    {
+        icon: 'mdi-chart-line',
+        title: '分析',
+        to: '/analytics',
+        color: 'purple',
+    },
+    {
+        icon: 'mdi-cog',
+        title: '設定',
+        to: '/settings',
+        color: 'grey-darken-1',
+    },
+    {
+        icon: 'mdi-shield-account',
+        title: '権限',
+        onClick: () => {
+            console.log('権限管理を開く');
+            router.push('/permissions');
+        },
+        color: 'red',
+    },
+    {
+        icon: 'mdi-file-document',
+        title: 'レポート',
+        to: '/reports',
+        color: 'teal',
     },
 ];
 

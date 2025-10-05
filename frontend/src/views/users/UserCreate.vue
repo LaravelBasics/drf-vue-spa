@@ -68,6 +68,8 @@
                                         {{ t('common.create') }}
                                     </v-btn>
 
+                                    <v-spacer></v-spacer>
+
                                     <v-btn
                                         variant="outlined"
                                         size="large"
@@ -113,6 +115,11 @@ const formData = ref({
 
 const breadcrumbs = computed(() => [
     { title: t('nav.home'), to: routes.HOME, disabled: false },
+    {
+        title: t('pages.admin.title'),
+        to: routes.ADMIN,
+        disabled: false,
+    },
     { title: t('pages.users.title'), to: routes.USERS, disabled: false },
     { title: t('pages.users.createTitle'), disabled: true },
 ]);
@@ -139,7 +146,7 @@ async function submitForm() {
                 username: formData.value.username,
             }),
         );
-        router.push(routes.USERS);
+        router.replace(routes.USERS);
     } catch (error) {
         console.error('ユーザー作成エラー:', error);
 
@@ -156,6 +163,6 @@ async function submitForm() {
 }
 
 function goBack() {
-    router.push(routes.USERS);
+    router.replace(routes.USERS);
 }
 </script>

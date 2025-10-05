@@ -11,7 +11,7 @@ class LoginSerializer(serializers.Serializer):
     employee_id = serializers.CharField(
         max_length=20,
         required=True,
-        help_text='ログインに使用する社員コード'
+        help_text='ログインに使用する社員番号'
     )
     password = serializers.CharField(
         write_only=True,
@@ -25,6 +25,6 @@ class LoginSerializer(serializers.Serializer):
         password = attrs.get('password')
         
         if not employee_id or not password:
-            raise serializers.ValidationError('社員コードとパスワードは必須です')
+            raise serializers.ValidationError('社員番号とパスワードは必須です')
         
         return attrs

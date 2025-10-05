@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
                 ('password', models.CharField(max_length=128, verbose_name='password')),
                 ('last_login', models.DateTimeField(blank=True, null=True, verbose_name='last login')),
                 ('is_superuser', models.BooleanField(default=False, help_text='Designates that this user has all permissions without explicitly assigning them.', verbose_name='superuser status')),
-                ('employee_id', models.CharField(db_index=True, help_text='ログイン認証に使用する一意の社員コード', max_length=20, unique=True, verbose_name='社員コード')),
+                ('employee_id', models.CharField(db_index=True, help_text='ログイン認証に使用する一意の社員番号', max_length=20, unique=True, verbose_name='社員番号')),
                 ('username', models.CharField(blank=True, help_text='表示用のユーザー名（ユニーク制約なし）', max_length=50, null=True, verbose_name='ユーザー名')),
                 ('email', models.EmailField(blank=True, help_text='メールアドレス（任意）', max_length=255, null=True, verbose_name='メールアドレス')),
                 ('is_admin', models.BooleanField(default=False, help_text='管理者権限を持つかどうか', verbose_name='管理者')),

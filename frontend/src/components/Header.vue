@@ -25,6 +25,7 @@
                     :to="item.to"
                     :disabled="item.disabled"
                     class="text-subtitle-2"
+                    :color="item.disabled ? 'default' : 'primary'"
                 >
                     {{ item.title }}
                 </v-breadcrumbs-item>

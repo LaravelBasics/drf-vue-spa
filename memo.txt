@@ -61,3 +61,35 @@ const headers = computed(() => [
         sortable: false,
         width: 80,
     },
+
+
+import { routes } from '@/constants/routes';
+routes.LOGIN
+
+（Vue 3/Vuetify 3の推奨） プロパティ (:icon="...") の使用が推奨
+import { ICONS } from '@/constants/icons';
+<v-icon :icon="ICONS.action.edit"></v-icon>
+
+ja.json
+{
+  "form": {
+    "fields": {
+      "employeeId": "社員ID",
+      "password": "パスワード"
+    },
+    "hints": {
+      // ⭐ パスワードのヒント用キーを追加
+      "password_requirements": "8文字以上、英字と数字を含む" 
+    },
+    "buttons": {
+      "login": "ログイン"
+    }
+  },
+  // ... (その他の翻訳キー)
+}
+
+// i18n の t 関数を取得
+import { useI18n } from 'vue-i18n';
+const { t } = useI18n();
+↓
+ :hint="t('form.hints.password_requirements')" 

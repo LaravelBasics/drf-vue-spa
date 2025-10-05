@@ -123,6 +123,11 @@ const formData = ref({
 
 const breadcrumbs = computed(() => [
     { title: t('nav.home'), to: routes.HOME, disabled: false },
+    {
+        title: t('pages.admin.title'),
+        to: routes.ADMIN,
+        disabled: false,
+    },
     { title: t('pages.users.title'), to: routes.USERS, disabled: false },
     { title: t('pages.users.editTitle'), disabled: true },
 ]);
@@ -168,7 +173,7 @@ async function submitForm() {
                 username: formData.value.username,
             }),
         );
-        router.push(routes.USERS);
+        router.replace(routes.USERS);
     } catch (error) {
         console.error('ユーザー更新エラー:', error);
         // ⭐ エラー通知
@@ -184,7 +189,7 @@ async function submitForm() {
 }
 
 function goBack() {
-    router.push(routes.USERS);
+    router.replace(routes.USERS);
 }
 
 onMounted(() => {

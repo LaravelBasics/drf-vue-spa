@@ -39,6 +39,7 @@ import { useI18n } from 'vue-i18n';
 import { useUiStore } from '@/stores/ui';
 import { useDesignSystem } from '@/composables/useDesignSystem';
 import { routes } from '@/constants/routes';
+import { ICONS } from '@/constants/icons';
 
 const { t, locale } = useI18n();
 const ui = useUiStore();
@@ -57,8 +58,8 @@ const navItems = computed(() => [
     { title: t('nav.settings'), icon: 'mdi-cog', to: routes.SETTINGS },
     {
         title: t('nav.management'),
-        icon: 'mdi-account-group',
-        to: routes.USERS,
+        icon: ICONS.nav.management,
+        to: routes.ADMIN,
     },
 ]);
 

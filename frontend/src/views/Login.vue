@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useValidation } from '@/composables/useValidation';
 import { useDesignSystem } from '@/composables/useDesignSystem';
 import { messages } from '@/constants/messages';
+import { routes } from '@/constants/routes';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -48,7 +49,7 @@ async function onSubmit() {
         isVisible.value = false;
 
         setTimeout(async () => {
-            const redirect = route.query.next || '/';
+            const redirect = route.query.next || routes.HOME;
             await router.push(redirect);
         }, 300); // フェードアウト時間と合わせる
     } else {

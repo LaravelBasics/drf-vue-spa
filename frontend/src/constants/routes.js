@@ -14,6 +14,7 @@ export const routes = Object.freeze({
     SETTINGS: '/settings',
 
     // 管理機能
+    ADMIN: '/admin',
     USERS: '/users',
     USER_CREATE: '/users/create',
     USER_EDIT: '/users/:id/edit',

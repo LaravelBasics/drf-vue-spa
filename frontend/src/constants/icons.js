@@ -10,6 +10,7 @@ export const ICONS = Object.freeze({
         profile: 'mdi-account',
         logout: 'mdi-power',
         divider: 'mdi-chevron-right',
+        management: 'mdi-account-cog',
     },
 
     // アクション

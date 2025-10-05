@@ -5,6 +5,7 @@ import { ref, computed } from 'vue';
 import { authAPI } from '@/api/auth';
 import { resetCSRFToken } from '@/plugins/axios';
 import router from '@/router';
+import { routes } from '@/constants/routes';
 
 export const useAuthStore = defineStore(
     'auth',
@@ -77,9 +78,9 @@ export const useAuthStore = defineStore(
 
                 if (
                     redirect &&
-                    router.currentRoute.value.path !== '/auth/login'
+                    router.currentRoute.value.path !== routes.LOGIN
                 ) {
-                    router.push('/auth/login').catch((err) => {
+                    router.push(routes.LOGIN).catch((err) => {
                         console.warn('リダイレクトエラー:', err);
                     });
                 }

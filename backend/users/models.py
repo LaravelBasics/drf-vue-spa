@@ -10,7 +10,7 @@ class CustomUserManager(BaseUserManager):
     def create_user(self, employee_id, password=None, **extra_fields):
         """通常のユーザーを作成"""
         if not employee_id:
-            raise ValueError('社員コードは必須です')
+            raise ValueError('社員番号は必須です')
         
         # デフォルト値を設定
         extra_fields.setdefault('is_active', True)
@@ -47,7 +47,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     カスタムユーザーモデル
     
     特徴:
-    - employee_id（社員コード）で認証
+    - employee_id（社員番号）で認証
     - username（ユーザー名）はユニーク制約なしの表示名
     - 論理削除対応
     - email は任意（必要に応じて unique 制約を追加可能）
@@ -55,11 +55,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     
     # ==================== 認証フィールド ====================
     employee_id = models.CharField(
-        '社員コード',
+        '社員番号',
         max_length=20,
         unique=True,
         db_index=True,
-        help_text='ログイン認証に使用する一意の社員コード'
+        help_text='ログイン認証に使用する一意の社員番号'
     )
     
     # ==================== 表示名・個人情報 ====================

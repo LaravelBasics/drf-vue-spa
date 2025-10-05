@@ -88,13 +88,13 @@
                 <!-- アクション列 -->
                 <template v-slot:item.actions-edit="{ item }">
                     <v-btn
-                        icon="mdi-pencil"
+                        :icon="ICONS.action.edit"
                         size="small"
                         variant="text"
                         color="primary"
                         @click="goToEdit(item.id)"
                     >
-                        <v-icon>mdi-pencil</v-icon>
+                        <v-icon :icon="ICONS.action.edit"></v-icon>
                         <v-tooltip activator="parent" location="top">
                             {{ t('common.edit') }}
                         </v-tooltip>
@@ -110,7 +110,7 @@
                         @click="goToDelete(item.id)"
                         :disabled="!canDelete(item)"
                     >
-                        <v-icon>mdi-delete</v-icon>
+                        <v-icon :icon="ICONS.action.delete"></v-icon>
                         <v-tooltip activator="parent" location="top">
                             {{
                                 canDelete(item)
@@ -165,6 +165,11 @@ const breadcrumbs = computed(() => [
     {
         title: t('nav.home'),
         to: routes.HOME,
+        disabled: false,
+    },
+    {
+        title: t('pages.admin.title'),
+        to: routes.ADMIN,
         disabled: false,
     },
     {

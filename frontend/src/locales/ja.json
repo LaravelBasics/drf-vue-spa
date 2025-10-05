@@ -18,7 +18,7 @@
         "profile": "プロフィール",
         "settings": "設定",
         "menu": "メニュー",
-        "management": "管理"
+        "management": "管理者メニュー"
     },
     "form": {
         "fields": {
@@ -27,7 +27,7 @@
             "email": "メールアドレス",
             "name": "名前",
             "phone": "電話番号",
-            "employeeId": "社員コード",
+            "employeeId": "社員番号",
             "isAdmin": "管理者",
             "isActive": "アカウント有効",
             "createdAt": "登録日"
@@ -56,7 +56,8 @@
         "filter": "フィルター",
         "refresh": "更新",
         "export": "エクスポート",
-        "download": "ダウンロード"
+        "download": "ダウンロード",
+        "back": "戻る"
     },
     "status": {
         "success": "成功",
@@ -81,8 +82,11 @@
     },
     "pages": {
         "home": {
-            "title": "ホーム画面",
+            "title": "ホーム",
             "orderList": "受注一覧"
+        },
+        "admin": {
+            "title": "管理者"
         },
         "settings": {
             "title": "設定",
@@ -110,7 +114,7 @@
             "fetchError": "ユーザー情報の取得に失敗しました"
         },
         "userCreate": {
-            "title": "ユーザー新規作成"
+            "title": "新規作成"
         },
         "userEdit": {
             "title": "ユーザー編集"

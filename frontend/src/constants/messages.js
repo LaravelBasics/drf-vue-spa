@@ -12,14 +12,14 @@ export const messages = {
     auth: {
         loginFailed:
             'ログインに失敗しました。ユーザー名またはパスワードが正しくありません。',
-        invalidCredentials: 'ユーザー名またはパスワードが違います',
+        invalidCredentials: '社員番号またはパスワードが違います',
         sessionExpired:
             'セッションの有効期限が切れました。再度ログインしてください。',
     },
 
     // フィールド名
     fields: {
-        employeeId: '社員コード',
+        employeeId: '社員番号',
         password: 'パスワード',
         username: 'ユーザー名',
         email: 'メールアドレス',

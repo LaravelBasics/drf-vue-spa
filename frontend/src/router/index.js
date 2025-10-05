@@ -30,6 +30,17 @@ const router = createRouter({
             component: () => import('@/views/Login.vue'),
             meta: { hideForAuth: true, transition: 'fade' },
         },
+
+        // 管理者権限必要
+        {
+            path: '/admin',
+            name: 'AdminMenu',
+            component: () => import('@/views/admin/AdminMenu.vue'),
+            meta: {
+                requiresAuth: true,
+                // requiresAdmin: true,
+            },
+        },
         // ユーザー管理（一覧）
         {
             path: routes.USERS,

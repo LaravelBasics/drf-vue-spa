@@ -147,7 +147,7 @@ class Command(BaseCommand):
                     self.stdout.write(f'  ... 他 {len(users_to_create) - 5}人')
                 
                 self.stdout.write(f'\nログイン情報:')
-                self.stdout.write(f'  社員コード: {users_to_create[0].employee_id}')
+                self.stdout.write(f'  社員番号: {users_to_create[0].employee_id}')
                 self.stdout.write(f'  パスワード: {default_password}')
                 
             except Exception as e:

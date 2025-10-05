@@ -126,9 +126,10 @@
                                 <v-btn
                                     variant="outlined"
                                     size="large"
+                                    prepend-icon="mdi-arrow-left"
                                     @click="router.back()"
                                 >
-                                    {{ t('common.cancel') }}
+                                    {{ t('common.back') }}
                                 </v-btn>
                             </div>
                         </v-card-text>
@@ -171,7 +172,7 @@ const allUsers = ref([]);
 const breadcrumbs = computed(() => [
     {
         title: t('nav.home'),
-        to: '/',
+        to: routes.HOME,
         disabled: false,
     },
     {
@@ -232,7 +233,7 @@ async function deleteUser() {
         notification.success(
             t('pages.users.deleteSuccess', { username: user.value.username }),
         );
-        router.push(routes.USERS);
+        router.replace(routes.USERS);
     } catch (error) {
         console.error('ユーザー削除エラー:', error);
 

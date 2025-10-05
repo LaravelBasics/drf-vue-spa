@@ -48,13 +48,13 @@ class UserCreateSerializer(serializers.ModelSerializer):
         ]
     
     def validate_employee_id(self, value):
-        """社員コードのバリデーション"""
+        """社員番号のバリデーション"""
         if not value.strip():
-            raise serializers.ValidationError('社員コードは必須です')
+            raise serializers.ValidationError('社員番号は必須です')
         
         # 既存チェック（論理削除済みも含む）
         if User.all_objects.filter(employee_id=value, deleted_at__isnull=True).exists():
-            raise serializers.ValidationError('この社員コードは既に使用されています')
+            raise serializers.ValidationError('この社員番号は既に使用されています')
         
         return value.strip()
     
@@ -137,7 +137,7 @@ class LoginSerializer(serializers.Serializer):
     employee_id = serializers.CharField(
         max_length=20,
         required=True,
-        help_text='ログインに使用する社員コード'
+        help_text='ログインに使用する社員番号'
     )
     
     password = serializers.CharField(
@@ -152,6 +152,6 @@ class LoginSerializer(serializers.Serializer):
         password = attrs.get('password')
         
         if not employee_id or not password:
-            raise serializers.ValidationError('社員コードとパスワードは必須です')
+            raise serializers.ValidationError('社員番号とパスワードは必須です')
         
         return attrs
