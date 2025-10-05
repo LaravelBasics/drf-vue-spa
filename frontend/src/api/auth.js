@@ -5,8 +5,8 @@ export const authAPI = {
         return api.get('auth/csrf/');
     },
 
-    login(username, password) {
-        return api.post('auth/login/', { username, password });
+    login(employeeId, password) {
+        return api.post('auth/login/', { employee_id: employeeId, password });
     },
 
     logout() {

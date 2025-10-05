@@ -85,7 +85,7 @@ api.interceptors.response.use(
         if (response) {
             // 認証エラーハンドリング
             if ([401, 403].includes(response.status)) {
-                const isLogoutRequest = config.url?.endsWith('auth/ogout/');
+                const isLogoutRequest = config.url?.endsWith('auth/logout/');
 
                 if (!isLogoutRequest) {
                     // ⭐ 直接ストアを呼び出し（コールバック不要）

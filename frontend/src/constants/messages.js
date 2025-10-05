@@ -19,8 +19,9 @@ export const messages = {
 
     // フィールド名
     fields: {
-        username: 'ユーザー名',
+        employeeId: '社員コード',
         password: 'パスワード',
+        username: 'ユーザー名',
         email: 'メールアドレス',
         name: '名前',
         phone: '電話番号',

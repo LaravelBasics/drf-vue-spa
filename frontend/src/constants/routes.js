@@ -2,8 +2,8 @@
 
 export const routes = Object.freeze({
     // 認証関連
-    LOGIN: '/login',
-    LOGOUT: '/logout',
+    LOGIN: '/auth/login',
+    LOGOUT: '/auth/logout',
 
     // メインページ
     HOME: '/',

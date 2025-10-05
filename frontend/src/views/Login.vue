@@ -14,7 +14,7 @@ const { t } = useI18n();
 const { createRules } = useValidation();
 const { colors, getIcon, getSize } = useDesignSystem();
 
-const username = ref('');
+const employeeId = ref('');
 const password = ref('');
 const error = ref('');
 const loading = ref(false);
@@ -22,7 +22,7 @@ const isVisible = ref(false); // ⭐ フェードイン制御
 const form = ref(null); // ⭐ これを追加！フォームを参照するための ref を定義します ⭐
 
 // ⭐ バリデーションルールを分離
-const nameRules = createRules.loginUsername();
+const employeeIdRules = createRules.loginUseremployeeId();
 const passwordRules = createRules.loginPassword();
 
 // ⭐ マウント時にスムーズフェードイン
@@ -40,7 +40,7 @@ async function onSubmit() {
     error.value = '';
     loading.value = true;
 
-    const result = await auth.loginSession(username.value, password.value);
+    const result = await auth.loginSession(employeeId.value, password.value);
     loading.value = false;
 
     if (result.success) {
@@ -80,16 +80,16 @@ async function onSubmit() {
                     <v-card-text class="py-6 px-6">
                         <v-form @submit.prevent="onSubmit" ref="form">
                             <v-text-field
-                                v-model="username"
+                                v-model="employeeId"
                                 :label="
-                                    t('form.placeholders.enterUsername', {
-                                        field: t('form.fields.username'),
+                                    t('form.placeholders.employeeId', {
+                                        field: t('form.fields.employeeId'),
                                     })
                                 "
                                 :prepend-inner-icon="getIcon('form', 'user')"
                                 variant="outlined"
                                 class="mt-1 mb-2"
-                                :rules="nameRules"
+                                :rules="employeeIdRules"
                             />
                             <v-text-field
                                 v-model="password"

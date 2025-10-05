@@ -17,7 +17,7 @@ const router = createRouter({
 
         // ⭐ その他の認証が必要なページ
         {
-            path: routes.SETTINGS, // '/settings'
+            path: routes.SETTINGS,
             name: 'Settings',
             component: () => import('@/views/Settings.vue'),
             meta: { requiresAuth: true },
@@ -25,7 +25,7 @@ const router = createRouter({
 
         // ⭐ ログインページ（認証不要）
         {
-            path: routes.LOGIN, // '/login'
+            path: routes.LOGIN, // '/auth/login'
             name: 'Login',
             component: () => import('@/views/Login.vue'),
             meta: { hideForAuth: true, transition: 'fade' },
@@ -68,7 +68,7 @@ const router = createRouter({
         {
             path: '/:pathMatch(.*)*',
             name: 'NotFound',
-            redirect: routes.HOME, // ホームにリダイレクト
+            redirect: routes.LOGIN, // ホームにリダイレクト
         },
     ],
     // ⭐ スクロール位置制御（ちらつき防止）

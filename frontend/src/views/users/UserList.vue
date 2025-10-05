@@ -7,8 +7,8 @@
 
         <v-container fluid class="pa-6">
             <!-- 検索・操作エリア -->
-            <v-row class="mb-1">
-                <v-col>
+            <v-row class="mb-1 align-center">
+                <v-col cols="auto">
                     <v-text-field
                         v-model="searchQuery"
                         :label="t('pages.users.searchPlaceholder')"
@@ -17,9 +17,9 @@
                         density="compact"
                         clearable
                         hide-details
+                        style="width: 400px"
                         @update:model-value="handleSearchInput"
                     >
-                        <!-- 検索中インジケーター -->
                         <template v-slot:append-inner v-if="searching">
                             <v-progress-circular
                                 indeterminate
@@ -30,7 +30,13 @@
                         </template>
                     </v-text-field>
                 </v-col>
-                <v-col class="d-flex align-end justify-end">
+                <v-col cols="auto">
+                    <div class="text-body-2 text-grey-darken-1">
+                        {{ startItem }}-{{ endItem }} / {{ totalItems }}件
+                    </div>
+                </v-col>
+                <v-spacer />
+                <v-col cols="auto">
                     <v-btn
                         color="primary"
                         size="default"
@@ -47,20 +53,16 @@
                 :headers="headers"
                 :items="users"
                 :loading="loading"
-                :items-per-page="itemsPerPage"
-                :items-length="totalItems"
-                :page="currentPage"
                 class="elevation-2"
                 density="compact"
-                hide-default-footer
                 hover
-                @update:page="handlePageChange"
-                @update:items-per-page="handleItemsPerPageChange"
+                hide-default-footer
+                @update:sort-by="handleSortChange"
             >
-                <!-- No列（index+1） -->
-                <template v-slot:item.id="{ item, index }">
+                <!-- ID列 -->
+                <template v-slot:item.id="{ item }">
                     <span class="font-weight-medium">
-                        {{ (currentPage - 1) * itemsPerPage + index + 1 }}
+                        {{ item.id }}
                     </span>
                 </template>
 
@@ -120,20 +122,21 @@
                 </template>
             </v-data-table>
 
-            <!-- <div class="d-flex justify-center mt-2">
+            <!-- ページネーション -->
+            <div class="d-flex justify-center mt-4">
                 <v-pagination
-                    :length="Math.ceil(totalItems / itemsPerPage)"
                     v-model="currentPage"
-                    :total-visible="3"
+                    :length="totalPages"
+                    :total-visible="7"
                     @update:model-value="handlePageChange"
                 />
-            </div> -->
+            </div>
         </v-container>
     </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import Header from '@/components/Header.vue';
@@ -152,6 +155,7 @@ const searchQuery = ref('');
 const currentPage = ref(1);
 const itemsPerPage = ref(10);
 const totalItems = ref(0);
+const sortBy = ref([]);
 
 // デバウンス用タイマー
 let searchTimer = null;
@@ -169,49 +173,67 @@ const breadcrumbs = computed(() => [
     },
 ]);
 
-// テーブルヘッダー
+// テーブルヘッダー（ソート可能）
 const headers = computed(() => [
     {
-        title: t('common.number'),
+        title: 'ID',
         key: 'id',
-        sortable: false,
+        sortable: true,
         width: 80,
     },
     {
         title: t('form.fields.username'),
         key: 'username',
-        sortable: false,
+        sortable: true,
     },
     {
         title: t('form.fields.employeeId'),
         key: 'employee_id',
-        sortable: false,
+        sortable: true,
     },
     {
         title: t('form.fields.isAdmin'),
         key: 'is_admin',
-        sortable: false,
+        sortable: true,
+        align: 'center',
     },
     {
         title: t('form.fields.createdAt'),
         key: 'created_at',
-        sortable: false,
+        sortable: true,
     },
     {
         title: t('common.edit'),
         key: 'actions-edit',
         sortable: false,
-        width: 60,
+        align: 'center',
+        width: 80,
     },
     {
         title: t('common.delete'),
         key: 'actions-delete',
         sortable: false,
-        width: 60,
+        align: 'center',
+        width: 80,
     },
 ]);
 
-// データ取得（サーバーサイド）
+// ページ数計算
+const totalPages = computed(() =>
+    Math.ceil(totalItems.value / itemsPerPage.value),
+);
+
+// 表示範囲計算
+const startItem = computed(() => {
+    if (totalItems.value === 0) return 0;
+    return (currentPage.value - 1) * itemsPerPage.value + 1;
+});
+
+const endItem = computed(() => {
+    return Math.min(currentPage.value * itemsPerPage.value, totalItems.value);
+});
+
+// データ取得
 async function fetchUsers() {
     loading.value = true;
     try {
@@ -220,19 +242,24 @@ async function fetchUsers() {
             page_size: itemsPerPage.value,
         };
 
-        // 検索クエリがある場合のみ追加
+        // 検索クエリ
         if (searchQuery.value && searchQuery.value.trim()) {
             params.search = searchQuery.value.trim();
         }
 
+        // ソート条件
+        if (sortBy.value.length > 0) {
+            const sort = sortBy.value[0];
+            const orderPrefix = sort.order === 'desc' ? '-' : '';
+            params.ordering = `${orderPrefix}${sort.key}`;
+        }
+
         const response = await usersAPI.list(params);
 
-        // DRF のページネーション形式に対応
         if (response.data.results) {
             users.value = response.data.results;
             totalItems.value = response.data.count;
         } else {
-            // ページネーションなしの場合
             users.value = response.data;
             totalItems.value = response.data.length;
         }
@@ -244,18 +271,16 @@ async function fetchUsers() {
     }
 }
 
-// 検索入力ハンドラー（デバウンス）
+// 検索入力ハンドラー
 function handleSearchInput(value) {
     searching.value = true;
 
-    // 既存のタイマーをクリア
     if (searchTimer) {
         clearTimeout(searchTimer);
     }
 
-    // 500ms 待機してから検索実行
     searchTimer = setTimeout(() => {
-        currentPage.value = 1; // 検索時はページをリセット
+        currentPage.value = 1;
         fetchUsers();
         updateURLParams();
     }, 500);
@@ -269,14 +294,21 @@ function handlePageChange(page) {
 }
 
 // 表示件数変更ハンドラー
-function handleItemsPerPageChange(perPage) {
-    itemsPerPage.value = perPage;
+function handleItemsPerPageChange() {
     currentPage.value = 1;
     fetchUsers();
     updateURLParams();
 }
 
-// URL パラメータを更新（ブックマーク対応）
+// ソート変更ハンドラー
+function handleSortChange(newSortBy) {
+    sortBy.value = newSortBy;
+    currentPage.value = 1;
+    fetchUsers();
+    updateURLParams();
+}
+
+// URL パラメータ更新
 function updateURLParams() {
     const query = {};
 
@@ -290,6 +322,13 @@ function updateURLParams() {
 
     if (itemsPerPage.value !== 10) {
         query.per_page = itemsPerPage.value;
+    }
+
+    // ソート条件
+    if (sortBy.value.length > 0) {
+        const sort = sortBy.value[0];
+        query.sort = sort.key;
+        query.order = sort.order;
     }
 
     router.replace({ query });
@@ -309,6 +348,16 @@ function initFromURLParams() {
 
     if (query.per_page) {
         itemsPerPage.value = parseInt(query.per_page);
+    }
+
+    // ソート条件復元
+    if (query.sort && query.order) {
+        sortBy.value = [
+            {
+                key: query.sort,
+                order: query.order,
+            },
+        ];
     }
 }
 

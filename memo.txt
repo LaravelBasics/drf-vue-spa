@@ -1,376 +1,63 @@
+0002_create_initial_superuser.py
+
+# backend/users/migrations/0002_create_initial_superuser.py
+from django.db import migrations
 
 
-検索
-<template>
-    <div>
-        <Header
-            :app-title="t('pages.users.title')"
-            :breadcrumbs="breadcrumbs"
-        />
+def create_initial_superuser(apps, schema_editor):
+    """初期管理者ユーザーを作成"""
+    User = apps.get_model('users', 'User')
+    
+    # 既に管理者が存在する場合はスキップ
+    if User.objects.filter(is_admin=True).exists():
+        return
+    
+    # employee_id で管理者が存在しないか確認
+    if not User.objects.filter(employee_id='9999').exists():
+        # ⚠️ create_superuser は使えないので、直接作成してパスワードをハッシュ化
+        from django.contrib.auth.hashers import make_password
+        
+        User.objects.create(
+            employee_id='9999',  # ← 認証IDとして employee_id を使用
+            username='管理者',     # ← 表示名（ユニーク制約なし）
+            email='admin@example.com',
+            password=make_password('test1234'),  # ← 初期パスワード（後で変更推奨）
+            is_admin=True,
+            is_staff=True,
+            is_superuser=True,
+            is_active=True,
+        )
 
-        <v-container fluid class="pa-6">
-            <!-- 検索・操作エリア -->
-            <v-row class="mb-4">
-                <v-col cols="12" md="7">
-                    <v-text-field
-                        v-model="searchQuery"
-                        :label="t('pages.users.searchPlaceholder')"
-                        prepend-inner-icon="mdi-magnify"
-                        variant="outlined"
-                        density="comfortable"
-                        clearable
-                        hide-details
-                        @keyup.enter="handleSearch"
-                    />
-                </v-col>
-                <v-col cols="12" md="2" class="d-flex align-end">
-                    <v-btn
-                        color="primary"
-                        size="large"
-                        block
-                        prepend-icon="mdi-magnify"
-                        @click="handleSearch"
-                        :loading="loading"
-                    >
-                        {{ t('common.search') }}
-                    </v-btn>
-                </v-col>
-                <v-col cols="12" md="3" class="d-flex align-end justify-end">
-                    <v-btn
-                        color="primary"
-                        size="large"
-                        prepend-icon="mdi-plus"
-                        @click="goToCreate"
-                    >
-                        {{ t('pages.users.createButton') }}
-                    </v-btn>
-                </v-col>
-            </v-row>
 
-            <!-- データテーブル -->
-            <v-data-table
-                :headers="headers"
-                :items="users"
-                :loading="loading"
-                :items-per-page="itemsPerPage"
-                :items-length="totalItems"
-                :page="currentPage"
-                class="elevation-2"
-                @update:page="handlePageChange"
-                @update:items-per-page="handleItemsPerPageChange"
-            >
-                <!-- No列（index+1） -->
+def reverse_func(apps, schema_editor):
+    """ロールバック処理（必要に応じて）"""
+    User = apps.get_model('users', 'User')
+    User.objects.filter(employee_id='admin').delete()
+
+
+class Migration(migrations.Migration):
+    
+    dependencies = [
+        ('users', '0001_initial'),  # 前のマイグレーションに依存
+    ]
+    
+    operations = [
+        migrations.RunPython(create_initial_superuser, reverse_func),
+    ]
+
+*********************************************************
+ <!-- No列（index+1） -->
                 <template v-slot:item.id="{ item, index }">
                     <span class="font-weight-medium">
                         {{ (currentPage - 1) * itemsPerPage + index + 1 }}
                     </span>
                 </template>
 
-                <!-- 管理者フラグ -->
-                <template v-slot:item.is_admin="{ item }">
-                    <v-chip
-                        :color="item.is_admin ? 'success' : 'default'"
-                        size="small"
-                        variant="flat"
-                    >
-                        <v-icon
-                            :icon="
-                                item.is_admin
-                                    ? 'mdi-shield-check'
-                                    : 'mdi-account'
-                            "
-                            size="small"
-                            class="mr-1"
-                        />
-                        {{
-                            item.is_admin ? t('common.admin') : t('common.user')
-                        }}
-                    </v-chip>
-                </template>
-
-                <!-- 登録日 -->
-                <template v-slot:item.created_at="{ item }">
-                    {{ formatDate(item.created_at) }}
-                </template>
-
-                <!-- アクション列 -->
-                <template v-slot:item.actions="{ item }">
-                    <div class="d-flex gap-2">
-                        <v-btn
-                            icon="mdi-pencil"
-                            size="small"
-                            variant="text"
-                            color="primary"
-                            @click="goToEdit(item.id)"
-                        >
-                            <v-icon>mdi-pencil</v-icon>
-                            <v-tooltip activator="parent" location="top">
-                                {{ t('common.edit') }}
-                            </v-tooltip>
-                        </v-btn>
-
-                        <v-btn
-                            icon="mdi-delete"
-                            size="small"
-                            variant="text"
-                            color="error"
-                            @click="goToDelete(item.id)"
-                            :disabled="!canDelete(item)"
-                        >
-                            <v-icon>mdi-delete</v-icon>
-                            <v-tooltip activator="parent" location="top">
-                                {{
-                                    canDelete(item)
-                                        ? t('common.delete')
-                                        : t('pages.users.cannotDeleteLastAdmin')
-                                }}
-                            </v-tooltip>
-                        </v-btn>
-                    </div>
-                </template>
-            </v-data-table>
-        </v-container>
-    </div>
-</template>
-
-<script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { useI18n } from 'vue-i18n';
-import Header from '@/components/Header.vue';
-import { usersAPI } from '@/api/users';
-import { routes } from '@/constants/routes';
-
-const router = useRouter();
-const route = useRoute();
-const { t } = useI18n();
-
-const users = ref([]);
-const loading = ref(false);
-const searchQuery = ref('');
-const currentPage = ref(1);
-const itemsPerPage = ref(10);
-const totalItems = ref(0);
-
-// パンくずリスト
-const breadcrumbs = computed(() => [
-    {
-        title: t('nav.home'),
-        to: routes.HOME,
-        disabled: false,
-    },
-    {
-        title: t('pages.users.title'),
-        disabled: true,
-    },
-]);
-
-// テーブルヘッダー
+// テーブルヘッダー（ソート可能に変更）
 const headers = computed(() => [
     {
-        title: 'No',
+        title: t('common.number'),
         key: 'id',
         sortable: false,
         width: 80,
     },
-    {
-        title: t('form.fields.username'),
-        key: 'username',
-        sortable: false,
-    },
-    {
-        title: t('form.fields.employeeId'),
-        key: 'employee_id',
-        sortable: false,
-    },
-    {
-        title: t('form.fields.isAdmin'),
-        key: 'is_admin',
-        sortable: false,
-    },
-    {
-        title: t('form.fields.createdAt'),
-        key: 'created_at',
-        sortable: false,
-    },
-    {
-        title: t('common.actions'),
-        key: 'actions',
-        sortable: false,
-        width: 120,
-    },
-]);
-
-// データ取得（サーバーサイド）
-async function fetchUsers() {
-    loading.value = true;
-    try {
-        const params = {
-            page: currentPage.value,
-            page_size: itemsPerPage.value,
-        };
-
-        // 検索クエリがある場合のみ追加
-        if (searchQuery.value && searchQuery.value.trim()) {
-            params.search = searchQuery.value.trim();
-        }
-
-        const response = await usersAPI.list(params);
-
-        // DRF のページネーション形式に対応
-        if (response.data.results) {
-            users.value = response.data.results;
-            totalItems.value = response.data.count;
-        } else {
-            // ページネーションなしの場合
-            users.value = response.data;
-            totalItems.value = response.data.length;
-        }
-    } catch (error) {
-        console.error('ユーザー一覧取得エラー:', error);
-    } finally {
-        loading.value = false;
-    }
-}
-
-// 検索ボタンクリック
-function handleSearch() {
-    currentPage.value = 1; // 検索時はページをリセット
-    fetchUsers();
-    updateURLParams();
-}
-
-// ページ変更ハンドラー
-function handlePageChange(page) {
-    currentPage.value = page;
-    fetchUsers();
-    updateURLParams();
-}
-
-// 表示件数変更ハンドラー
-function handleItemsPerPageChange(perPage) {
-    itemsPerPage.value = perPage;
-    currentPage.value = 1;
-    fetchUsers();
-    updateURLParams();
-}
-
-// URL パラメータを更新（ブックマーク対応）
-function updateURLParams() {
-    const query = {};
-
-    if (searchQuery.value && searchQuery.value.trim()) {
-        query.search = searchQuery.value.trim();
-    }
-
-    if (currentPage.value > 1) {
-        query.page = currentPage.value;
-    }
-
-    if (itemsPerPage.value !== 10) {
-        query.per_page = itemsPerPage.value;
-    }
-
-    router.replace({ query });
-}
-
-// URL パラメータから初期化
-function initFromURLParams() {
-    const query = route.query;
-
-    if (query.search) {
-        searchQuery.value = query.search;
-    }
-
-    if (query.page) {
-        currentPage.value = parseInt(query.page);
-    }
-
-    if (query.per_page) {
-        itemsPerPage.value = parseInt(query.per_page);
-    }
-}
-
-// 削除可能かチェック
-function canDelete(user) {
-    if (!user.is_admin) return true;
-
-    const adminCount = users.value.filter(
-        (u) => u.is_admin && u.is_active,
-    ).length;
-    return adminCount > 1;
-}
-
-// 日付フォーマット
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    });
-}
-
-// ナビゲーション
-function goToCreate() {
-    router.push(routes.USER_CREATE);
-}
-
-function goToEdit(id) {
-    router.push(routes.USER_EDIT.replace(':id', id));
-}
-
-function goToDelete(id) {
-    router.push(routes.USER_DELETE.replace(':id', id));
-}
-
-onMounted(() => {
-    initFromURLParams();
-    fetchUsers();
-});
-</script>
-
-<style scoped>
-.gap-2 {
-    gap: 8px;
-}
-</style>
-
-
-
-0002_create_initial_superuser.py
-
-from django.db import migrations
-
-def create_initial_superuser(apps, schema_editor):
-    # 'users' アプリの 'CustomUser' モデルを取得
-    CustomUser = apps.get_model('users', 'CustomUser')
-    
-    # ユーザーがまだ存在しない場合のみ作成
-    if not CustomUser.objects.filter(username='admin').exists():
-        CustomUser.objects.create_superuser(
-            username='admin',
-            email='admin@example.com',
-            # ★ パスワードは後で変更してください
-            password='testtastaoL1!', 
-            # ★ 必須フィールドである employee_id にユニークな値を設定
-            employee_id=9999
-        )
-
-class Migration(migrations.Migration):
-
-    dependencies = [
-        # 1つ前のマイグレーションファイルを指定 (通常は initial)
-        ('users', '0001_initial'), 
-    ]
-
-    operations = [
-        # データ投入関数を実行
-        migrations.RunPython(create_initial_superuser, reverse_code=migrations.RunPython.noop),
-    ]
-
-python manage.py migrate users
-
-論理削除に変更した場合のコマンド
-python manage.py makemigrations
-python manage.py migrate

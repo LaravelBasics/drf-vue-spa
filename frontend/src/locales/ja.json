@@ -27,13 +27,14 @@
             "email": "メールアドレス",
             "name": "名前",
             "phone": "電話番号",
-            "employeeId": "社員番号",
+            "employeeId": "社員コード",
             "isAdmin": "管理者",
             "isActive": "アカウント有効",
             "createdAt": "登録日"
         },
         "placeholders": {
-            "enterUsername": "{field}を入力してください",
+            "employeeId": "{field}を入力してください",
+            "enterUseremployeeId": "{field}を入力してください",
             "enterPassword": "{field}を入力してください"
         },
         "validation": {

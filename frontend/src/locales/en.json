@@ -44,7 +44,7 @@
             "createdAt": "Created At"
         },
         "placeholders": {
-            "enterUsername": "Enter {field}",
+            "enterUseremployeeId": "Enter {field}",
             "enterPassword": "Enter {field}"
         },
         "validation": {

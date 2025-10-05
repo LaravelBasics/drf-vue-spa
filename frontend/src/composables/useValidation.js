@@ -7,11 +7,12 @@ export function useValidation() {
 
     // よく使われる組み合わせを定義
     const createRules = {
-        // ログイン用ユーザー名
-        loginUsername() {
+        // ログイン用ユーザー名（employeeIdに名前を変更）
+        loginUseremployeeId() {
+            // ★★★ 関数名を一致させる ★★★
             return [
-                rules.required('username'),
-                rules.maxLength('username', 10),
+                rules.required('employeeId'), // 'username' も 'employeeId' に変更
+                rules.maxLength('employeeId', 10),
             ];
         },
 

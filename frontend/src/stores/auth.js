@@ -17,12 +17,12 @@ export const useAuthStore = defineStore(
         const isAuthenticated = computed(() => !!user.value);
         const isLoading = computed(() => loading.value);
 
-        async function loginSession(username, password) {
+        async function loginSession(employeeId, password) {
             loading.value = true;
             error.value = null;
 
             try {
-                await authAPI.login(username, password);
+                await authAPI.login(employeeId, password);
                 await fetchUser();
                 return { success: true };
             } catch (e) {
@@ -75,8 +75,11 @@ export const useAuthStore = defineStore(
                 loading.value = false;
                 resetCSRFToken();
 
-                if (redirect && router.currentRoute.value.path !== '/login') {
-                    router.push('/login').catch((err) => {
+                if (
+                    redirect &&
+                    router.currentRoute.value.path !== '/auth/login'
+                ) {
+                    router.push('/auth/login').catch((err) => {
                         console.warn('リダイレクトエラー:', err);
                     });
                 }

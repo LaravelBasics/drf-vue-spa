@@ -1,28 +1,44 @@
+# backend/users/migrations/0002_create_initial_superuser.py
 from django.db import migrations
 
+
 def create_initial_superuser(apps, schema_editor):
-    # 'users' アプリの 'CustomUser' モデルを取得
-    CustomUser = apps.get_model('users', 'CustomUser')
+    """初期管理者ユーザーを作成"""
+    User = apps.get_model('users', 'User')
     
-    # ユーザーがまだ存在しない場合のみ作成
-    if not CustomUser.objects.filter(username='admin').exists():
-        CustomUser.objects.create_superuser(
-            username='admin',
+    # 既に管理者が存在する場合はスキップ
+    if User.objects.filter(is_admin=True).exists():
+        return
+    
+    # employee_id で管理者が存在しないか確認
+    if not User.objects.filter(employee_id='9999').exists():
+        # ⚠️ create_superuser は使えないので、直接作成してパスワードをハッシュ化
+        from django.contrib.auth.hashers import make_password
+        
+        User.objects.create(
+            employee_id='9999',  # ← 認証IDとして employee_id を使用
+            username='管理者',     # ← 表示名（ユニーク制約なし）
             email='admin@example.com',
-            # ★ パスワードは後で変更してください
-            password='testtastaoL1!', 
-            # ★ 必須フィールドである employee_id にユニークな値を設定
-            employee_id=9999
+            password=make_password('test1234'),  # ← 初期パスワード（後で変更推奨）
+            is_admin=True,
+            is_staff=True,
+            is_superuser=True,
+            is_active=True,
         )
 
+
+def reverse_func(apps, schema_editor):
+    """ロールバック処理（必要に応じて）"""
+    User = apps.get_model('users', 'User')
+    User.objects.filter(employee_id='admin').delete()
+
+
 class Migration(migrations.Migration):
-
+    
     dependencies = [
-        # 1つ前のマイグレーションファイルを指定 (通常は initial)
-        ('users', '0001_initial'), 
+        ('users', '0001_initial'),  # 前のマイグレーションに依存
     ]
-
+    
     operations = [
-        # データ投入関数を実行
-        migrations.RunPython(create_initial_superuser, reverse_code=migrations.RunPython.noop),
+        migrations.RunPython(create_initial_superuser, reverse_func),
     ]

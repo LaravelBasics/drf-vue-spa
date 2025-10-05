@@ -48,7 +48,13 @@ INSTALLED_APPS = [
 ]
 
 # 💡 小文字で指定します
-AUTH_USER_MODEL = 'users.CustomUser'
+# AUTH_USER_MODEL = 'users.CustomUser'
+AUTH_USER_MODEL = 'users.User'
+
+AUTHENTICATION_BACKENDS = [
+    'accounts.backends.EmployeeIdBackend',
+    # 'django.contrib.auth.backends.ModelBackend',  # デフォルトのバックエンド
+]
 
 REST_FRAMEWORK = {
     # APIを叩いたときに「誰がアクセスしているか」を判定する方法を指定
@@ -63,11 +69,11 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
+    'PAGE_SIZE': 10,
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
-        # 'rest_framework.filters.OrderingFilter',
+        'rest_framework.filters.OrderingFilter',
     ],
 }
 
@@ -98,8 +104,13 @@ SESSION_SAVE_EVERY_REQUEST = True  # アクティビティがあればセッシ�
 CSRF_TRUSTED_ORIGINS = ["http://localhost:5173"]
 
 CSRF_COOKIE_HTTPONLY = False
+# SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 SESSION_COOKIE_SECURE = False     # https でない開発環境
+# SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SECURE = False
+# SESSION_COOKIE_SAMESITE = None
+
+# CSRF_COOKIE_SAMESITE = None
 
 ROOT_URLCONF = 'config.urls'
 

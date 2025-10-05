@@ -1,3 +1,4 @@
+# backend/users/views.py
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -5,6 +6,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import F
+from django.db.models.functions import Collate
 
 from .serializers import UserSerializer, UserCreateSerializer, UserUpdateSerializer
 from .services.user_service import UserService
@@ -13,7 +16,7 @@ User = get_user_model()
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    """ユーザー管理ViewSet（論理削除対応）"""
+    """ユーザー管理ViewSet（論理削除対応・employee_id認証）"""
     
     queryset = User.objects.all()  # デフォルトで削除済み除外
     permission_classes = [IsAuthenticated]
@@ -23,11 +26,37 @@ class UserViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter
     ]
     
-    search_fields = ['^username']
+    # employee_id と username で検索可能
+    search_fields = ['^employee_id', 'username']
     filterset_fields = ['is_admin', 'is_active']
-    ordering_fields = ['username', 'employee_id', 'created_at', 'is_admin']
-    ordering = ['-created_at']
+
+    # 日本語ソート対応
+    ordering_fields = ['username', 'employee_id', 'created_at', 'is_admin', 'id']
+    ordering = ['id']
     
+    def get_queryset(self):
+        """日本語ソート対応のクエリセット"""
+        queryset = super().get_queryset()
+        
+        # orderingパラメータを取得
+        ordering_param = self.request.query_params.get('ordering', '')
+        
+        # usernameのソート時は日本語対応
+        if 'username' in ordering_param:
+            # PostgreSQLの場合
+            # queryset = queryset.annotate(
+            #     username_collate=Collate('username', 'ja_JP')
+            # ).order_by('username_collate' if ordering_param == 'username' else '-username_collate')
+            
+            # SQLiteの場合（開発環境）
+            # NOCASEでソート（完璧ではないが許容範囲）
+            if ordering_param == 'username':
+                queryset = queryset.order_by(F('username').asc(nulls_last=True))
+            else:
+                queryset = queryset.order_by(F('username').desc(nulls_last=True))
+        
+        return queryset
+
     def get_serializer_class(self):
         """アクションに応じてシリアライザーを選択"""
         if self.action == 'create':
@@ -155,8 +184,6 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """ユーザー統計情報（高速化版）"""
-        # select_related や prefetch_related 不要な単純集計
-        # values() + count() で高速化
         from django.db.models import Count, Q
         
         stats = User.objects.aggregate(
