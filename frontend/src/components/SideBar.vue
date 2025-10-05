@@ -1,10 +1,18 @@
 <template>
-    <v-navigation-drawer app v-model="ui.drawer">
-        <v-list>
+    <v-navigation-drawer
+        v-model="ui.drawer"
+        :rail="ui.rail"
+        permanent
+        app
+        @click="handleDrawerClick"
+    >
+        <!-- ナビゲーションアイテム -->
+        <v-list nav>
             <v-list-item
                 v-for="(item, i) in navItems"
                 :key="i"
                 :to="item.to"
+                :value="item.title"
                 link
             >
                 <template v-slot:prepend>
@@ -14,19 +22,24 @@
             </v-list-item>
         </v-list>
 
-        <!-- 言語切り替えボタン -->
+        <!-- 言語切り替えボタン（下部） -->
         <template v-slot:append>
             <div class="pa-2">
                 <v-btn
-                    @click="toggleLanguage"
+                    @click.stop="toggleLanguage"
                     variant="outlined"
                     size="small"
                     block
                 >
-                    <v-icon :size="getSize('sm')" class="me-2">
+                    <v-icon class="me-2" v-if="!ui.rail">
                         {{ languageIcon }}
                     </v-icon>
-                    {{ languageDisplayText }}
+                    <v-icon v-else>
+                        {{ languageIcon }}
+                    </v-icon>
+                    <span v-if="!ui.rail">
+                        {{ languageDisplayText }}
+                    </span>
                 </v-btn>
             </div>
         </template>
@@ -63,22 +76,20 @@ const navItems = computed(() => [
     },
 ]);
 
-// 言語表示テキスト（日本語/English）
 const languageDisplayText = computed(() => {
     return locale.value === 'ja' ? '日本語' : 'English';
 });
 
-// 言語切り替えアイコン（候補から選択）
 const languageIcon = computed(() => {
-    // アイコン候補:
-    // mdi-web - 地球儀（一般的）
-    // mdi-earth - 地球
-    // mdi-flag - 旗
-    // mdi-google-translate - Google翻訳アイコン
-    // mdi-alphabetical-variant - A文字
-    // mdi-format-letter-case - 大小文字
-    return 'mdi-web'; // 最も分かりやすい地球儀アイコン
+    return 'mdi-web';
 });
+
+// ⭐ レールモード時のクリックでフル表示に切り替え
+const handleDrawerClick = () => {
+    if (ui.rail) {
+        ui.rail = false;
+    }
+};
 
 function toggleLanguage() {
     locale.value = locale.value === 'ja' ? 'en' : 'ja';

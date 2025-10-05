@@ -1,6 +1,7 @@
 <template>
     <v-app-bar app>
-        <v-app-bar-nav-icon @click="ui.drawer = !ui.drawer">
+        <!-- ⭐ ハンバーガーメニュー（レール切り替え） -->
+        <v-app-bar-nav-icon @click="ui.toggleRail">
             <v-icon>{{ getIcon('nav', 'menu') }}</v-icon>
         </v-app-bar-nav-icon>
 
@@ -13,7 +14,7 @@
             <v-icon :size="getSize('sm')" class="me-2">
                 {{ getIcon('form', 'user') }}
             </v-icon>
-            <span>{{ auth.user.username }}</span>
+            <span>{{ auth.user?.username || auth.user?.employee_id }}</span>
         </v-chip>
 
         <v-chip
