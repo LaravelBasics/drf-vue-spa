@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import F
@@ -14,6 +15,12 @@ from .services.user_service import UserService
 
 User = get_user_model()
 
+
+# カスタムページネーションクラス
+class UserPagination(PageNumberPagination):
+    page_size = 10  # デフォルト10件
+    page_size_query_param = 'page_size'  # クライアントから変更可能
+    max_page_size = 10  # 最大10件
 
 class UserViewSet(viewsets.ModelViewSet):
     """ユーザー管理ViewSet（論理削除対応・employee_id認証）"""

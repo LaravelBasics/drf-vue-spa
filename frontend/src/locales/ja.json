@@ -78,7 +78,8 @@
         "refresh": "更新",
         "save": "保存",
         "admin": "管理",
-        "user": "一般"
+        "user": "一般",
+        "detail": "詳細"
     },
     "pages": {
         "home": {

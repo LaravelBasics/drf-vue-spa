@@ -49,15 +49,17 @@
             </v-row>
 
             <!-- データテーブル -->
-            <v-data-table
+            <v-data-table-server
                 :headers="headers"
                 :items="users"
                 :loading="loading"
+                :items-length="totalItems"
+                :items-per-page="itemsPerPage"
                 class="elevation-2"
                 density="compact"
                 hover
                 hide-default-footer
-                @update:sort-by="handleSortChange"
+                @update:options="handleOptionsUpdate"
             >
                 <!-- ID列 -->
                 <template v-slot:item.id="{ item }">
@@ -120,7 +122,7 @@
                         </v-tooltip>
                     </v-btn>
                 </template>
-            </v-data-table>
+            </v-data-table-server>
 
             <!-- ページネーション -->
             <div class="d-flex justify-center mt-4">
@@ -276,6 +278,16 @@ async function fetchUsers() {
     }
 }
 
+// v-data-table-serverのoptionsハンドラー
+function handleOptionsUpdate(options) {
+    currentPage.value = options.page;
+    itemsPerPage.value = options.itemsPerPage;
+    sortBy.value = options.sortBy;
+
+    fetchUsers();
+    updateURLParams();
+}
+
 // 検索入力ハンドラー
 function handleSearchInput(value) {
     searching.value = true;
@@ -294,21 +306,6 @@ function handleSearchInput(value) {
 // ページ変更ハンドラー
 function handlePageChange(page) {
     currentPage.value = page;
-    fetchUsers();
-    updateURLParams();
-}
-
-// 表示件数変更ハンドラー
-function handleItemsPerPageChange() {
-    currentPage.value = 1;
-    fetchUsers();
-    updateURLParams();
-}
-
-// ソート変更ハンドラー
-function handleSortChange(newSortBy) {
-    sortBy.value = newSortBy;
-    currentPage.value = 1;
     fetchUsers();
     updateURLParams();
 }
