@@ -52,9 +52,11 @@
             <v-data-table-server
                 :headers="headers"
                 :items="users"
-                :loading="loading"
                 :items-length="totalItems"
-                :items-per-page="itemsPerPage"
+                :loading="loading"
+                v-model:items-per-page="itemsPerPage"
+                v-model:page="currentPage"
+                v-model:sort-by="sortBy"
                 class="elevation-2"
                 density="compact"
                 hover
@@ -63,9 +65,7 @@
             >
                 <!-- ID列 -->
                 <template v-slot:item.id="{ item }">
-                    <span class="font-weight-medium">
-                        {{ item.id }}
-                    </span>
+                    <span class="font-weight-medium">{{ item.id }}</span>
                 </template>
 
                 <!-- 管理者フラグ -->
@@ -87,39 +87,15 @@
                     {{ formatDate(item.created_at) }}
                 </template>
 
-                <!-- アクション列 -->
-                <template v-slot:item.actions-edit="{ item }">
+                <!-- ⭐ 詳細リンク -->
+                <template v-slot:item.actions-detail="{ item }">
                     <v-btn
-                        :icon="ICONS.action.edit"
-                        size="small"
+                        :to="routes.USER_DETAIL.replace(':id', item.id)"
                         variant="text"
                         color="primary"
-                        @click="goToEdit(item.id)"
-                    >
-                        <v-icon :icon="ICONS.action.edit"></v-icon>
-                        <v-tooltip activator="parent" location="top">
-                            {{ t('common.edit') }}
-                        </v-tooltip>
-                    </v-btn>
-                </template>
-
-                <template v-slot:item.actions-delete="{ item }">
-                    <v-btn
-                        icon="mdi-delete"
                         size="small"
-                        variant="text"
-                        color="error"
-                        @click="goToDelete(item.id)"
-                        :disabled="!canDelete(item)"
                     >
-                        <v-icon :icon="ICONS.action.delete"></v-icon>
-                        <v-tooltip activator="parent" location="top">
-                            {{
-                                canDelete(item)
-                                    ? t('common.delete')
-                                    : t('pages.users.cannotDeleteLastAdmin')
-                            }}
-                        </v-tooltip>
+                        {{ t('common.detail') }}
                     </v-btn>
                 </template>
             </v-data-table-server>
@@ -210,18 +186,11 @@ const headers = computed(() => [
         sortable: true,
     },
     {
-        title: t('common.edit'),
-        key: 'actions-edit',
+        title: t('common.detail'), // ⭐ 詳細に変更
+        key: 'actions-detail',
         sortable: false,
         align: 'center',
-        width: 80,
-    },
-    {
-        title: t('common.delete'),
-        key: 'actions-delete',
-        sortable: false,
-        align: 'center',
-        width: 80,
+        width: 100,
     },
 ]);
 
@@ -363,16 +332,6 @@ function initFromURLParams() {
     }
 }
 
-// 削除可能かチェック
-function canDelete(user) {
-    if (!user.is_admin) return true;
-
-    const adminCount = users.value.filter(
-        (u) => u.is_admin && u.is_active,
-    ).length;
-    return adminCount > 1;
-}
-
 // 日付フォーマット
 function formatDate(dateString) {
     const date = new Date(dateString);
@@ -383,17 +342,9 @@ function formatDate(dateString) {
     });
 }
 
-// ナビゲーション
+// 新規作成画面へ遷移
 function goToCreate() {
     router.push(routes.USER_CREATE);
-}
-
-function goToEdit(id) {
-    router.push(routes.USER_EDIT.replace(':id', id));
-}
-
-function goToDelete(id) {
-    router.push(routes.USER_DELETE.replace(':id', id));
 }
 
 onMounted(() => {

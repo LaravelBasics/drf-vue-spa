@@ -41,12 +41,13 @@ const router = createRouter({
                 // requiresAdmin: true,
             },
         },
+
         // ユーザー管理（一覧）
         {
             path: routes.USERS,
-            name: 'Users',
+            name: 'UserList',
             component: () => import('@/views/users/UserList.vue'),
-            meta: { requiresAuth: true },
+            meta: { requiresAuth: true, requiresAdmin: true },
         },
 
         // ユーザー新規作成
@@ -54,15 +55,24 @@ const router = createRouter({
             path: routes.USER_CREATE,
             name: 'UserCreate',
             component: () => import('@/views/users/UserCreate.vue'),
-            meta: { requiresAuth: true, transition: 'fade' },
+            meta: { requiresAuth: true, requiresAdmin: true },
         },
 
-        // ユーザー編集
+        // ⭐ ユーザー詳細
         {
-            path: routes.USER_EDIT,
-            name: 'UserEdit',
-            component: () => import('@/views/users/UserEdit.vue'),
-            meta: { requiresAuth: true, transition: 'fade' },
+            path: routes.USER_DETAIL,
+            name: 'UserDetail',
+            component: () => import('@/views/users/UserDetail.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true },
+            props: true,
+        },
+
+        // ⭐ ユーザー更新
+        {
+            path: routes.USER_UPDATE,
+            name: 'UserUpdate',
+            component: () => import('@/views/users/UserUpdate.vue'),
+            meta: { requiresAuth: true, requiresAdmin: true },
             props: true,
         },
 
@@ -71,7 +81,7 @@ const router = createRouter({
             path: routes.USER_DELETE,
             name: 'UserDelete',
             component: () => import('@/views/users/UserDelete.vue'),
-            meta: { requiresAuth: true, transition: 'fade' },
+            meta: { requiresAuth: true, requiresAdmin: true },
             props: true,
         },
 

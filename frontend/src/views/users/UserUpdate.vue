@@ -1,7 +1,7 @@
 <template>
     <div>
         <Header
-            :app-title="t('pages.users.editTitle')"
+            :app-title="t('pages.users.updateTitle')"
             :breadcrumbs="breadcrumbs"
         ></Header>
 
@@ -69,7 +69,7 @@
                                         variant="outlined"
                                         size="large"
                                         prepend-icon="mdi-arrow-left"
-                                        @click="goBack"
+                                        @click="router.back()"
                                     >
                                         {{ t('common.back') }}
                                     </v-btn>
@@ -123,13 +123,9 @@ const formData = ref({
 
 const breadcrumbs = computed(() => [
     { title: t('nav.home'), to: routes.HOME, disabled: false },
-    {
-        title: t('pages.admin.title'),
-        to: routes.ADMIN,
-        disabled: false,
-    },
+    { title: t('pages.admin.title'), to: routes.ADMIN, disabled: false },
     { title: t('pages.users.title'), to: routes.USERS, disabled: false },
-    { title: t('pages.users.editTitle'), disabled: true },
+    { title: t('pages.users.updateTitle'), disabled: true }, // ⭐ 更新
 ]);
 
 const usernameRules = createRules.username();
@@ -186,10 +182,6 @@ async function submitForm() {
     } finally {
         submitting.value = false;
     }
-}
-
-function goBack() {
-    router.replace(routes.USERS);
 }
 
 onMounted(() => {

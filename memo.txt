@@ -93,3 +93,8 @@ import { useI18n } from 'vue-i18n';
 const { t } = useI18n();
 ↓
  :hint="t('form.hints.password_requirements')" 
+
+ 10/7
+ ★変更：v-data-table-serverの方に変更→サーバーサイドでページネーションを設定する
+ 　　　：ナビゲーションバーのハンバーガーアイコンで開閉
+ 　　　：サイドバーは一定まで画面サイズ小さくなったら通常のモーダル式ハンバーガーアイコンで開閉に変更
