@@ -1,10 +1,10 @@
 <template>
     <v-navigation-drawer
         v-model="ui.drawer"
-        :rail="ui.rail"
-        permanent
+        :rail="ui.isDesktop && ui.rail"
+        :permanent="ui.isDesktop"
+        :temporary="!ui.isDesktop"
         app
-        @click="handleDrawerClick"
     >
         <!-- ナビゲーションアイテム -->
         <v-list nav>
@@ -14,6 +14,7 @@
                 :to="item.to"
                 :value="item.title"
                 link
+                @click="handleNavItemClick"
             >
                 <template v-slot:prepend>
                     <v-icon :size="getSize('md')">{{ item.icon }}</v-icon>
@@ -31,13 +32,10 @@
                     size="small"
                     block
                 >
-                    <v-icon class="me-2" v-if="!ui.rail">
+                    <v-icon class="me-2">
                         {{ languageIcon }}
                     </v-icon>
-                    <v-icon v-else>
-                        {{ languageIcon }}
-                    </v-icon>
-                    <span v-if="!ui.rail">
+                    <span>
                         {{ languageDisplayText }}
                     </span>
                 </v-btn>
@@ -84,10 +82,11 @@ const languageIcon = computed(() => {
     return 'mdi-web';
 });
 
-// ⭐ レールモード時のクリックでフル表示に切り替え
-const handleDrawerClick = () => {
-    if (ui.rail) {
-        ui.rail = false;
+// ⭐ ナビゲーションアイテムクリック時の処理
+// モバイルではサイドバーを自動で閉じる
+const handleNavItemClick = () => {
+    if (!ui.isDesktop) {
+        ui.drawer = false;
     }
 };
 
