@@ -7,6 +7,7 @@
 
         <v-container fluid class="pa-6">
             <!-- 検索・操作エリア -->
+
             <v-row class="mb-1 align-center">
                 <v-col cols="auto">
                     <v-text-field
@@ -30,12 +31,15 @@
                         </template>
                     </v-text-field>
                 </v-col>
+
                 <v-col cols="auto">
                     <div class="text-body-2 text-grey-darken-1">
                         {{ startItem }}-{{ endItem }} / {{ totalItems }}件
                     </div>
                 </v-col>
+
                 <v-spacer />
+
                 <v-col cols="auto">
                     <v-btn
                         color="primary"
@@ -57,11 +61,12 @@
                 v-model:items-per-page="itemsPerPage"
                 v-model:page="currentPage"
                 v-model:sort-by="sortBy"
-                class="elevation-2"
+                class="elevation-2 clickable-table"
                 density="compact"
                 hover
                 hide-default-footer
                 @update:options="handleOptionsUpdate"
+                @click:row="handleRowClick"
             >
                 <!-- ID列 -->
                 <template v-slot:item.id="{ item }">
@@ -85,18 +90,6 @@
                 <!-- 登録日 -->
                 <template v-slot:item.created_at="{ item }">
                     {{ formatDate(item.created_at) }}
-                </template>
-
-                <!-- ⭐ 詳細リンク -->
-                <template v-slot:item.actions-detail="{ item }">
-                    <v-btn
-                        :to="routes.USER_DETAIL.replace(':id', item.id)"
-                        variant="text"
-                        color="primary"
-                        size="small"
-                    >
-                        {{ t('common.detail') }}
-                    </v-btn>
                 </template>
             </v-data-table-server>
 
@@ -125,7 +118,6 @@ import { ICONS } from '@/constants/icons.js';
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
-
 const users = ref([]);
 const loading = ref(false);
 const searching = ref(false);
@@ -184,13 +176,6 @@ const headers = computed(() => [
         title: t('form.fields.createdAt'),
         key: 'created_at',
         sortable: true,
-    },
-    {
-        title: t('common.detail'), // ⭐ 詳細に変更
-        key: 'actions-detail',
-        sortable: false,
-        align: 'center',
-        width: 100,
     },
 ]);
 
@@ -347,8 +332,53 @@ function goToCreate() {
     router.push(routes.USER_CREATE);
 }
 
+// 行クリックで詳細画面へ遷移
+function handleRowClick(event, { item }) {
+    router.push(routes.USER_DETAIL.replace(':id', item.id));
+}
+
 onMounted(() => {
     initFromURLParams();
     fetchUsers();
 });
 </script>
+
+<style scoped>
+/* 行をクリック可能に */
+:deep(.clickable-table tbody tr) {
+    cursor: pointer;
+    position: relative;
+}
+
+/* ホバー時のツールチップ（プライマリカラー） */
+:deep(.clickable-table tbody tr:hover::after) {
+    content: '詳細を表示';
+    position: absolute;
+    right: 12px; /* 右端からのパディング */
+    top: 50%;
+    transform: translateY(-50%); /* 垂直方向の中央寄せは維持 */
+    background-color: rgb(var(--v-theme-primary));
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+</style>

@@ -32,10 +32,15 @@
                     size="small"
                     block
                 >
-                    <v-icon class="me-2">
-                        {{ languageIcon }}
-                    </v-icon>
-                    <span>
+                    <span v-if="!isDesktop && ui.rail">
+                        <v-icon :size="getSize('sm')">
+                            {{ languageIcon }}
+                        </v-icon>
+                    </span>
+                    <span v-if="isDesktop || !ui.rail">
+                        <v-icon :size="getSize('sm')" class="me-2">{{
+                            languageIcon
+                        }}</v-icon>
                         {{ languageDisplayText }}
                     </span>
                 </v-btn>

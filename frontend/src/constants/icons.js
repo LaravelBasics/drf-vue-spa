@@ -26,6 +26,8 @@ export const ICONS = Object.freeze({
         download: 'mdi-download',
         upload: 'mdi-upload',
         export: 'mdi-file-excel',
+        view: 'mdi-eye-outline', // ← 追加
+        detail: 'mdi-information-outline', // ← 別の選択肢
     },
 
     // 状態
