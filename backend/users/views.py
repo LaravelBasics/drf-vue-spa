@@ -38,7 +38,9 @@ class UserViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter
     ]
     
-    search_fields = ['^employee_id', 'username']
+    # search_fields = ['^employee_id', 'username']これだと検索パターンが２つになる
+    search_fields = ['^username']
+
     filterset_fields = ['is_admin', 'is_active']
     ordering_fields = ['username', 'employee_id', 'created_at', 'is_admin', 'id']
     ordering = ['id']

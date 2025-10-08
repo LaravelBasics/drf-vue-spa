@@ -15,6 +15,7 @@
                 :value="item.title"
                 link
                 @click="handleNavItemClick"
+                color="grey-darken-2"
             >
                 <template v-slot:prepend>
                     <v-icon :size="getSize('md')">{{ item.icon }}</v-icon>
@@ -123,3 +124,12 @@ function toggleLanguage() {
     locale.value = locale.value === 'ja' ? 'en' : 'ja';
 }
 </script>
+
+<style scoped>
+/* 以下のセレクタは、アクティブな v-list-item の中の特定の要素をターゲットにしています。*/
+/* アクティブ状態の背景を制御するCSS変数をリセットする */
+.v-list-item--active {
+    /* アクティブ時の背景色の透明度を制御する変数を0にする */
+    --v-activated-opacity: 0 !important;
+}
+</style>
