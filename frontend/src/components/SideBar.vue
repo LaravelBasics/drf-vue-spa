@@ -9,7 +9,7 @@
         <!-- ナビゲーションアイテム -->
         <v-list nav>
             <v-list-item
-                v-for="(item, i) in navItems"
+                v-for="(item, i) in filteredNavItems"
                 :key="i"
                 :to="item.to"
                 :value="item.title"
@@ -32,17 +32,28 @@
                     size="small"
                     block
                 >
-                    <span v-if="!isDesktop && ui.rail">
+                    <!-- ⭐ モバイル時はテキストも表示 -->
+                    <template v-if="!ui.isDesktop">
+                        <v-icon :size="getSize('sm')" class="me-2">
+                            {{ languageIcon }}
+                        </v-icon>
+                        {{ languageDisplayText }}
+                    </template>
+
+                    <!-- ⭐ PC時: rail状態でアイコンのみ -->
+                    <template v-else-if="ui.rail">
                         <v-icon :size="getSize('sm')">
                             {{ languageIcon }}
                         </v-icon>
-                    </span>
-                    <span v-if="isDesktop || !ui.rail">
-                        <v-icon :size="getSize('sm')" class="me-2">{{
-                            languageIcon
-                        }}</v-icon>
+                    </template>
+
+                    <!-- ⭐ PC時: rail解除でアイコン+テキスト -->
+                    <template v-else>
+                        <v-icon :size="getSize('sm')" class="me-2">
+                            {{ languageIcon }}
+                        </v-icon>
                         {{ languageDisplayText }}
-                    </span>
+                    </template>
                 </v-btn>
             </div>
         </template>
@@ -54,12 +65,14 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useUiStore } from '@/stores/ui';
 import { useDesignSystem } from '@/composables/useDesignSystem';
+import { usePermissions } from '@/composables/usePermissions';
 import { routes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 
 const { t, locale } = useI18n();
 const ui = useUiStore();
 const { getIcon, getSize } = useDesignSystem();
+const { isAdmin } = usePermissions();
 
 const currentLocale = computed(() => locale.value);
 
@@ -76,8 +89,19 @@ const navItems = computed(() => [
         title: t('nav.management'),
         icon: ICONS.nav.management,
         to: routes.ADMIN,
+        requiresAdmin: true, // ⭐ 管理者のみ表示
     },
 ]);
+
+// ⭐ 権限に応じてフィルタリング
+const filteredNavItems = computed(() => {
+    return navItems.value.filter((item) => {
+        if (item.requiresAdmin) {
+            return isAdmin.value;
+        }
+        return true;
+    });
+});
 
 const languageDisplayText = computed(() => {
     return locale.value === 'ja' ? '日本語' : 'English';

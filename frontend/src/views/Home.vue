@@ -4,19 +4,22 @@
     </Header>
 
     <!-- メニューカードグリッド -->
-    <MenuCardGrid :items="menuItems" />
+    <MenuCardGrid :items="filteredMenuItems" />
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { useDesignSystem } from '@/composables/useDesignSystem';
+import { usePermissions } from '@/composables/usePermissions';
 import Header from '@/components/Header.vue';
 import MenuCardGrid from '@/components/MenuCardGrid.vue';
 import { routes } from '@/constants/routes';
 
 const { t } = useI18n();
 const router = useRouter();
+const { isAdmin } = usePermissions();
 const { colors, getIcon, getSize, getComponentConfig } = useDesignSystem();
 
 const headerButtons = [
@@ -47,12 +50,14 @@ const menuItems = [
         title: '管理者メニュー',
         to: routes.ADMIN,
         color: 'primary',
+        requiresAdmin: true, // ⭐ 管理者のみ
     },
     {
         icon: 'mdi-account-group',
         title: 'ユーザー管理',
         to: '/users',
         color: 'blue',
+        requiresAdmin: true, // ⭐ 管理者のみ
     },
     {
         icon: 'mdi-shopping',
@@ -86,6 +91,7 @@ const menuItems = [
             router.push('/permissions');
         },
         color: 'red',
+        requiresAdmin: true,
     },
     {
         icon: 'mdi-file-document',
@@ -94,6 +100,16 @@ const menuItems = [
         color: 'teal',
     },
 ];
+
+// ⭐ 権限に応じてフィルタリング
+const filteredMenuItems = computed(() => {
+    return menuItems.filter((item) => {
+        if (item.requiresAdmin) {
+            return isAdmin.value;
+        }
+        return true;
+    });
+});
 
 function openOrderSearch() {
     console.log('Search orders');

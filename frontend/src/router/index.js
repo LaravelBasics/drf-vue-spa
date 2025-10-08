@@ -1,64 +1,54 @@
-// src/router/index.js (App.vueでレイアウト管理版)
+// src/router/index.js (修正版 - beforeEach統合)
 
 import { createRouter, createWebHistory } from 'vue-router';
 import { authGuard } from './auth-guard.js';
+import { adminGuard } from './admin-guard.js';
 import { routes } from '@/constants/routes';
 
 const router = createRouter({
     history: createWebHistory(),
     routes: [
-        // ⭐ routes定数を使用してパスを管理
         {
-            path: routes.HOME, // '/'
+            path: routes.HOME,
             name: 'Home',
             component: () => import('@/views/Home.vue'),
             meta: { requiresAuth: true, transition: 'slide-left' },
         },
-
-        // ⭐ その他の認証が必要なページ
         {
             path: routes.SETTINGS,
             name: 'Settings',
             component: () => import('@/views/Settings.vue'),
             meta: { requiresAuth: true },
         },
-
-        // ⭐ ログインページ（認証不要）
         {
-            path: routes.LOGIN, // '/auth/login'
+            path: routes.LOGIN,
             name: 'Login',
             component: () => import('@/views/Login.vue'),
             meta: { hideForAuth: true, transition: 'fade' },
         },
 
-        // 管理者権限必要
+        // ⭐ 管理者権限必要
         {
             path: '/admin',
             name: 'AdminMenu',
             component: () => import('@/views/admin/AdminMenu.vue'),
             meta: {
                 requiresAuth: true,
-                // requiresAdmin: true,
+                requiresAdmin: true,
             },
         },
-
-        // ユーザー管理（一覧）
         {
             path: routes.USERS,
             name: 'UserList',
             component: () => import('@/views/users/UserList.vue'),
             meta: { requiresAuth: true, requiresAdmin: true },
         },
-
-        // ユーザー新規作成
         {
             path: routes.USER_CREATE,
             name: 'UserCreate',
             component: () => import('@/views/users/UserCreate.vue'),
             meta: { requiresAuth: true, requiresAdmin: true },
         },
-
-        // ⭐ ユーザー詳細
         {
             path: routes.USER_DETAIL,
             name: 'UserDetail',
@@ -66,8 +56,6 @@ const router = createRouter({
             meta: { requiresAuth: true, requiresAdmin: true },
             props: true,
         },
-
-        // ⭐ ユーザー更新
         {
             path: routes.USER_UPDATE,
             name: 'UserUpdate',
@@ -75,8 +63,6 @@ const router = createRouter({
             meta: { requiresAuth: true, requiresAdmin: true },
             props: true,
         },
-
-        // ユーザー削除
         {
             path: routes.USER_DELETE,
             name: 'UserDelete',
@@ -84,47 +70,52 @@ const router = createRouter({
             meta: { requiresAuth: true, requiresAdmin: true },
             props: true,
         },
-
-        // ⭐ 404ページ
         {
             path: '/:pathMatch(.*)*',
             name: 'NotFound',
-            redirect: routes.LOGIN, // ホームにリダイレクト
+            redirect: routes.HOME,
         },
     ],
-    // ⭐ スクロール位置制御（ちらつき防止）
     scrollBehavior(to, from, savedPosition) {
-        // ⭐ ページ遷移時のスクロール位置を制御
         if (savedPosition) {
-            // ブラウザの戻る/進むボタン使用時
             return savedPosition;
         } else if (to.hash) {
-            // アンカーリンク
             return { el: to.hash, behavior: 'smooth' };
         } else {
-            // 通常の遷移は最上部へ（滑らかに）
             return { top: 0, behavior: 'smooth' };
         }
     },
 });
-// ⭐ ナビゲーション開始時の処理
+
+// ⭐ ナビゲーションガード（統合版）
 router.beforeEach(async (to, from, next) => {
-    // ページ遷移開始時にローディング状態を設定
+    // ローディング表示
     document.body.style.cursor = 'progress';
 
-    // 認証ガード実行
-    const result = await authGuard(to, from);
-
-    if (result === true) {
-        next();
-    } else {
-        next(result);
+    // 1. 認証チェック
+    const authResult = await authGuard(to, from);
+    if (authResult !== true) {
+        document.body.style.cursor = '';
+        next(authResult);
+        return;
     }
+
+    // 2. 管理者権限チェック
+    const adminResult = await adminGuard(to, from);
+    if (adminResult !== true) {
+        document.body.style.cursor = '';
+        next(adminResult);
+        return;
+    }
+
+    // 全てのガードを通過
+    document.body.style.cursor = '';
+    next();
 });
 
 // ⭐ ナビゲーション完了時の処理
 router.afterEach((to, from) => {
-    // ローディング状態解除
+    // ローディング状態解除（念のため）
     document.body.style.cursor = '';
 
     // ページタイトル更新
