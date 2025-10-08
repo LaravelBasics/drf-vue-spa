@@ -16,6 +16,7 @@
             <v-btn
                 variant="text"
                 icon="mdi-close"
+                size="x-small"
                 @click="notification.close()"
             />
         </template>
@@ -32,7 +33,7 @@ const getColor = computed(() => {
     const colorMap = {
         success: 'success',
         error: 'error',
-        warning: 'warning',
+        warning: 'amber-darken-1',
         info: 'info',
     };
     return colorMap[notification.type] || 'info';

@@ -1,5 +1,4 @@
 // src/router/admin-guard.js
-
 import { useAuthStore } from '@/stores/auth';
 import { routes } from '@/constants/routes';
 
@@ -27,12 +26,12 @@ export const adminGuard = async (to, from) => {
     if (!auth.user.is_admin) {
         console.warn('🚫 管理者権限がありません');
 
+        // ⭐ ホームにリダイレクト + 通知用フラグ
         return {
             path: routes.HOME,
             replace: true,
             query: {
-                error: 'unauthorized',
-                message: '管理者権限が必要です',
+                unauthorized: 'admin', // ⭐ シンプルなフラグ
             },
         };
     }

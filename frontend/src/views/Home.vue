@@ -8,19 +8,34 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useDesignSystem } from '@/composables/useDesignSystem';
 import { usePermissions } from '@/composables/usePermissions';
+import { useNotificationStore } from '@/stores/notification'; // ⭐ 追加
 import Header from '@/components/Header.vue';
 import MenuCardGrid from '@/components/MenuCardGrid.vue';
 import { routes } from '@/constants/routes';
 
 const { t } = useI18n();
 const router = useRouter();
+const route = useRoute(); // ⭐ 追加
+const notification = useNotificationStore(); // ⭐ 追加
 const { isAdmin } = usePermissions();
 const { colors, getIcon, getSize, getComponentConfig } = useDesignSystem();
+
+// ⭐ マウント時に権限エラーチェック
+onMounted(() => {
+    // クエリパラメータに unauthorized=admin がある場合
+    if (route.query.unauthorized === 'admin') {
+        // 警告通知を表示
+        notification.warning('この機能は管理者のみ利用できます', 5000);
+
+        // ⭐ URLをクリーンにする（クエリパラメータ削除）
+        router.replace({ path: routes.HOME, query: {} });
+    }
+});
 
 const headerButtons = [
     {
@@ -50,14 +65,14 @@ const menuItems = [
         title: '管理者メニュー',
         to: routes.ADMIN,
         color: 'primary',
-        requiresAdmin: true, // ⭐ 管理者のみ
+        requiresAdmin: true,
     },
     {
         icon: 'mdi-account-group',
         title: 'ユーザー管理',
         to: '/users',
         color: 'blue',
-        requiresAdmin: true, // ⭐ 管理者のみ
+        requiresAdmin: true,
     },
     {
         icon: 'mdi-shopping',
