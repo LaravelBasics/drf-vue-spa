@@ -4,11 +4,24 @@
 
 <script setup>
 import Header from '@/components/Header.vue';
+import { ICONS } from '@/constants/icons';
 
 const headerButtons = [
-    { name: '検索', action: openOrderSearch, icon: 'mdi-magnify' },
-    { name: 'CSV', action: exportToCSV, icon: 'mdi-file-excel' },
-    { name: '新規', action: createNewOrder, icon: 'mdi-plus' },
+    {
+        name: '検索',
+        action: openOrderSearch,
+        icon: ICONS.action.search,
+    },
+    {
+        name: 'CSV',
+        action: exportToCSV,
+        icon: ICONS.file.excel,
+    },
+    {
+        name: '新規',
+        action: createNewOrder,
+        icon: ICONS.action.add,
+    },
 ];
 
 function openOrderSearch() {

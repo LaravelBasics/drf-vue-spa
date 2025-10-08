@@ -13,15 +13,16 @@ import { useI18n } from 'vue-i18n';
 import { useRouter, useRoute } from 'vue-router';
 import { useDesignSystem } from '@/composables/useDesignSystem';
 import { usePermissions } from '@/composables/usePermissions';
-import { useNotificationStore } from '@/stores/notification'; // ⭐ 追加
+import { useNotificationStore } from '@/stores/notification';
 import Header from '@/components/Header.vue';
 import MenuCardGrid from '@/components/MenuCardGrid.vue';
 import { routes } from '@/constants/routes';
+import { ICONS } from '@/constants/icons';
 
 const { t } = useI18n();
 const router = useRouter();
-const route = useRoute(); // ⭐ 追加
-const notification = useNotificationStore(); // ⭐ 追加
+const route = useRoute();
+const notification = useNotificationStore();
 const { isAdmin } = usePermissions();
 const { colors, getIcon, getSize, getComponentConfig } = useDesignSystem();
 
@@ -41,19 +42,19 @@ const headerButtons = [
     {
         name: t('actions.search'),
         action: openOrderSearch,
-        icon: 'mdi-magnify',
+        icon: ICONS.action.search,
         type: 'primary',
     },
     {
         name: t('actions.export'),
         action: exportToCSV,
-        icon: 'mdi-file-excel',
+        icon: ICONS.file.excel,
         type: 'success',
     },
     {
         name: t('actions.add'),
         action: createNewOrder,
-        icon: 'mdi-plus',
+        icon: ICONS.action.add,
         type: 'primary',
     },
 ];
@@ -61,45 +62,45 @@ const headerButtons = [
 // メニューカードの定義
 const menuItems = [
     {
-        icon: 'mdi-account-cog',
+        icon: ICONS.nav.management, // ⭐ 管理者メニュー
         title: '管理者メニュー',
         to: routes.ADMIN,
         color: 'primary',
         requiresAdmin: true,
     },
     {
-        icon: 'mdi-account-group',
+        icon: 'group', // ⭐ ユーザーグループ
         title: 'ユーザー管理',
         to: '/users',
         color: 'blue',
         requiresAdmin: true,
     },
     {
-        icon: 'mdi-shopping',
+        icon: 'shopping_cart', // ⭐ 注文
         title: '注文',
         to: '/orders',
         color: 'success',
     },
     {
-        icon: 'mdi-package-variant',
+        icon: 'inventory_2', // ⭐ 商品・在庫
         title: '商品',
         to: '/products',
         color: 'orange',
     },
     {
-        icon: 'mdi-chart-line',
+        icon: 'analytics', // ⭐ 分析
         title: '分析',
         to: '/analytics',
         color: 'purple',
     },
     {
-        icon: 'mdi-cog',
+        icon: 'settings', // ⭐ 設定
         title: '設定',
         to: '/settings',
         color: 'grey-darken-1',
     },
     {
-        icon: 'mdi-shield-account',
+        icon: 'shield', // ⭐ 権限
         title: '権限',
         onClick: () => {
             console.log('権限管理を開く');
@@ -109,7 +110,7 @@ const menuItems = [
         requiresAdmin: true,
     },
     {
-        icon: 'mdi-file-document',
+        icon: 'description', // ⭐ レポート
         title: 'レポート',
         to: '/reports',
         color: 'teal',

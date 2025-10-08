@@ -8,7 +8,10 @@ import router from './router';
 import vuetify from './plugins/vuetify';
 import i18n from './plugins/i18n';
 
-import '@mdi/font/css/materialdesignicons.css';
+import 'material-symbols/outlined.css';
+// ⭐ 他のスタイルも選べます（どれか1つだけimport）
+// import 'material-symbols/rounded.css';  // 丸みあり
+// import 'material-symbols/sharp.css';    // シャープ
 import './assets/style/main.scss';
 
 import { useAuthStore } from '@/stores/auth';

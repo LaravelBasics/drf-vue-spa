@@ -13,7 +13,7 @@
                     <v-text-field
                         v-model="searchQuery"
                         :label="t('pages.users.searchPlaceholder')"
-                        prepend-inner-icon="mdi-magnify"
+                        :prepend-inner-icon="ICONS.action.search"
                         variant="outlined"
                         density="compact"
                         clearable
@@ -44,7 +44,7 @@
                     <v-btn
                         color="primary"
                         size="default"
-                        prepend-icon="mdi-plus"
+                        :prepend-icon="ICONS.action.add"
                         @click="goToCreate"
                     >
                         {{ t('pages.users.createButton') }}

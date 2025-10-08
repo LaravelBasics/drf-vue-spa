@@ -15,7 +15,7 @@
         <template v-slot:actions>
             <v-btn
                 variant="text"
-                icon="mdi-close"
+                :icon="ICONS.action.close"
                 size="x-small"
                 @click="notification.close()"
             />
@@ -26,6 +26,7 @@
 <script setup>
 import { computed } from 'vue';
 import { useNotificationStore } from '@/stores/notification';
+import { ICONS } from '@/constants/icons';
 
 const notification = useNotificationStore();
 
@@ -41,11 +42,11 @@ const getColor = computed(() => {
 
 const getIcon = computed(() => {
     const iconMap = {
-        success: 'mdi-check-circle',
-        error: 'mdi-alert-circle',
-        warning: 'mdi-alert',
-        info: 'mdi-information',
+        success: ICONS.status.success, // check_circle
+        error: ICONS.status.error, // error
+        warning: ICONS.status.warning, // warning
+        info: ICONS.status.info, // info
     };
-    return iconMap[notification.type] || 'mdi-information';
+    return iconMap[notification.type] || ICONS.status.info;
 });
 </script>

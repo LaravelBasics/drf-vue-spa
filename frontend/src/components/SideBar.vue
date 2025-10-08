@@ -78,19 +78,19 @@ const { isAdmin } = usePermissions();
 const currentLocale = computed(() => locale.value);
 
 const navItems = computed(() => [
-    { title: t('nav.home'), icon: 'mdi-home', to: routes.HOME },
+    { title: t('nav.home'), icon: ICONS.nav.home, to: routes.HOME },
     {
         title: t('nav.dashboard'),
-        icon: 'mdi-view-dashboard',
+        icon: ICONS.nav.dashboard,
         to: routes.DASHBOARD,
     },
-    { title: t('nav.profile'), icon: 'mdi-account', to: routes.PROFILE },
-    { title: t('nav.settings'), icon: 'mdi-cog', to: routes.SETTINGS },
+    { title: t('nav.profile'), icon: ICONS.nav.profile, to: routes.PROFILE },
+    { title: t('nav.settings'), icon: ICONS.nav.settings, to: routes.SETTINGS },
     {
         title: t('nav.management'),
         icon: ICONS.nav.management,
         to: routes.ADMIN,
-        requiresAdmin: true, // ⭐ 管理者のみ表示
+        requiresAdmin: true,
     },
 ]);
 
@@ -109,11 +109,10 @@ const languageDisplayText = computed(() => {
 });
 
 const languageIcon = computed(() => {
-    return 'mdi-web';
+    return 'language'; // ⭐ Material Symbols の地球儀アイコン
 });
 
 // ⭐ ナビゲーションアイテムクリック時の処理
-// モバイルではサイドバーを自動で閉じる
 const handleNavItemClick = () => {
     if (!ui.isDesktop) {
         ui.drawer = false;
@@ -126,10 +125,7 @@ function toggleLanguage() {
 </script>
 
 <style scoped>
-/* 以下のセレクタは、アクティブな v-list-item の中の特定の要素をターゲットにしています。*/
-/* アクティブ状態の背景を制御するCSS変数をリセットする */
 .v-list-item--active {
-    /* アクティブ時の背景色の透明度を制御する変数を0にする */
     --v-activated-opacity: 0 !important;
 }
 </style>

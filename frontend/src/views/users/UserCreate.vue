@@ -63,7 +63,7 @@
                                         color="primary"
                                         size="large"
                                         :loading="submitting"
-                                        prepend-icon="mdi-content-save"
+                                        :prepend-icon="ICONS.action.save"
                                     >
                                         {{ t('common.create') }}
                                     </v-btn>
@@ -73,7 +73,7 @@
                                     <v-btn
                                         variant="outlined"
                                         size="large"
-                                        prepend-icon="mdi-arrow-left"
+                                        prepend-icon="arrow_back"
                                         @click="goBack"
                                     >
                                         {{ t('common.back') }}
@@ -97,6 +97,7 @@ import { useNotificationStore } from '@/stores/notification';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
 import { routes } from '@/constants/routes';
+import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
 const { t } = useI18n();

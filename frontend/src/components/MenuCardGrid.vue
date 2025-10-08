@@ -31,7 +31,8 @@ defineProps({
     items: {
         type: Array,
         required: true,
-        // 例: [{ icon: 'mdi-account-cog', title: '管理', to: '/admin' }]
+        // ⭐ 例: [{ icon: 'admin_panel_settings', title: '管理', to: '/admin' }]
+        // Material Symbols アイコン名を使用
     },
 });
 </script>

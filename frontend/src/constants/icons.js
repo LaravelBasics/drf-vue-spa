@@ -1,65 +1,73 @@
-// src/constants/icons.js - アイコン統一管理
+// src/constants/icons.js - Material Symbols (Google公式) 版
 
 export const ICONS = Object.freeze({
     // ナビゲーション
     nav: {
-        menu: 'mdi-menu',
-        home: 'mdi-home',
-        dashboard: 'mdi-view-dashboard',
-        settings: 'mdi-cog',
-        profile: 'mdi-account',
-        logout: 'mdi-power',
-        divider: 'mdi-chevron-right',
-        management: 'mdi-account-cog',
+        menu: 'menu',
+        home: 'home',
+        dashboard: 'dashboard',
+        settings: 'settings',
+        profile: 'account_circle',
+        logout: 'logout',
+        divider: 'chevron_right',
+        management: 'admin_panel_settings',
     },
 
     // アクション
     action: {
-        add: 'mdi-plus',
-        edit: 'mdi-pencil',
-        delete: 'mdi-delete',
-        save: 'mdi-content-save',
-        cancel: 'mdi-close',
-        search: 'mdi-magnify',
-        filter: 'mdi-filter',
-        refresh: 'mdi-refresh',
-        download: 'mdi-download',
-        upload: 'mdi-upload',
-        export: 'mdi-file-excel',
-        view: 'mdi-eye-outline', // ← 追加
-        detail: 'mdi-information-outline', // ← 別の選択肢
+        add: 'add',
+        edit: 'edit',
+        delete: 'delete',
+        save: 'save',
+        cancel: 'close',
+        search: 'search',
+        filter: 'filter_list',
+        refresh: 'refresh',
+        download: 'download',
+        upload: 'upload',
+        export: 'description', // Excelアイコンの代替
+        view: 'visibility',
+        detail: 'info',
+        close: 'close', // ⭐ 明示的に追加
     },
 
     // 状態
     status: {
-        success: 'mdi-check-circle',
-        error: 'mdi-alert-circle',
-        warning: 'mdi-alert',
-        info: 'mdi-information',
-        loading: 'mdi-loading',
-        admin: 'mdi-shield-check',
-        check: 'mdi-check-bold',
-        minus: 'mdi-minus',
+        success: 'check_circle',
+        error: 'error',
+        warning: 'warning',
+        info: 'info',
+        loading: 'progress_activity',
+        admin: 'verified_user',
+        check: 'check',
+        minus: 'remove',
+        alert: 'notification_important', // ⭐ 追加
     },
 
     // フォーム
     form: {
-        user: 'mdi-account',
-        password: 'mdi-lock',
-        email: 'mdi-email',
-        phone: 'mdi-phone',
-        date: 'mdi-calendar',
-        time: 'mdi-clock',
-        visibility: 'mdi-eye',
-        visibilityOff: 'mdi-eye-off',
+        user: 'person',
+        password: 'lock',
+        email: 'email',
+        phone: 'phone',
+        date: 'calendar_today',
+        time: 'schedule',
+        visibility: 'visibility',
+        visibilityOff: 'visibility_off',
     },
 
     // ファイル・データ
     file: {
-        document: 'mdi-file-document',
-        pdf: 'mdi-file-pdf-box',
-        excel: 'mdi-file-excel',
-        image: 'mdi-file-image',
-        folder: 'mdi-folder',
+        document: 'description',
+        pdf: 'picture_as_pdf',
+        excel: 'table_chart', // Excel代替
+        image: 'image',
+        folder: 'folder',
+    },
+
+    // ⭐ ブランド・その他
+    brand: {
+        deployed_code: 'deployed_code', // GitHubロゴの代替（Material Symbolsにロゴはないため）
+        language: 'language', // 言語切り替え用
     },
 });

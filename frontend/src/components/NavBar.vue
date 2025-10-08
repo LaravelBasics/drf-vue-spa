@@ -6,7 +6,9 @@
         </v-app-bar-nav-icon>
 
         <v-toolbar-title>
-            <v-icon :size="getSize('lg')">mdi-github</v-icon>
+            <v-icon :size="getSize('lg')">{{
+                getIcon('brand', 'deployed_code')
+            }}</v-icon>
             <span>{{ t('app.title') }}</span>
         </v-toolbar-title>
 

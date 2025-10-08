@@ -128,7 +128,7 @@
                                 <v-btn
                                     color="primary"
                                     size="large"
-                                    prepend-icon="mdi-pencil"
+                                    :prepend-icon="ICONS.action.edit"
                                     @click="goToUpdate"
                                 >
                                     {{ t('common.edit') }}
@@ -139,7 +139,7 @@
                                 <v-btn
                                     color="error"
                                     size="large"
-                                    prepend-icon="mdi-delete"
+                                    :prepend-icon="ICONS.action.delete"
                                     @click="goToDelete"
                                     :disabled="isLastAdmin"
                                 >
@@ -151,7 +151,7 @@
                                 <v-btn
                                     variant="outlined"
                                     size="large"
-                                    prepend-icon="mdi-arrow-left"
+                                    prepend-icon="arrow_back"
                                     @click="goBack"
                                 >
                                     {{ t('common.back') }}
@@ -184,6 +184,7 @@ import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
 import { routes } from '@/constants/routes';
 import { useNotificationStore } from '@/stores/notification';
+import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
 const route = useRoute();

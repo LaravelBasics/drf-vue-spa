@@ -10,7 +10,7 @@
                 <v-col cols="12" md="8" lg="8">
                     <v-card elevation="2" v-if="!loading">
                         <v-card-title class="text-h5 pa-6 bg-grey-lighten-4">
-                            {{ t('pages.users.editTitle') }}
+                            {{ t('pages.users.updateTitle') }}
                         </v-card-title>
 
                         <v-card-text class="pa-6">
@@ -58,7 +58,7 @@
                                         color="primary"
                                         size="large"
                                         :loading="submitting"
-                                        prepend-icon="mdi-content-save"
+                                        :prepend-icon="ICONS.action.save"
                                     >
                                         {{ t('common.save') }}
                                     </v-btn>
@@ -68,7 +68,7 @@
                                     <v-btn
                                         variant="outlined"
                                         size="large"
-                                        prepend-icon="mdi-arrow-left"
+                                        prepend-icon="arrow_back"
                                         @click="router.back()"
                                     >
                                         {{ t('common.back') }}
@@ -103,6 +103,7 @@ import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
 import { routes } from '@/constants/routes';
 import { useNotificationStore } from '@/stores/notification';
+import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
 const route = useRoute();
@@ -125,7 +126,7 @@ const breadcrumbs = computed(() => [
     { title: t('nav.home'), to: routes.HOME, disabled: false },
     { title: t('pages.admin.title'), to: routes.ADMIN, disabled: false },
     { title: t('pages.users.title'), to: routes.USERS, disabled: false },
-    { title: t('pages.users.updateTitle'), disabled: true }, // ⭐ 更新
+    { title: t('pages.users.updateTitle'), disabled: true },
 ]);
 
 const usernameRules = createRules.username();

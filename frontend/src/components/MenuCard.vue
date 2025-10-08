@@ -25,7 +25,7 @@
 
 <script setup>
 const props = defineProps({
-    // アイコン名（mdi-account-cog など）
+    // ⭐ Material Symbols アイコン名（admin_panel_settings など）
     icon: {
         type: String,
         required: true,

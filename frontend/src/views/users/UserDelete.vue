@@ -19,7 +19,6 @@
                                 type="warning"
                                 variant="tonal"
                                 class="mb-6"
-                                icon="mdi-alert"
                             >
                                 {{ t('pages.userDelete.warningMessage') }}
                             </v-alert>
@@ -117,7 +116,7 @@
                                     :disabled="isLastAdmin"
                                     @click="deleteUser"
                                 >
-                                    <v-icon class="me-2">mdi-delete</v-icon>
+                                    <v-icon class="me-2">delete</v-icon>
                                     {{ t('common.delete') }}
                                 </v-btn>
 
@@ -126,7 +125,7 @@
                                 <v-btn
                                     variant="outlined"
                                     size="large"
-                                    prepend-icon="mdi-arrow-left"
+                                    prepend-icon="arrow_back"
                                     @click="router.back()"
                                 >
                                     {{ t('common.back') }}
