@@ -29,6 +29,9 @@ class UserViewSet(viewsets.ModelViewSet):
     
     queryset = User.objects.all()
     
+    # ⭐ 追加: カスタムページネーションクラスを適用
+    pagination_class = UserPagination
+
     # ⭐ 管理者権限必須に変更
     permission_classes = [IsAuthenticated, IsAdminUser]
     
