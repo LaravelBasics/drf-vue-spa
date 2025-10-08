@@ -1,4 +1,4 @@
-// C:\Users\pvufx\Desktop\template\frontend\src\stores\ui.js
+// Desktop\template\frontend\src\stores\ui.js
 
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';

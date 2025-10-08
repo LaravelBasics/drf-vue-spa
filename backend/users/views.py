@@ -1,9 +1,9 @@
-# backend/users/views.py
+# backend/users/views.py (修正版)
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
@@ -12,32 +12,34 @@ from django.db.models.functions import Collate
 
 from .serializers import UserSerializer, UserCreateSerializer, UserUpdateSerializer
 from .services.user_service import UserService
+from .permissions import IsAdminUser  # ⭐ 追加
 
 User = get_user_model()
 
 
 # カスタムページネーションクラス
 class UserPagination(PageNumberPagination):
-    page_size = 10  # デフォルト10件
-    page_size_query_param = 'page_size'  # クライアントから変更可能
-    max_page_size = 10  # 最大10件
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 10
+
 
 class UserViewSet(viewsets.ModelViewSet):
     """ユーザー管理ViewSet（論理削除対応・employee_id認証）"""
     
-    queryset = User.objects.all()  # デフォルトで削除済み除外
-    permission_classes = [IsAuthenticated]
+    queryset = User.objects.all()
+    
+    # ⭐ 管理者権限必須に変更
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
     filter_backends = [
         DjangoFilterBackend, 
         filters.SearchFilter, 
         filters.OrderingFilter
     ]
     
-    # employee_id と username で検索可能
     search_fields = ['^employee_id', 'username']
     filterset_fields = ['is_admin', 'is_active']
-
-    # 日本語ソート対応
     ordering_fields = ['username', 'employee_id', 'created_at', 'is_admin', 'id']
     ordering = ['id']
     
@@ -45,18 +47,9 @@ class UserViewSet(viewsets.ModelViewSet):
         """日本語ソート対応のクエリセット"""
         queryset = super().get_queryset()
         
-        # orderingパラメータを取得
         ordering_param = self.request.query_params.get('ordering', '')
         
-        # usernameのソート時は日本語対応
         if 'username' in ordering_param:
-            # PostgreSQLの場合
-            # queryset = queryset.annotate(
-            #     username_collate=Collate('username', 'ja_JP')
-            # ).order_by('username_collate' if ordering_param == 'username' else '-username_collate')
-            
-            # SQLiteの場合（開発環境）
-            # NOCASEでソート（完璧ではないが許容範囲）
             if ordering_param == 'username':
                 queryset = queryset.order_by(F('username').asc(nulls_last=True))
             else:
@@ -72,8 +65,16 @@ class UserViewSet(viewsets.ModelViewSet):
             return UserUpdateSerializer
         return UserSerializer
     
+    # ⭐ 権限チェック強化（念のため）
+    def check_admin_permission(self):
+        """管理者権限チェック（追加の安全装置）"""
+        if not self.request.user.is_admin:
+            raise PermissionDenied('この操作には管理者権限が必要です')
+    
     def create(self, request, *args, **kwargs):
         """ユーザー作成"""
+        self.check_admin_permission()  # ⭐ 念のため明示的チェック
+        
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
@@ -87,6 +88,8 @@ class UserViewSet(viewsets.ModelViewSet):
     
     def update(self, request, *args, **kwargs):
         """ユーザー更新"""
+        self.check_admin_permission()
+        
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=kwargs.get('partial', False))
         serializer.is_valid(raise_exception=True)
@@ -104,6 +107,8 @@ class UserViewSet(viewsets.ModelViewSet):
     
     def destroy(self, request, *args, **kwargs):
         """ユーザー削除（論理削除）"""
+        self.check_admin_permission()
+        
         instance = self.get_object()
         
         try:
@@ -119,6 +124,8 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def bulk_delete(self, request):
         """一括削除（論理削除）"""
+        self.check_admin_permission()
+        
         user_ids = request.data.get('ids', [])
         
         if not user_ids:
@@ -142,6 +149,8 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def restore(self, request, pk=None):
         """ユーザー復元"""
+        self.check_admin_permission()
+        
         try:
             user = UserService.restore_user(pk)
             serializer = UserSerializer(user)
@@ -158,6 +167,8 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def bulk_restore(self, request):
         """一括復元"""
+        self.check_admin_permission()
+        
         user_ids = request.data.get('ids', [])
         
         if not user_ids:
@@ -175,9 +186,9 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def deleted(self, request):
         """削除済みユーザー一覧"""
-        deleted_users = User.all_objects.filter(deleted_at__isnull=False)
+        self.check_admin_permission()
         
-        # フィルタリング・検索・ソート適用
+        deleted_users = User.all_objects.filter(deleted_at__isnull=False)
         deleted_users = self.filter_queryset(deleted_users)
         
         page = self.paginate_queryset(deleted_users)
@@ -191,6 +202,8 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """ユーザー統計情報（高速化版）"""
+        self.check_admin_permission()
+        
         from django.db.models import Count, Q
         
         stats = User.objects.aggregate(
@@ -199,7 +212,6 @@ class UserViewSet(viewsets.ModelViewSet):
             admins=Count('id', filter=Q(is_admin=True, is_active=True))
         )
         
-        # 削除済みユーザー数
         deleted_count = User.all_objects.filter(deleted_at__isnull=False).count()
         
         return Response({

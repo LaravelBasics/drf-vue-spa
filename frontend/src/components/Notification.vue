@@ -1,4 +1,4 @@
-<!-- C:\Users\pvufx\Desktop\template\frontend\src\components\Notification.vue -->
+<!-- Desktop\template\frontend\src\components\Notification.vue -->
 <template>
     <v-snackbar
         v-model="notification.show"

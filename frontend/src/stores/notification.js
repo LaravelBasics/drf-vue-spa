@@ -1,4 +1,4 @@
-// C:\Users\pvufx\Desktop\template\frontend\src\stores\notification.js
+//　Desktop\template\frontend\src\stores\notification.js
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
