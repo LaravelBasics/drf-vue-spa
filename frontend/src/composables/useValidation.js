@@ -30,7 +30,7 @@ export function useValidation() {
                 rules.required('username'),
                 rules.minLength('username', 3),
                 rules.maxLength('username', 20),
-                rules.alphaNumeric(),
+                // rules.alphaNumeric(),
             ];
         },
 

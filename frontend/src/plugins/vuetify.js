@@ -68,6 +68,8 @@ const materialSymbols = {
         warning: 'warning', // type="warning"
         error: 'error', // type="error"
         success: 'check_circle', // type="success"
+        clear: 'close', // または 'cancel'。ここでは'close'が一般的
+        cancel: 'cancel',
         // ... (他のデフォルトアイコンも必要に応じて追加)
     },
     // 重要な変更: アイコンをレンダリングするためのコンポーネント関数

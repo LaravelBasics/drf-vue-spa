@@ -50,6 +50,68 @@
                                     hide-details
                                 />
 
+                                <v-divider class="my-6" />
+
+                                <!-- パスワード変更セクション -->
+                                <div class="mb-4">
+                                    <v-checkbox
+                                        v-model="changePassword"
+                                        label="パスワードを変更する"
+                                        hide-details
+                                        class="mb-3"
+                                    />
+
+                                    <v-expand-transition>
+                                        <div v-if="changePassword">
+                                            <v-text-field
+                                                v-model="formData.password"
+                                                label="新しいパスワード"
+                                                :rules="passwordRules"
+                                                :type="
+                                                    showPassword
+                                                        ? 'text'
+                                                        : 'password'
+                                                "
+                                                :append-inner-icon="
+                                                    showPassword
+                                                        ? 'visibility'
+                                                        : 'visibility_off'
+                                                "
+                                                @click:append-inner="
+                                                    showPassword = !showPassword
+                                                "
+                                                variant="outlined"
+                                                class="mb-3"
+                                                hint="8文字以上で入力してください"
+                                                persistent-hint
+                                            />
+
+                                            <v-text-field
+                                                v-model="passwordConfirm"
+                                                label="新しいパスワード（確認）"
+                                                :rules="passwordConfirmRules"
+                                                :type="
+                                                    showPasswordConfirm
+                                                        ? 'text'
+                                                        : 'password'
+                                                "
+                                                :append-inner-icon="
+                                                    showPasswordConfirm
+                                                        ? 'visibility'
+                                                        : 'visibility_off'
+                                                "
+                                                @click:append-inner="
+                                                    showPasswordConfirm =
+                                                        !showPasswordConfirm
+                                                "
+                                                variant="outlined"
+                                                hint="確認のため再度入力してください"
+                                                persistent-hint
+                                            />
+                                        </div>
+                                    </v-expand-transition>
+                                </div>
+
                                 <v-divider class="my-4" />
 
                                 <div class="d-flex gap-2">
@@ -115,11 +177,17 @@ const loading = ref(true);
 const submitting = ref(false);
 const form = ref(null);
 
+const changePassword = ref(false);
+const showPassword = ref(false);
+const showPasswordConfirm = ref(false);
+const passwordConfirm = ref('');
+
 const formData = ref({
     username: '',
     employee_id: '',
     is_admin: false,
     is_active: true,
+    password: '',
 });
 
 const breadcrumbs = computed(() => [
@@ -137,6 +205,26 @@ const employeeIdRules = [
     (v) => /^\d{1,10}$/.test(v) || t('form.validation.employeeIdFormat'),
 ];
 
+const passwordRules = computed(() => {
+    if (!changePassword.value) return [];
+    return [
+        (v) => !!v || 'パスワードを入力してください',
+        (v) =>
+            (v && v.length >= 8) || 'パスワードは8文字以上で入力してください',
+        (v) =>
+            (v && v.length <= 128) ||
+            'パスワードは128文字以内で入力してください',
+    ];
+});
+
+const passwordConfirmRules = computed(() => {
+    if (!changePassword.value) return [];
+    return [
+        (v) => !!v || '確認用パスワードを入力してください',
+        (v) => v === formData.value.password || 'パスワードが一致しません',
+    ];
+});
+
 const userId = computed(() => route.params.id);
 
 async function fetchUser() {
@@ -148,9 +236,11 @@ async function fetchUser() {
             employee_id: response.data.employee_id,
             is_admin: response.data.is_admin,
             is_active: response.data.is_active,
+            password: '',
         };
     } catch (error) {
         console.error('ユーザー情報取得エラー:', error);
+        notification.error('ユーザー情報の取得に失敗しました');
         router.push(routes.USERS);
     } finally {
         loading.value = false;
@@ -163,8 +253,20 @@ async function submitForm() {
 
     submitting.value = true;
     try {
-        await usersAPI.update(userId.value, formData.value);
-        // ⭐ 成功通知
+        const updateData = {
+            username: formData.value.username,
+            employee_id: formData.value.employee_id,
+            is_admin: formData.value.is_admin,
+            is_active: formData.value.is_active,
+        };
+
+        // パスワード変更が選択されている場合のみ送信
+        if (changePassword.value && formData.value.password) {
+            updateData.password = formData.value.password;
+        }
+
+        await usersAPI.update(userId.value, updateData);
+
         notification.success(
             t('pages.users.updateSuccess', {
                 username: formData.value.username,
@@ -173,7 +275,7 @@ async function submitForm() {
         router.replace(routes.USERS);
     } catch (error) {
         console.error('ユーザー更新エラー:', error);
-        // ⭐ エラー通知
+
         const errorMessage =
             error.response?.data?.error ||
             error.response?.data?.detail ||

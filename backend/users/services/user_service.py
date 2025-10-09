@@ -1,6 +1,6 @@
+# backend/users/services/user_service.py
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Q
 from rest_framework.exceptions import ValidationError
 
 User = get_user_model()
@@ -22,13 +22,11 @@ class UserService:
         Raises:
             ValidationError: 最後の管理者を削除・無効化しようとした場合
         """
-        # exists() を使用してカウント不要にする（高速化）
         query = User.objects.filter(is_admin=True, is_active=True)
         
         if user_id:
             query = query.exclude(id=user_id)
         
-        # 最初に該当者がいるか確認
         if not query.exists():
             if is_admin is None and is_active is None:
                 raise ValidationError(
@@ -53,6 +51,7 @@ class UserService:
         """
         password = validated_data.pop('password', None)
         
+        # CustomUserManager.create_user() を使用してパスワードを自動ハッシュ化
         user = User.objects.create_user(
             password=password or 'defaultpassword123',
             **validated_data
@@ -87,11 +86,19 @@ class UserService:
                 is_active=new_is_active
             )
         
-        # update_fields を使用して必要なフィールドのみ更新（高速化）
+        # パスワード処理を分離
+        password = validated_data.pop('password', None)
+        
+        # 通常のフィールド更新
         update_fields = []
         for attr, value in validated_data.items():
             setattr(user_instance, attr, value)
             update_fields.append(attr)
+        
+        # パスワードが指定されている場合はハッシュ化して保存
+        if password:
+            user_instance.set_password(password)
+            update_fields.append('password')
         
         if update_fields:
             user_instance.save(update_fields=update_fields)
@@ -114,7 +121,7 @@ class UserService:
         if user_instance.is_admin:
             UserService._check_last_admin(user_id=user_instance.id)
         
-        # 論理削除（高速）
+        # 論理削除
         user_instance.soft_delete()
     
     @staticmethod
@@ -155,7 +162,7 @@ class UserService:
                     "管理者は最低1人必要です。すべての管理者を削除することはできません。"
                 )
         
-        # 一括論理削除（update使用で超高速）
+        # 一括論理削除
         updated_count = User.objects.filter(id__in=user_ids).update(
             deleted_at=timezone.now(),
             is_active=False
@@ -177,7 +184,7 @@ class UserService:
         Raises:
             User.DoesNotExist: ユーザーが存在しない場合
         """
-        # 削除済みユーザーを取得
+        # 削除済みユーザーを取得（all_objects使用）
         user = User.all_objects.get(id=user_id, deleted_at__isnull=False)
         user.restore()
         return user

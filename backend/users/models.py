@@ -5,7 +5,11 @@ from django.utils import timezone
 
 
 class CustomUserManager(BaseUserManager):
-    """カスタムユーザーマネージャー"""
+    """カスタムユーザーマネージャー（論理削除対応）"""
+    
+    def get_queryset(self):
+        """デフォルトで削除済みを除外"""
+        return super().get_queryset().filter(deleted_at__isnull=True)
     
     def create_user(self, employee_id, password=None, **extra_fields):
         """通常のユーザーを作成"""
@@ -35,11 +39,12 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(employee_id, password, **extra_fields)
 
 
-class SoftDeleteManager(models.Manager):
-    """論理削除対応マネージャー（削除済みを除外）"""
+class AllObjectsManager(BaseUserManager):
+    """全レコード取得用マネージャー（削除済みも含む）"""
     
     def get_queryset(self):
-        return super().get_queryset().filter(deleted_at__isnull=True)
+        """削除済みも含めて全件取得"""
+        return super().get_queryset()
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -76,7 +81,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         max_length=255,
         blank=True,
         null=True,
-        # 必要に応じて unique=True に変更可能
         help_text='メールアドレス（任意）'
     )
     
@@ -110,7 +114,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         auto_now=True
     )
     
-    # 論理削除用
     deleted_at = models.DateTimeField(
         '削除日時',
         blank=True,
@@ -118,16 +121,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
     
     # ==================== Django認証設定 ====================
-    # 認証に使うフィールドを employee_id に設定
     USERNAME_FIELD = 'employee_id'
-    
-    # createsuperuser コマンドで追加入力を求めるフィールド
-    # (employee_id と password は自動的に聞かれるので不要)
     REQUIRED_FIELDS = ['username']
     
     # ==================== マネージャー ====================
-    objects = SoftDeleteManager()  # デフォルトは削除済み除外
-    all_objects = models.Manager()  # すべてのレコードにアクセス
+    objects = CustomUserManager()      # デフォルト（削除済み除外 + create_user対応）
+    all_objects = AllObjectsManager()  # 削除済みも含む全件
     
     class Meta:
         db_table = 'users'

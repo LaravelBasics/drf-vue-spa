@@ -1,43 +1,65 @@
-from django.contrib.auth.backends import BaseBackend # 👈 ModelBackend から BaseBackend に変更
+# backend/accounts/backends.py
+from django.contrib.auth.backends import BaseBackend
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ObjectDoesNotExist
 
 User = get_user_model()
 
 
-class EmployeeIdBackend(BaseBackend): # 👈 ModelBackend から BaseBackend に変更
+class EmployeeIdBackend(BaseBackend):
     """
     employee_id で認証するカスタムバックエンド
+    
+    - USERNAME_FIELD が employee_id のユーザーモデルに対応
+    - 論理削除されたユーザーも検索対象（LoginAPIView で判定）
+    - パスワードチェックのみ実施
     """
     
     def authenticate(self, request, username=None, password=None, **kwargs):
-        employee_id = username 
+        """
+        認証処理
+        
+        Args:
+            request: HTTPリクエスト
+            username: employee_id（Django内部では username として扱われる）
+            password: パスワード
+        
+        Returns:
+            User: 認証成功時のユーザーインスタンス
+            None: 認証失敗時
+        """
+        employee_id = username
         
         if employee_id is None or password is None:
-             return None
-        
-        try:
-            # ⭐ 論理削除されたユーザーも検索できるよう all_objects を使用することが推奨
-            #    Userモデルにall_objectsが定義されていることを前提
-            user = User.all_objects.get(employee_id=employee_id) 
-            
-            # もし all_objects がない場合は、objects に戻して、ユーザーが存在するか確認
-            # user = User.objects.get(employee_id=employee_id) 
-
-        except User.DoesNotExist:
             return None
         
-        # パスワード確認
-        # user_can_authenticate は BaseBackend にはないため、シンプルにチェック
+        try:
+            # 論理削除されたユーザーも検索対象
+            # （is_active や deleted_at のチェックは LoginAPIView で実施）
+            user = User.all_objects.get(employee_id=employee_id)
+        except User.DoesNotExist:
+            # 存在しないユーザー（タイミング攻撃対策のため処理時間を揃える）
+            User().set_password(password)
+            return None
+        
+        # パスワード検証
         if user.check_password(password):
             return user
         
         return None
-
+    
     def get_user(self, user_id):
-        """セッションからユーザーIDでユーザーを取得"""
+        """
+        セッションからユーザーを取得
+        
+        Args:
+            user_id: ユーザーID
+        
+        Returns:
+            User: ユーザーインスタンス
+            None: ユーザーが存在しない、または削除済みの場合
+        """
         try:
-            # ログインユーザーの取得は論理削除されていないユーザーを対象とする
+            # ログインユーザーは削除済みを除外
             return User.objects.get(pk=user_id)
         except User.DoesNotExist:
             return None
