@@ -93,7 +93,6 @@
                                 type="error"
                                 variant="tonal"
                                 class="mb-4"
-                                icon="mdi-alert-circle"
                             >
                                 {{ t('pages.userDelete.lastAdminError') }}
                             </v-alert>
