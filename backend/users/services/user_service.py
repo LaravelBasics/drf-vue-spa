@@ -2,6 +2,7 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
+from audit.utils import create_audit_log, get_model_changes
 
 User = get_user_model()
 
@@ -62,6 +63,7 @@ class UserService:
     @staticmethod
     @transaction.atomic
     def update_user(user_instance, validated_data):
+        """ユーザー更新（監査ログ対応）"""
         """
         ユーザー更新（高速化版）
         
@@ -75,6 +77,9 @@ class UserService:
         Raises:
             ValidationError: 最後の管理者を無効化しようとした場合
         """
+
+        # 変更内容を記録
+        changes = get_model_changes(user_instance, validated_data)
         # 管理者チェック（更新前の状態と更新後の状態を比較）
         if user_instance.is_admin:
             new_is_admin = validated_data.get('is_admin', user_instance.is_admin)
@@ -103,6 +108,14 @@ class UserService:
         if update_fields:
             user_instance.save(update_fields=update_fields)
         
+        # ⭐ 監査ログを記録
+        create_audit_log(
+            action='UPDATE',
+            model_name='User',
+            object_id=user_instance.id,
+            changes=changes
+        )
+
         return user_instance
 
     @staticmethod
@@ -123,6 +136,13 @@ class UserService:
         
         # 論理削除
         user_instance.soft_delete()
+
+        # ⭐ 監査ログを記録
+        create_audit_log(
+            action='DELETE',
+            model_name='User',
+            object_id=user_instance.id
+        )
     
     @staticmethod
     @transaction.atomic

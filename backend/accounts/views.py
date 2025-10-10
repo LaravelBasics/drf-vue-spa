@@ -7,6 +7,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from .serializers import LoginSerializer
+from audit.utils import create_audit_log
 
 
 class CSRFView(APIView):
@@ -19,6 +20,7 @@ class CSRFView(APIView):
 
 
 class LoginAPIView(APIView):
+    """ログインAPI（監査ログ対応）"""
     """
     ログインAPI（employee_id認証対応）
     
@@ -48,6 +50,15 @@ class LoginAPIView(APIView):
         if user:
             # 論理削除されているユーザーはログイン不可
             if hasattr(user, 'deleted_at') and user.deleted_at:
+                # ⭐ ログイン失敗を記録
+                create_audit_log(
+                    action='LOGIN_FAILED',
+                    model_name='User',
+                    object_id=user.id,
+                    success=False,
+                    error_message='削除されたアカウント',
+                    request=request
+                )
                 return Response(
                     {'detail': 'このアカウントは削除されています'}, 
                     status=status.HTTP_401_UNAUTHORIZED
@@ -55,12 +66,29 @@ class LoginAPIView(APIView):
             
             # アクティブでないユーザーはログイン不可
             if not user.is_active:
+                # ⭐ ログイン失敗を記録
+                create_audit_log(
+                    action='LOGIN_FAILED',
+                    model_name='User',
+                    object_id=user.id,
+                    success=False,
+                    error_message='無効化されたアカウント',
+                    request=request
+                )
                 return Response(
                     {'detail': 'このアカウントは無効化されています'}, 
                     status=status.HTTP_401_UNAUTHORIZED
                 )
             
             login(request, user)
+
+            # ⭐ ログイン成功を記録
+            create_audit_log(
+                action='LOGIN',
+                model_name='User',
+                object_id=user.id,
+                request=request
+            )
             return Response({
                 'detail': 'logged_in',
                 'user': {
@@ -73,6 +101,15 @@ class LoginAPIView(APIView):
                 }
             })
         
+        # ⭐ ログイン失敗を記録（ユーザー不明）
+        create_audit_log(
+            action='LOGIN_FAILED',
+            model_name='User',
+            success=False,
+            error_message=f'認証失敗: {employee_id}',
+            request=request
+        )
+
         return Response(
             {'detail': '社員番号またはパスワードが正しくありません'}, 
             status=status.HTTP_401_UNAUTHORIZED
@@ -84,6 +121,13 @@ class LogoutAPIView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
+        # ⭐ ログアウトを記録
+        create_audit_log(
+            action='LOGOUT',
+            model_name='User',
+            object_id=request.user.id,
+            request=request
+        )
         logout(request)
         return Response({'detail': 'logged_out'})
 
