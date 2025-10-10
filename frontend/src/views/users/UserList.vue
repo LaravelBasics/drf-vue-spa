@@ -26,7 +26,7 @@
                                 indeterminate
                                 size="20"
                                 width="2"
-                                color="primary"
+                                color="#1976D2"
                             />
                         </template>
                     </v-text-field>
@@ -42,7 +42,8 @@
 
                 <v-col cols="auto">
                     <v-btn
-                        color="primary"
+                        variant="outlined"
+                        color="#1976D2"
                         size="default"
                         :prepend-icon="ICONS.action.add"
                         @click="goToCreate"
