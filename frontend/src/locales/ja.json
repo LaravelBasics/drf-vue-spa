@@ -126,9 +126,10 @@
         },
         "userDelete": {
             "title": "ユーザー削除確認",
-            "warningMessage": "このユーザーを削除すると、元に戻すことはできません。",
-            "confirmMessage": "ユーザー「{username}」を削除してもよろしいですか？",
-            "lastAdminError": "管理者は最低1人必要です。最後の管理者を削除することはできません。"
+            "confirmTitle": "削除の確認",
+            "confirmMessage": "本当に「{username}」を削除しますか？",
+            "warningMessage": "このユーザーを削除すると、関連するデータも失われる可能性があります。",
+            "lastAdminError": "最後の管理者は削除できません"
         }
     }
 }

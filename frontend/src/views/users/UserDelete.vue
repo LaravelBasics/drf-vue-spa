@@ -97,23 +97,14 @@
                                 {{ t('pages.userDelete.lastAdminError') }}
                             </v-alert>
 
-                            <!-- 削除確認メッセージ -->
-                            <!-- <p class="text-h6 mb-4 text-center">
-                                {{
-                                    t('pages.userDelete.confirmMessage', {
-                                        username: user.username,
-                                    })
-                                }}
-                            </p> -->
-
                             <!-- ボタン -->
                             <div class="d-flex gap-2">
+                                <!-- ⭐ 削除ボタン: モーダルを開く -->
                                 <v-btn
                                     color="error"
                                     size="large"
-                                    :loading="deleting"
                                     :disabled="isLastAdmin"
-                                    @click="deleteUser"
+                                    @click="showConfirmDialog = true"
                                 >
                                     <v-icon class="me-2">delete</v-icon>
                                     {{ t('common.delete') }}
@@ -144,6 +135,31 @@
                 </v-col>
             </v-row>
         </v-container>
+
+        <!-- ⭐ 削除確認モーダル -->
+        <ConfirmDialog
+            v-model="showConfirmDialog"
+            :title="t('pages.userDelete.confirmTitle')"
+            :message="
+                t('pages.userDelete.confirmMessage', {
+                    username: user.username,
+                })
+            "
+            :confirm-text="t('common.delete')"
+            :cancel-text="t('common.cancel')"
+            confirm-color="error"
+            icon="info"
+            confirm-icon="delete"
+            :loading="deleting"
+            @confirm="deleteUser"
+        >
+            <!-- 追加情報（オプション） -->
+            <template #content>
+                <v-alert type="error" variant="tonal" class="mt-4">
+                    この操作は取り消せません
+                </v-alert>
+            </template>
+        </ConfirmDialog>
     </div>
 </template>
 
@@ -152,6 +168,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import Header from '@/components/Header.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue'; // ⭐ 追加
 import { usersAPI } from '@/api/users';
 import { routes } from '@/constants/routes';
 import { useNotificationStore } from '@/stores/notification';
@@ -165,6 +182,7 @@ const loading = ref(true);
 const deleting = ref(false);
 const user = ref({});
 const allUsers = ref([]);
+const showConfirmDialog = ref(false); // ⭐ 追加
 
 // パンくずリスト
 const breadcrumbs = computed(() => [
@@ -184,17 +202,14 @@ const breadcrumbs = computed(() => [
         disabled: false,
     },
     { title: t('pages.users.detailTitle2'), disabled: true },
-
     {
         title: t('pages.users.deleteTitle2'),
         disabled: true,
     },
 ]);
 
-// ユーザーIDを取得
 const userId = computed(() => route.params.id);
 
-// 最後の管理者かどうかをチェック
 const isLastAdmin = computed(() => {
     if (!user.value.is_admin) return false;
     const adminCount = allUsers.value.filter(
@@ -203,7 +218,6 @@ const isLastAdmin = computed(() => {
     return adminCount === 1;
 });
 
-// ユーザー情報を取得
 async function fetchUser() {
     loading.value = true;
     try {
@@ -215,29 +229,30 @@ async function fetchUser() {
         allUsers.value = usersResponse.data.results;
     } catch (error) {
         console.error('ユーザー情報取得エラー:', error);
-        notification.error(t('pages.users.fetchError')); // ⭐ 追加
+        notification.error(t('pages.users.fetchError'));
         router.push(routes.USERS);
     } finally {
         loading.value = false;
     }
 }
 
-// ユーザー削除
+// ⭐ ユーザー削除（モーダルから呼ばれる）
 async function deleteUser() {
     if (isLastAdmin.value) return;
 
     deleting.value = true;
     try {
         await usersAPI.delete(userId.value);
-        // ⭐ 成功通知
         notification.success(
             t('pages.users.deleteSuccess', { username: user.value.username }),
         );
+
+        // ⭐ モーダルを閉じてから遷移
+        showConfirmDialog.value = false;
         router.replace(routes.USERS);
     } catch (error) {
         console.error('ユーザー削除エラー:', error);
 
-        // ⭐ エラー通知
         const errorMessage =
             error.response?.data?.error ||
             error.response?.data?.detail ||
@@ -249,7 +264,6 @@ async function deleteUser() {
     }
 }
 
-// マウント時にデータ取得
 onMounted(() => {
     fetchUser();
 });
