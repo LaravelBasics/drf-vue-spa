@@ -1,0 +1,35 @@
+🧩 全体構成まとめ（DRF + Vue 3 + Vuetify + Pinia）
+■ フロントエンド（frontend/）
+
+技術スタック
+
+Vue.js 3（Composition API）
+
+Vuetify
+
+Pinia（状態管理）
+
+Vue Router
+
+Axios（CSRF対応あり）
+
+i18n（多言語対応）
+
+デザイン指針・権限・バリデーションなどを composable で共通化
+
+
+■ バックエンド（backend/）
+
+技術スタック
+
+Django + Django REST Framework
+
+認証：セッション認証（Cookieベース）
+
+ModelViewSet 構成（Service層 + Serializer分離）
+
+論理削除、監査ログ、ダミーデータ生成
+
+CORS, CSRF, セキュリティ設定, REST構成
+
+スマホなども対応するなら、認証はJWT推奨？

@@ -133,7 +133,9 @@ onMounted(async () => {
 }
 
 /* レイアウトシフト防止 */
-* {
+*,
+*::before,
+*::after {
     box-sizing: border-box;
 }
 
