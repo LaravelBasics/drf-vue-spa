@@ -10,7 +10,7 @@
                 <v-col cols="12" md="8" lg="6">
                     <v-card elevation="2" v-if="!loading">
                         <v-card-title class="text-h5 pa-6 bg-grey-lighten-4">
-                            {{ t('pages.users.detailTitle') }}
+                            {{ t('pages.users.detailTitle2') }}
                         </v-card-title>
 
                         <v-card-text class="pa-6">
@@ -201,7 +201,7 @@ const breadcrumbs = computed(() => [
     { title: t('nav.home'), to: routes.HOME, disabled: false },
     { title: t('pages.admin.title'), to: routes.ADMIN, disabled: false },
     { title: t('pages.users.title'), to: routes.USERS, disabled: false },
-    { title: t('pages.users.detailTitle'), disabled: true },
+    { title: t('pages.users.detailTitle2'), disabled: true },
 ]);
 
 // 最後の管理者かチェック

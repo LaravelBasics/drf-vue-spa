@@ -60,7 +60,8 @@ export const ICONS = Object.freeze({
     file: {
         document: 'description',
         pdf: 'picture_as_pdf',
-        excel: 'table_chart', // Excel代替
+        excel: 'table_chart', // ⭐ Excel/スプレッドシートの表現
+        csv: 'dataset', // ⭐ CSV/データセットの表現
         image: 'image',
         folder: 'folder',
     },

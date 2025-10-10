@@ -69,10 +69,21 @@
                 @update:options="handleOptionsUpdate"
                 @click:row="handleRowClick"
             >
-                <!-- ID列 -->
                 <template v-slot:item.id="{ item }">
-                    <span class="font-weight-medium">{{ item.id }}</span>
+                    <RouterLink
+                        :to="routes.USER_DETAIL.replace(':id', item.id)"
+                        class="font-weight-medium text-decoration-none text-primary"
+                        aria-label="ユーザー詳細へ移動"
+                        @click.stop
+                    >
+                        {{ item.id }}
+                    </RouterLink>
                 </template>
+
+                <!-- ID列 -->
+                <!-- <template v-slot:item.id="{ item }">
+                    <span class="font-weight-medium">{{ item.id }}</span>
+                </template> -->
 
                 <!-- 管理者フラグ -->
                 <template v-slot:item.is_admin="{ item }">

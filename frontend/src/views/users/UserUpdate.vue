@@ -10,11 +10,15 @@
                 <v-col cols="12" md="8" lg="8">
                     <v-card elevation="2" v-if="!loading">
                         <v-card-title class="text-h5 pa-6 bg-grey-lighten-4">
-                            {{ t('pages.users.updateTitle') }}
+                            {{ t('pages.users.updateTitle2') }}
                         </v-card-title>
 
                         <v-card-text class="pa-6">
-                            <v-form ref="form" @submit.prevent="submitForm">
+                            <v-form
+                                ref="form"
+                                @submit.prevent
+                                @keypress.enter.prevent
+                            >
                                 <v-text-field
                                     v-model="formData.username"
                                     :label="t('form.fields.username')"
@@ -117,6 +121,7 @@
                                 <div class="d-flex gap-2">
                                     <v-btn
                                         type="submit"
+                                        @click="submitForm"
                                         color="primary"
                                         size="large"
                                         :loading="submitting"
@@ -132,6 +137,7 @@
                                         size="large"
                                         prepend-icon="arrow_back"
                                         @click="router.back()"
+                                        type="button"
                                     >
                                         {{ t('common.back') }}
                                     </v-btn>
@@ -194,7 +200,12 @@ const breadcrumbs = computed(() => [
     { title: t('nav.home'), to: routes.HOME, disabled: false },
     { title: t('pages.admin.title'), to: routes.ADMIN, disabled: false },
     { title: t('pages.users.title'), to: routes.USERS, disabled: false },
-    { title: t('pages.users.updateTitle'), disabled: true },
+    {
+        title: t('pages.users.detailTitle2'),
+        to: routes.USER_DETAIL,
+        disabled: true,
+    },
+    { title: t('pages.users.updateTitle2'), disabled: true },
 ]);
 
 const usernameRules = createRules.username();

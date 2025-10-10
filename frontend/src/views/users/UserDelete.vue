@@ -1,7 +1,7 @@
 <template>
     <div>
         <Header
-            :app-title="t('pages.userDelete.title')"
+            :app-title="t('pages.users.deleteTitle')"
             :breadcrumbs="breadcrumbs"
         ></Header>
 
@@ -10,7 +10,7 @@
                 <v-col cols="12" md="8" lg="8">
                     <v-card class="elevation-2">
                         <v-card-title class="text-h5 pa-6 bg-error text-white">
-                            {{ t('pages.userDelete.title') }}
+                            {{ t('pages.users.deleteTitle2') }}
                         </v-card-title>
 
                         <v-card-text class="pa-6" v-if="!loading">
@@ -183,8 +183,10 @@ const breadcrumbs = computed(() => [
         to: routes.USERS,
         disabled: false,
     },
+    { title: t('pages.users.detailTitle2'), disabled: true },
+
     {
-        title: t('pages.userDelete.title'),
+        title: t('pages.users.deleteTitle2'),
         disabled: true,
     },
 ]);
