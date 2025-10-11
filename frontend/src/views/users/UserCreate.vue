@@ -29,7 +29,7 @@ const breadcrumbs = computed(() => [
     { title: t('nav.home'), to: routes.HOME, disabled: false },
     { title: t('pages.admin.title'), to: routes.ADMIN, disabled: false },
     { title: t('pages.users.title'), to: routes.USERS, disabled: false },
-    { title: t('pages.users.createTitle'), disabled: true },
+    { title: t('pages.users.createTitle2'), disabled: true },
 ]);
 
 // ⭐ バリデーションルールは createRules から直接取得
@@ -68,13 +68,13 @@ function goBack() {
             :breadcrumbs="breadcrumbs"
         />
 
-        <v-container class="pa-6">
+        <v-container class="pa-4">
             <v-row justify="center">
-                <v-col cols="12" md="8" lg="6">
+                <v-col cols="12" sm="10" md="6">
                     <v-card elevation="2">
-                        <v-card-title class="text-h5 pa-6 bg-grey-lighten-4">
+                        <!-- <v-card-title class="text-h5 pa-6 bg-grey-lighten-4">
                             {{ t('pages.users.createTitle') }}
-                        </v-card-title>
+                        </v-card-title> -->
 
                         <v-card-text class="pa-6">
                             <!-- ⭐ フォーム参照をセット -->

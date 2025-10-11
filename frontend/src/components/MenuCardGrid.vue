@@ -1,13 +1,13 @@
 <template>
-    <v-container fluid>
+    <v-container fluid class="pa-6">
         <v-row>
             <v-col
                 v-for="(item, index) in items"
                 :key="index"
-                cols="12"
-                sm="6"
-                md="4"
-                lg="3"
+                cols="6"
+                sm="4"
+                md="3"
+                lg="2"
                 xl="2"
             >
                 <MenuCard

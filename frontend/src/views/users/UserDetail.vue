@@ -5,21 +5,18 @@
             :breadcrumbs="breadcrumbs"
         />
 
-        <v-container class="pa-6">
+        <v-container class="pa-4">
             <v-row justify="center">
-                <v-col cols="12" md="8" lg="6">
+                <v-col cols="12" sm="10" md="6">
                     <v-card elevation="2" v-if="!loading">
-                        <v-card-title class="text-h5 pa-6 bg-grey-lighten-4">
+                        <!-- <v-card-title class="text-h5 pa-6 bg-grey-lighten-4">
                             {{ t('pages.users.detailTitle2') }}
-                        </v-card-title>
+                        </v-card-title> -->
 
                         <v-card-text class="pa-6">
                             <!-- ユーザー情報表示 -->
                             <v-row class="mb-3">
-                                <v-col
-                                    cols="4"
-                                    class="font-weight-bold text-grey-darken-1"
-                                >
+                                <v-col cols="4" class="font-weight-bold">
                                     ID:
                                 </v-col>
                                 <v-col cols="8">
@@ -30,10 +27,7 @@
                             <v-divider class="my-3"></v-divider>
 
                             <v-row class="mb-3">
-                                <v-col
-                                    cols="4"
-                                    class="font-weight-bold text-grey-darken-1"
-                                >
+                                <v-col cols="4" class="font-weight-bold">
                                     {{ t('form.fields.username') }}:
                                 </v-col>
                                 <v-col cols="8">
@@ -44,10 +38,7 @@
                             <v-divider class="my-3"></v-divider>
 
                             <v-row class="mb-3">
-                                <v-col
-                                    cols="4"
-                                    class="font-weight-bold text-grey-darken-1"
-                                >
+                                <v-col cols="4" class="font-weight-bold">
                                     {{ t('form.fields.employeeId') }}:
                                 </v-col>
                                 <v-col cols="8">
@@ -58,14 +49,25 @@
                             <v-divider class="my-3"></v-divider>
 
                             <v-row class="mb-3">
-                                <v-col
-                                    cols="4"
-                                    class="font-weight-bold text-grey-darken-1"
-                                >
+                                <v-col cols="4" class="font-weight-bold">
                                     {{ t('form.fields.isAdmin') }}:
                                 </v-col>
                                 <v-col cols="8">
-                                    <v-chip
+                                    <v-icon
+                                        :color="
+                                            user.is_admin ? 'success' : 'grey'
+                                        "
+                                        :size="
+                                            user.is_admin ? 'default' : 'small'
+                                        "
+                                    >
+                                        {{
+                                            user.is_admin
+                                                ? ICONS.status.check
+                                                : ICONS.status.minus
+                                        }}
+                                    </v-icon>
+                                    <!-- <v-chip
                                         :color="
                                             user.is_admin
                                                 ? 'success'
@@ -78,17 +80,14 @@
                                                 ? t('common.yes')
                                                 : t('common.no')
                                         }}
-                                    </v-chip>
+                                    </v-chip> -->
                                 </v-col>
                             </v-row>
 
                             <v-divider class="my-3"></v-divider>
 
                             <v-row class="mb-3">
-                                <v-col
-                                    cols="4"
-                                    class="font-weight-bold text-grey-darken-1"
-                                >
+                                <v-col cols="4" class="font-weight-bold">
                                     {{ t('form.fields.isActive') }}:
                                 </v-col>
                                 <v-col cols="8">
@@ -110,10 +109,7 @@
                             <v-divider class="my-3"></v-divider>
 
                             <v-row class="mb-3">
-                                <v-col
-                                    cols="4"
-                                    class="font-weight-bold text-grey-darken-1"
-                                >
+                                <v-col cols="4" class="font-weight-bold">
                                     {{ t('form.fields.createdAt') }}:
                                 </v-col>
                                 <v-col cols="8">
@@ -121,13 +117,14 @@
                                 </v-col>
                             </v-row>
 
-                            <v-divider class="my-4"></v-divider>
+                            <v-divider class="my-4" />
 
                             <!-- アクションボタン -->
                             <div class="d-flex gap-2">
                                 <v-btn
                                     color="primary"
                                     size="large"
+                                    variant="outlined"
                                     :prepend-icon="ICONS.action.edit"
                                     @click="goToUpdate"
                                 >
@@ -139,6 +136,7 @@
                                 <v-btn
                                     color="error"
                                     size="large"
+                                    variant="outlined"
                                     :prepend-icon="ICONS.action.delete"
                                     @click="goToDelete"
                                     :disabled="isLastAdmin"

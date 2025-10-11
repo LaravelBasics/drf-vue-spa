@@ -13,7 +13,7 @@ const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
 const { createRules } = useValidation();
-const { handleApiError, showSuccess } = useApiError(); // ⭐ 通知統一
+const { handleApiError, showInfo } = useApiError(); // ⭐ 通知統一
 const { colors, getIcon, getSize } = useDesignSystem();
 
 const employeeId = ref('');
@@ -47,7 +47,7 @@ async function onSubmit() {
 
         if (result.success) {
             // ⭐ 成功通知を表示
-            showSuccess('auth.loginSuccess', {}, 3000); // 2秒に指定
+            showInfo('auth.loginSuccess', {}, 3000); // デフォルトの設定は5秒
 
             // ⭐ フェードアウトしてから遷移
             isVisible.value = false;
@@ -135,8 +135,6 @@ async function onSubmit() {
                             </v-btn>
                         </v-form>
                     </v-card-text>
-
-                    <!-- ⭐ エラーメッセージはもう不要（通知で表示） -->
                 </v-card>
             </div>
         </transition>

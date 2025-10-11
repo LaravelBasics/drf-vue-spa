@@ -1,6 +1,11 @@
 <!-- src/components/ConfirmDialog.vue -->
 <template>
-    <v-dialog v-model="dialog" max-width="500" persistent>
+    <v-dialog
+        v-model="dialog"
+        max-width="500"
+        persistent
+        class="dialog-offset-up"
+    >
         <v-card>
             <!-- ヘッダー -->
             <v-card-title class="text-h5 pa-4" :class="headerClass">
@@ -18,6 +23,16 @@
 
             <!-- ボタン -->
             <v-card-actions class="pa-4">
+                <v-btn
+                    :color="confirmColor"
+                    @click="handleConfirm"
+                    :loading="loading"
+                    class="custom-confirm"
+                >
+                    <v-icon class="me-2">{{ confirmIcon }}</v-icon>
+                    {{ confirmText }}
+                </v-btn>
+
                 <v-spacer></v-spacer>
 
                 <v-btn
@@ -26,15 +41,6 @@
                     :disabled="loading"
                 >
                     {{ cancelText }}
-                </v-btn>
-
-                <v-btn
-                    :color="confirmColor"
-                    @click="handleConfirm"
-                    :loading="loading"
-                >
-                    <v-icon class="me-2">{{ confirmIcon }}</v-icon>
-                    {{ confirmText }}
                 </v-btn>
             </v-card-actions>
         </v-card>
@@ -127,3 +133,45 @@ function handleCancel() {
     dialog.value = false;
 }
 </script>
+
+<style scoped>
+/*
+ * Vuetify のボタンのクラスと色変数を利用してボーダーを追加します。
+ * .v-btn--theme-${color} は、:color="color" が指定されたときに付与されるクラスです。
+ * rgb(var(--v-theme-${color})) は、その色の CSS 変数から色を取得する記法です。
+ */
+
+/* ------------------------------------------- */
+/* 実行ボタンにボーダーを追加 */
+/* ------------------------------------------- */
+
+.v-btn.custom-confirm {
+    /* ボーダーをボタン全体に追加 */
+    border: 2px solid;
+}
+
+/* error color が指定された場合のボーダー色 */
+.v-btn.custom-confirm.v-btn--theme-error {
+    border-color: rgb(var(--v-theme-error)) !important;
+}
+
+/* warning color が指定された場合のボーダー色 */
+.v-btn.custom-confirm.v-btn--theme-warning {
+    border-color: rgb(var(--v-theme-warning)) !important;
+}
+
+/* primary color が指定された場合のボーダー色 */
+.v-btn.custom-confirm.v-btn--theme-primary {
+    border-color: rgb(var(--v-theme-primary)) !important;
+}
+
+/* success color が指定された場合のボーダー色 */
+.v-btn.custom-confirm.v-btn--theme-success {
+    border-color: rgb(var(--v-theme-success)) !important;
+}
+
+.dialog-offset-up :deep(.v-overlay__content) {
+    /* 垂直方向の上端から30pxの位置に配置 */
+    top: 50px !important;
+}
+</style>

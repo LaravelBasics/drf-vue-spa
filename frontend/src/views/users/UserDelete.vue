@@ -5,13 +5,13 @@
             :breadcrumbs="breadcrumbs"
         ></Header>
 
-        <v-container class="pa-6">
+        <v-container class="pa-4">
             <v-row justify="center">
-                <v-col cols="12" md="8" lg="8">
+                <v-col cols="12" sm="10" md="6">
                     <v-card class="elevation-2">
-                        <v-card-title class="text-h5 pa-6 bg-error text-white">
+                        <!-- <v-card-title class="text-h5 pa-6 bg-error text-white">
                             {{ t('pages.users.deleteTitle2') }}
-                        </v-card-title>
+                        </v-card-title> -->
 
                         <v-card-text class="pa-6" v-if="!loading">
                             <!-- 警告メッセージ -->
@@ -97,12 +97,15 @@
                                 {{ t('pages.userDelete.lastAdminError') }}
                             </v-alert>
 
+                            <v-divider class="my-4" />
+
                             <!-- ボタン -->
                             <div class="d-flex gap-2">
                                 <!-- 削除ボタン: モーダルを開く -->
                                 <v-btn
                                     color="error"
                                     size="large"
+                                    variant="outlined"
                                     :disabled="isLastAdmin"
                                     @click="showConfirmDialog = true"
                                 >
@@ -142,7 +145,7 @@
             :title="t('pages.userDelete.confirmTitle')"
             :message="
                 t('pages.userDelete.confirmMessage', {
-                    username: user.username,
+                    employee_id: user.employee_id,
                 })
             "
             :confirm-text="t('common.delete')"
@@ -192,7 +195,7 @@ const breadcrumbs = computed(() => [
         disabled: false,
     },
     {
-        title: t('nav.management'),
+        title: t('pages.admin.title'),
         to: routes.ADMIN,
         disabled: false,
     },

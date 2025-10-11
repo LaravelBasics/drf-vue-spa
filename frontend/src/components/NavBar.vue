@@ -23,6 +23,7 @@
             @click="handleLogout"
             :color="colors.current.secondary"
             class="mr-2"
+            variant="outlined"
         >
             <v-icon :size="getSize('sm')" class="me-2">
                 {{ getIcon('nav', 'logout') }}

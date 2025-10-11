@@ -7,6 +7,7 @@
         :location="auth.user ? 'top' : 'top center'"
         :content-class="!auth.user ? 'snackbar-login-center' : ''"
         :multi-line="false"
+        class="custom-snackbar-width"
     >
         <div class="d-flex align-center">
             <v-icon :icon="getIcon" class="mr-3" />

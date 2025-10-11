@@ -128,13 +128,13 @@ onMounted(() => {
             :breadcrumbs="breadcrumbs"
         ></Header>
 
-        <v-container class="pa-6">
+        <v-container class="pa-4">
             <v-row justify="center">
-                <v-col cols="12" md="8" lg="8">
+                <v-col cols="12" sm="12" md="10">
                     <v-card elevation="2" v-if="!loading">
-                        <v-card-title class="text-h5 pa-6 bg-grey-lighten-4">
+                        <!-- <v-card-title class="text-h5 pa-6 bg-grey-lighten-4">
                             {{ t('pages.users.updateTitle2') }}
-                        </v-card-title>
+                        </v-card-title> -->
 
                         <v-card-text class="pa-6">
                             <!-- ⭐ フォーム参照をセット -->
@@ -143,106 +143,125 @@ onMounted(() => {
                                 @submit.prevent
                                 @keypress.enter.prevent
                             >
-                                <!-- ⭐ 基本情報 -->
-                                <v-text-field
-                                    v-model="formData.username"
-                                    :label="t('form.fields.username')"
-                                    :rules="usernameRules"
-                                    variant="outlined"
-                                    class="mb-4"
-                                    required
-                                />
+                                <v-row>
+                                    <v-col cols="12" md="6" class="pb-0">
+                                        <!-- ⭐ 基本情報 -->
+                                        <v-text-field
+                                            v-model="formData.username"
+                                            :label="t('form.fields.username')"
+                                            :rules="usernameRules"
+                                            variant="outlined"
+                                            class="mb-2"
+                                            required
+                                        />
+                                    </v-col>
 
-                                <v-text-field
-                                    v-model="formData.employee_id"
-                                    :label="t('form.fields.employeeId')"
-                                    :rules="employeeIdRules"
-                                    variant="outlined"
-                                    type="text"
-                                    inputmode="numeric"
-                                    class="mb-4"
-                                    required
-                                    hint="10桁以内の数字"
-                                    persistent-hint
-                                />
+                                    <v-col cols="12" md="6" class="pb-0">
+                                        <v-text-field
+                                            v-model="formData.employee_id"
+                                            :label="t('form.fields.employeeId')"
+                                            :rules="employeeIdRules"
+                                            variant="outlined"
+                                            type="text"
+                                            inputmode="numeric"
+                                            class="mb-4"
+                                            required
+                                            hint="10桁以内の数字"
+                                            persistent-hint
+                                        />
+                                    </v-col>
 
-                                <v-checkbox
-                                    v-model="formData.is_admin"
-                                    :label="t('form.fields.isAdmin')"
-                                    class="mb-2"
-                                    hide-details
-                                />
-
-                                <v-checkbox
-                                    v-model="formData.is_active"
-                                    :label="t('form.fields.isActive')"
-                                    class="mb-2"
-                                    hide-details
-                                />
-
-                                <v-divider class="my-6" />
-
-                                <!-- ⭐ パスワード変更セクション -->
-                                <div class="mb-4">
-                                    <v-checkbox
-                                        v-model="changePassword"
-                                        label="パスワードを変更する"
-                                        hide-details
-                                        class="mb-3"
-                                    />
-
-                                    <v-expand-transition>
-                                        <div v-if="changePassword">
-                                            <!-- ⭐ ルール適用 -->
-                                            <v-text-field
-                                                v-model="formData.password"
-                                                label="新しいパスワード"
-                                                :rules="passwordRules"
-                                                :type="
-                                                    showPassword
-                                                        ? 'text'
-                                                        : 'password'
-                                                "
-                                                :append-inner-icon="
-                                                    showPassword
-                                                        ? 'visibility'
-                                                        : 'visibility_off'
-                                                "
-                                                @click:append-inner="
-                                                    showPassword = !showPassword
-                                                "
-                                                variant="outlined"
-                                                class="mb-3"
-                                                hint="8文字以上、英字と数字を含む"
-                                                persistent-hint
+                                    <v-col cols="12" md="6" class="pt-0">
+                                        <!-- ⭐ パスワード変更セクション -->
+                                        <div class="mb-0">
+                                            <v-checkbox
+                                                v-model="changePassword"
+                                                label="パスワードを変更する"
+                                                hide-details
+                                                class="mb-2"
                                             />
 
-                                            <!-- ⭐ パスワード確認ルール適用 -->
-                                            <v-text-field
-                                                v-model="passwordConfirm"
-                                                label="新しいパスワード（確認）"
-                                                :rules="passwordConfirmRules"
-                                                :type="
-                                                    showPasswordConfirm
-                                                        ? 'text'
-                                                        : 'password'
-                                                "
-                                                :append-inner-icon="
-                                                    showPasswordConfirm
-                                                        ? 'visibility'
-                                                        : 'visibility_off'
-                                                "
-                                                @click:append-inner="
-                                                    showPasswordConfirm =
-                                                        !showPasswordConfirm
-                                                "
-                                                variant="outlined"
-                                                hint="確認のため再度入力してください"
-                                                persistent-hint
-                                            />
+                                            <v-expand-transition>
+                                                <div v-if="changePassword">
+                                                    <!-- ⭐ ルール適用 -->
+                                                    <v-text-field
+                                                        v-model="
+                                                            formData.password
+                                                        "
+                                                        label="新しいパスワード"
+                                                        :rules="passwordRules"
+                                                        :type="
+                                                            showPassword
+                                                                ? 'text'
+                                                                : 'password'
+                                                        "
+                                                        :append-inner-icon="
+                                                            showPassword
+                                                                ? 'visibility'
+                                                                : 'visibility_off'
+                                                        "
+                                                        @click:append-inner="
+                                                            showPassword =
+                                                                !showPassword
+                                                        "
+                                                        variant="outlined"
+                                                        class="mb-3"
+                                                        hint="8文字以上、英字と数字を含む"
+                                                        persistent-hint
+                                                    />
+
+                                                    <!-- ⭐ パスワード確認ルール適用 -->
+                                                    <v-text-field
+                                                        v-model="
+                                                            passwordConfirm
+                                                        "
+                                                        label="新しいパスワード（確認）"
+                                                        :rules="
+                                                            passwordConfirmRules
+                                                        "
+                                                        :type="
+                                                            showPasswordConfirm
+                                                                ? 'text'
+                                                                : 'password'
+                                                        "
+                                                        :append-inner-icon="
+                                                            showPasswordConfirm
+                                                                ? 'visibility'
+                                                                : 'visibility_off'
+                                                        "
+                                                        @click:append-inner="
+                                                            showPasswordConfirm =
+                                                                !showPasswordConfirm
+                                                        "
+                                                        variant="outlined"
+                                                        hint="確認のため再度入力してください"
+                                                        persistent-hint
+                                                    />
+                                                </div>
+                                            </v-expand-transition>
                                         </div>
-                                    </v-expand-transition>
-                                </div>
+                                    </v-col>
+                                </v-row>
+
+                                <v-row>
+                                    <v-col cols="12" md="6" class="pt-0">
+                                        <v-checkbox
+                                            v-model="formData.is_admin"
+                                            :label="t('form.fields.isAdmin')"
+                                            class="mb-2"
+                                            hide-details
+                                        />
+                                    </v-col>
+
+                                    <v-col cols="12" md="6" class="pt-0">
+                                        <v-checkbox
+                                            v-model="formData.is_active"
+                                            :label="t('form.fields.isActive')"
+                                            class="mb-2"
+                                            hide-details
+                                        />
+                                    </v-col>
+                                </v-row>
 
                                 <v-divider class="my-4" />
 
@@ -252,6 +271,7 @@ onMounted(() => {
                                         @click="submitForm"
                                         color="primary"
                                         size="large"
+                                        variant="outlined"
                                         :loading="submitting"
                                         prepend-icon="save"
                                     >

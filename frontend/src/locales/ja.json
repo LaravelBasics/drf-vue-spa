@@ -73,7 +73,7 @@
         "no": "いいえ",
         "number": "No",
         "actions": "操作",
-        "create": "作成",
+        "create": "登録",
         "edit": "編集",
         "delete": "削除",
         "cancel": "キャンセル",
@@ -103,9 +103,10 @@
         },
         "users": {
             "title": "ユーザー管理",
-            "searchPlaceholder": "ユーザー名で検索",
-            "createButton": "新規ユーザー",
-            "createTitle": "ユーザー新規作成",
+            "searchPlaceholder": "ユーザー名",
+            "createButton": "ユーザー登録",
+            "createTitle": "ユーザー登録",
+            "createTitle2": "登録",
             "detailTitle": "ユーザー詳細",
             "detailTitle2": "詳細",
             "updateTitle": "ユーザー編集",
@@ -113,16 +114,16 @@
             "deleteTitle": "ユーザー削除",
             "deleteTitle2": "削除",
             "cannotDeleteLastAdmin": "最後の管理者は削除できません",
-            "createSuccess": "ユーザー「{username}」を作成しました",
+            "createSuccess": "ユーザー「{username}」を登録しました",
             "updateSuccess": "ユーザー「{username}」を更新しました",
             "deleteSuccess": "ユーザー「{username}」を削除しました",
-            "createError": "ユーザーの作成に失敗しました",
+            "createError": "ユーザーの登録に失敗しました",
             "updateError": "ユーザーの更新に失敗しました",
             "deleteError": "ユーザーの削除に失敗しました",
             "fetchError": "ユーザー情報の取得に失敗しました"
         },
         "userCreate": {
-            "title": "新規作成"
+            "title": "新規登録"
         },
         "userEdit": {
             "title": "ユーザー編集"
@@ -130,7 +131,7 @@
         "userDelete": {
             "title": "ユーザー削除確認",
             "confirmTitle": "削除の確認",
-            "confirmMessage": "本当に「{username}」を削除しますか？",
+            "confirmMessage": "本当に社員番号「 {employee_id} 」を削除しますか？",
             "warningMessage": "このユーザーを削除すると、関連するデータも失われる可能性があります。",
             "lastAdminError": "最後の管理者は削除できません"
         }

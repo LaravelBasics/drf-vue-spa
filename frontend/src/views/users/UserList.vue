@@ -5,11 +5,11 @@
             :breadcrumbs="breadcrumbs"
         />
 
-        <v-container fluid class="pa-6">
+        <v-container fluid class="pa-4">
             <!-- 検索・操作エリア -->
 
             <v-row class="mb-1 align-center">
-                <v-col cols="auto">
+                <v-col cols="12" sm="5" md="3">
                     <v-text-field
                         v-model="searchQuery"
                         :label="t('pages.users.searchPlaceholder')"
@@ -18,7 +18,6 @@
                         density="compact"
                         clearable
                         hide-details
-                        style="width: 400px"
                         @update:model-value="handleSearchInput"
                     >
                         <template v-slot:append-inner v-if="searching">
@@ -26,13 +25,13 @@
                                 indeterminate
                                 size="20"
                                 width="2"
-                                color="#1976D2"
+                                color="primary"
                             />
                         </template>
                     </v-text-field>
                 </v-col>
 
-                <v-col cols="auto">
+                <v-col cols="12" sm="4" md="3">
                     <div class="text-body-2 text-grey-darken-1">
                         {{ startItem }}-{{ endItem }} / {{ totalItems }}件
                     </div>
@@ -40,10 +39,10 @@
 
                 <v-spacer />
 
-                <v-col cols="auto">
+                <v-col cols="12" sm="3" md="3" class="d-flex justify-end">
                     <v-btn
                         variant="outlined"
-                        color="#1976D2"
+                        color="primary"
                         size="default"
                         :prepend-icon="ICONS.action.add"
                         @click="goToCreate"
