@@ -1,3 +1,72 @@
+<script setup>
+import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import { useValidation } from '@/composables/useValidation';
+import { useApiError } from '@/composables/useApiError'; // ⭐ 追加
+import Header from '@/components/Header.vue';
+import { usersAPI } from '@/api/users';
+import { routes } from '@/constants/routes';
+import { ICONS } from '@/constants/icons';
+
+const router = useRouter();
+const { t } = useI18n();
+const { createRules } = useValidation();
+const { handleApiError, showSuccess } = useApiError(); // ⭐ 追加
+
+const submitting = ref(false);
+const form = ref(null);
+
+const formData = ref({
+    username: '',
+    employee_id: '',
+    password: '',
+    is_admin: false,
+});
+
+const breadcrumbs = computed(() => [
+    { title: t('nav.home'), to: routes.HOME, disabled: false },
+    { title: t('pages.admin.title'), to: routes.ADMIN, disabled: false },
+    { title: t('pages.users.title'), to: routes.USERS, disabled: false },
+    { title: t('pages.users.createTitle'), disabled: true },
+]);
+
+const usernameRules = createRules.username();
+const employeeIdRules = [
+    (v) =>
+        !!v ||
+        t('form.validation.required', { field: t('form.fields.employeeId') }),
+    (v) => /^\d{1,10}$/.test(v) || t('form.validation.employeeIdFormat'),
+];
+const passwordRules = createRules.newPassword();
+
+async function submitForm() {
+    const { valid } = await form.value.validate();
+    if (!valid) return;
+
+    submitting.value = true;
+    try {
+        await usersAPI.create(formData.value);
+
+        // ⭐ 成功メッセージ（シンプル）
+        showSuccess('pages.users.createSuccess', {
+            username: formData.value.username,
+        });
+
+        router.replace(routes.USERS);
+    } catch (error) {
+        // ⭐ エラーハンドリング（1行で完結！）
+        handleApiError(error, 'pages.users.createError');
+    } finally {
+        submitting.value = false;
+    }
+}
+
+function goBack() {
+    router.replace(routes.USERS);
+}
+</script>
+
 <template>
     <div>
         <Header
@@ -87,83 +156,3 @@
         </v-container>
     </div>
 </template>
-
-<script setup>
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { useI18n } from 'vue-i18n';
-import { useValidation } from '@/composables/useValidation';
-import { useNotificationStore } from '@/stores/notification';
-import Header from '@/components/Header.vue';
-import { usersAPI } from '@/api/users';
-import { routes } from '@/constants/routes';
-import { ICONS } from '@/constants/icons';
-
-const router = useRouter();
-const { t } = useI18n();
-const { createRules } = useValidation();
-const notification = useNotificationStore();
-
-const submitting = ref(false);
-const form = ref(null);
-
-const formData = ref({
-    username: '',
-    employee_id: '',
-    password: '',
-    is_admin: false,
-});
-
-const breadcrumbs = computed(() => [
-    { title: t('nav.home'), to: routes.HOME, disabled: false },
-    {
-        title: t('pages.admin.title'),
-        to: routes.ADMIN,
-        disabled: false,
-    },
-    { title: t('pages.users.title'), to: routes.USERS, disabled: false },
-    { title: t('pages.users.createTitle'), disabled: true },
-]);
-
-const usernameRules = createRules.username();
-const employeeIdRules = [
-    (v) =>
-        !!v ||
-        t('form.validation.required', { field: t('form.fields.employeeId') }),
-    (v) => /^\d{1,10}$/.test(v) || t('form.validation.employeeIdFormat'),
-];
-const passwordRules = createRules.newPassword();
-
-async function submitForm() {
-    const { valid } = await form.value.validate();
-    if (!valid) return;
-
-    submitting.value = true;
-    try {
-        await usersAPI.create(formData.value);
-        // ⭐ 成功通知
-        notification.success(
-            t('pages.users.createSuccess', {
-                username: formData.value.username,
-            }),
-        );
-        router.replace(routes.USERS);
-    } catch (error) {
-        console.error('ユーザー作成エラー:', error);
-
-        // ⭐ エラー通知
-        const errorMessage =
-            error.response?.data?.detail ||
-            error.response?.data?.error ||
-            t('pages.users.createError');
-
-        notification.error(errorMessage);
-    } finally {
-        submitting.value = false;
-    }
-}
-
-function goBack() {
-    router.replace(routes.USERS);
-}
-</script>

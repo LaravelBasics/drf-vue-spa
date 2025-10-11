@@ -23,7 +23,7 @@ const isVisible = ref(false); // ⭐ フェードイン制御
 const form = ref(null); // ⭐ これを追加！フォームを参照するための ref を定義します ⭐
 
 // ⭐ バリデーションルールを分離
-const employeeIdRules = createRules.loginUseremployeeId();
+const employeeIdRules = createRules.loginEmployeeId(); // ⭐ 修正済み
 const passwordRules = createRules.loginPassword();
 
 // ⭐ マウント時にスムーズフェードイン

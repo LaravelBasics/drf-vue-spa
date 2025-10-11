@@ -99,7 +99,7 @@
 
                             <!-- ボタン -->
                             <div class="d-flex gap-2">
-                                <!-- ⭐ 削除ボタン: モーダルを開く -->
+                                <!-- 削除ボタン: モーダルを開く -->
                                 <v-btn
                                     color="error"
                                     size="large"
@@ -136,7 +136,7 @@
             </v-row>
         </v-container>
 
-        <!-- ⭐ 削除確認モーダル -->
+        <!-- 削除確認モーダル -->
         <ConfirmDialog
             v-model="showConfirmDialog"
             :title="t('pages.userDelete.confirmTitle')"
@@ -167,22 +167,22 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
-import ConfirmDialog from '@/components/ConfirmDialog.vue'; // ⭐ 追加
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { usersAPI } from '@/api/users';
 import { routes } from '@/constants/routes';
-import { useNotificationStore } from '@/stores/notification';
 
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
-const notification = useNotificationStore();
+const { handleApiError, showSuccess } = useApiError();
 
 const loading = ref(true);
 const deleting = ref(false);
 const user = ref({});
 const allUsers = ref([]);
-const showConfirmDialog = ref(false); // ⭐ 追加
+const showConfirmDialog = ref(false);
 
 // パンくずリスト
 const breadcrumbs = computed(() => [
@@ -193,7 +193,7 @@ const breadcrumbs = computed(() => [
     },
     {
         title: t('nav.management'),
-        to: routes.USERS,
+        to: routes.ADMIN,
         disabled: false,
     },
     {
@@ -226,39 +226,30 @@ async function fetchUser() {
             usersAPI.list(),
         ]);
         user.value = userResponse.data;
-        allUsers.value = usersResponse.data.results;
+        allUsers.value = usersResponse.data.results || usersResponse.data;
     } catch (error) {
-        console.error('ユーザー情報取得エラー:', error);
-        notification.error(t('pages.users.fetchError'));
+        handleApiError(error, 'pages.users.fetchError');
         router.push(routes.USERS);
     } finally {
         loading.value = false;
     }
 }
 
-// ⭐ ユーザー削除（モーダルから呼ばれる）
 async function deleteUser() {
     if (isLastAdmin.value) return;
 
     deleting.value = true;
     try {
         await usersAPI.delete(userId.value);
-        notification.success(
-            t('pages.users.deleteSuccess', { username: user.value.username }),
-        );
 
-        // ⭐ モーダルを閉じてから遷移
+        showSuccess('pages.users.deleteSuccess', {
+            username: user.value.username,
+        });
+
         showConfirmDialog.value = false;
         router.replace(routes.USERS);
     } catch (error) {
-        console.error('ユーザー削除エラー:', error);
-
-        const errorMessage =
-            error.response?.data?.error ||
-            error.response?.data?.detail ||
-            t('pages.users.deleteError');
-
-        notification.error(errorMessage);
+        handleApiError(error, 'pages.users.deleteError');
     } finally {
         deleting.value = false;
     }

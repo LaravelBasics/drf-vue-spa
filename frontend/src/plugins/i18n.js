@@ -21,7 +21,7 @@ const i18n = createI18n({
         ja,
         en,
     },
-    // ⭐ フォールバックの警告を表示（開発時のみ）
+    // ⭐ 本番環境では警告を非表示、開発環境では表示
     silentFallbackWarn: import.meta.env.PROD,
     // ⭐ 翻訳が見つからない場合の警告を表示（開発時のみ）
     silentTranslationWarn: import.meta.env.PROD,

@@ -75,8 +75,6 @@ const ui = useUiStore();
 const { getIcon, getSize } = useDesignSystem();
 const { isAdmin } = usePermissions();
 
-const currentLocale = computed(() => locale.value);
-
 const navItems = computed(() => [
     { title: t('nav.home'), icon: ICONS.nav.home, to: routes.HOME },
     {

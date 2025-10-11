@@ -1,0 +1,1032 @@
+🧩 全体構成まとめ（DRF + Vue 3 + Vuetify + Pinia）
+■ フロントエンド（frontend/）
+
+技術スタック
+
+Vue.js 3（Composition API）
+
+Vuetify
+
+Pinia（状態管理）
+
+Vue Router
+
+Axios（CSRF対応あり）
+
+i18n（多言語対応）
+
+デザイン指針・権限・バリデーションなどを composable で共通化
+
+
+
+*******************************************************************************
+
+1. コンポーネントの役割
+ConfirmDialog.vue - 確認ダイアログ
+
+<!-- 使用例 -->
+<ConfirmDialog
+    v-model="showDialog"
+    title="削除確認"
+    message="本当に削除しますか？"
+    confirm-text="削除"
+    cancel-text="キャンセル"
+    confirm-color="error"
+    icon="alert-circle"
+    :loading="isDeleting"
+    @confirm="handleDelete"
+    @cancel="handleCancel"
+>
+    <!-- オプション: 追加情報 -->
+    <template #content>
+        <p class="text-caption text-grey">この操作は取り消せません</p>
+    </template>
+</ConfirmDialog>
+
+*******************************************************************************
+Header.vue - ヘッダー＋パンくず
+
+<!-- 使用例 -->
+<Header
+    app-title="管理システム"
+    :breadcrumbs="[
+        { title: 'ホーム', to: '/' },
+        { title: 'ユーザー管理', to: '/users', disabled: true }
+    ]"
+    :page-buttons="[
+        { name: '新規作成', icon: 'add', type: 'primary', action: handleCreate },
+        { name: 'エクスポート', icon: 'download', type: 'success', action: handleExport }
+    ]"
+/>
+
+*******************************************************************************
+MenuCard.vue - メニューカード（単体）
+
+<!-- 使用例 -->
+<MenuCard
+    icon="admin_panel_settings"
+    title="管理"
+    to="/admin"
+    color="primary"
+    :icon-size="64"
+/>
+
+*******************************************************************************
+MenuCardGrid.vue - メニューカードのグリッド表示
+
+<script setup>
+const menuItems = [
+    { icon: 'dashboard', title: 'ダッシュボード', to: '/dashboard', color: 'primary' },
+    { icon: 'person', title: 'プロフィール', to: '/profile', color: 'success' },
+    { icon: 'settings', title: '設定', to: '/settings', color: 'info' }
+];
+</script>
+
+<template>
+    <MenuCardGrid :items="menuItems" />
+</template>
+
+*******************************************************************************
+NavBar.vue - トップナビゲーションバー
+
+ハンバーガーメニュー（レール切り替え）
+ブランドロゴ＋タイトル
+ユーザー名表示
+ログアウトボタン
+
+*******************************************************************************
+SideBar.vue - サイドナビゲーション
+
+ナビゲーションアイテム（ホーム、ダッシュボード、プロフィールなど）
+権限に応じたフィルタリング（isAdminで管理メニュー表示）
+言語切り替えボタン（下部固定）
+
+*******************************************************************************
+Notification.vue - トースト通知
+// stores/notification.js で使用
+notification.success('保存しました');
+notification.error('エラーが発生しました');
+notification.warning('注意してください');
+notification.info('お知らせです');
+
+
+*******************************************************************************
+2. Composables（再利用可能なロジック）
+useDesignSystem.js - デザインシステム管理
+
+const { colors, getIcon, getSize, getSpacing, toggleTheme } = useDesignSystem();
+
+// 使用例
+const iconSize = getSize('md'); // 24
+const primaryColor = colors.value.current.primary;
+const homeIcon = getIcon('nav', 'home'); // 'home'
+
+*******************************************************************************
+usePermissions.js - 権限管理
+
+const { isAdmin, isActive } = usePermissions();
+
+// 使用例
+<v-btn v-if="isAdmin">管理メニュー</v-btn>
+
+*******************************************************************************
+useValidation.js - バリデーションルール
+
+const { rules, createRules } = useValidation();
+
+// 使用例
+const employeeIdRules = createRules.loginUseremployeeId();
+const passwordRules = createRules.loginPassword();
+
+*******************************************************************************
+3. Constants（定数管理）
+
+icons.js - アイコン統一管理
+
+import { ICONS } from '@/constants/icons';
+
+// 使用例
+<v-icon>{{ ICONS.nav.home }}</v-icon>
+<v-icon>{{ ICONS.action.add }}</v-icon>
+<v-icon>{{ ICONS.status.success }}</v-icon>
+
+*******************************************************************************
+theme.js - テーマ・デザイン統一
+
+import { COLORS, SPACING } from '@/constants/theme';
+
+// 使用例
+const primaryColor = COLORS.brand.primary; // '#1976D2'
+const padding = SPACING.lg; // 24
+
+*******************************************************************************
+messages.js - エラーメッセージ統一
+
+import { messages } from '@/constants/messages';
+
+// 使用例（バリデーションエラー）
+const errorMsg = messages.required.replace('{name}', messages.fields.employeeId);
+// → "社員番号は必須です"
+
+
+********************************************************************************
+
+1. ルーティング関連
+routes.js - ルート定義の統一管理
+
+import { routes } from '@/constants/routes';
+
+// 使用例: プログラムでのナビゲーション
+router.push(routes.USER_DETAIL.replace(':id', userId));
+router.push(routes.HOME);
+
+// テンプレートでの使用
+<v-btn :to="routes.USERS">ユーザー一覧</v-btn>
+
+メリット: タイポ防止、一括変更が容易
+
+*******************************************************************************
+2. API層
+auth.js - 認証API
+
+import { authAPI } from '@/api/auth';
+
+// 使用例
+await authAPI.getCsrf();
+await authAPI.login('12345', 'password');
+await authAPI.logout();
+const user = await authAPI.me();
+
+*******************************************************************************
+users.js - ユーザー管理API
+
+import { usersAPI } from '@/api/users';
+
+// 使用例
+const users = await usersAPI.list({ page: 1, search: 'test' });
+const user = await usersAPI.get(userId);
+await usersAPI.create({ username: 'new_user', ... });
+await usersAPI.update(userId, { username: 'updated' });
+await usersAPI.delete(userId);
+const stats = await usersAPI.stats();
+
+*******************************************************************************
+3. Axios設定
+axios.js - 自動CSRF・認証エラーハンドリング
+
+// 自動的に処理される内容:
+// 1. CSRFトークンの自動取得・付与（POST/PUT/PATCH/DELETE時）
+// 2. 401/403エラー時の自動ログアウト
+// 3. CSRFエラー時の自動リトライ
+
+// 使用例（通常は直接使わない）
+import api from '@/plugins/axios';
+const response = await api.get('/some-endpoint/');
+
+*******************************************************************************
+4. 認証ストア
+auth.js (Pinia Store)
+
+import { useAuthStore } from '@/stores/auth';
+
+const auth = useAuthStore();
+
+// 使用例
+await auth.loginSession('12345', 'password');
+await auth.logout();
+await auth.fetchUser(); // ユーザー情報再取得
+await auth.initialize(); // 初回初期化（アプリ起動時）
+await auth.validateSession(); // セッション有効性チェック
+
+// 状態参照
+console.log(auth.user); // ユーザー情報
+console.log(auth.isAuthenticated); // ログイン状態
+console.log(auth.loading); // ローディング中
+
+重要: persistでuserを永続化（リロード時も保持）
+
+*******************************************************************************
+5. ナビゲーションガード
+auth-guard.js - 認証チェック
+
+// ルート定義での使用
+{
+    path: '/dashboard',
+    meta: { requiresAuth: true } // ⭐ ログイン必須
+}
+
+{
+    path: '/login',
+    meta: { hideForAuth: true } // ⭐ ログイン済みはホームへ
+}
+
+*******************************************************************************
+admin-guard.js - 管理者権限チェック
+
+// ルート定義での使用
+{
+    path: '/admin',
+    meta: { 
+        requiresAuth: true,
+        requiresAdmin: true // ⭐ 管理者のみアクセス可能
+    }
+}
+
+処理の流れ:
+
+beforeEachでauth-guard実行 → 未ログインなら/auth/loginへ
+次にadmin-guard実行 → 非管理者なら/へ（unauthorized=adminクエリ付き）
+
+*******************************************************************************
+6. 通知ストア
+notification.js (Pinia Store)
+
+import { useNotificationStore } from '@/stores/notification';
+
+const notification = useNotificationStore();
+
+// 使用例
+notification.success('保存しました'); // 5秒表示
+notification.error('エラーが発生しました', 7000); // 7秒表示
+notification.warning('注意してください', 6000);
+notification.info('お知らせです');
+notification.close(); // 手動で閉じる
+
+*******************************************************************************
+7. UIストア
+ui.js (Pinia Store)
+
+import { useUiStore } from '@/stores/ui';
+
+const ui = useUiStore();
+
+// 使用例
+ui.toggleDrawer(); // サイドバー開閉
+ui.toggleRail(); // レールモード切り替え（PC時のみ）
+
+// 状態参照
+console.log(ui.drawer); // サイドバーの開閉状態
+console.log(ui.rail); // レールモード（アイコンのみ表示）
+console.log(ui.isDesktop); // PC画面かどうか
+
+レスポンシブ対応:
+
+PC: drawer=true, rail=true（ミニモード）
+モバイル: drawer=false, railは無視（一時的に開閉）
+
+*******************************************************************************
+8. バリデーション
+validation.js
+
+import { createValidationRules } from '@/utils/validation';
+
+const rules = createValidationRules();
+
+// 使用例（v-text-field）
+<v-text-field
+    :rules="[
+        rules.required('username'),
+        rules.minLength('username', 3),
+        rules.maxLength('username', 20)
+    ]"
+/>
+
+// カスタムバリデーション
+<v-text-field
+    :rules="[
+        rules.custom(
+            (value) => /^[0-9]+$/.test(value),
+            'form.validation.employeeIdFormat'
+        )
+    ]"
+/>
+
+*******************************************************************************
+9. i18n（多言語対応）
+i18n.js - 自動言語検出 + フォールバック
+
+import { useI18n } from 'vue-i18n';
+
+const { t, locale } = useI18n();
+
+// 使用例
+<h1>{{ t('pages.users.title') }}</h1> // "ユーザー管理"
+<v-btn>{{ t('actions.save') }}</v-btn> // "保存"
+
+// 言語切り替え
+locale.value = 'en'; // 英語に変更
+locale.value = 'ja'; // 日本語に変更
+
+// パラメータ付き翻訳
+t('form.validation.maxLength', { field: 'ユーザー名', max: 20 })
+// → "ユーザー名は20文字以内で入力してください"
+
+フォールバック設定:
+
+英語の翻訳がない場合、日本語を表示
+開発時のみ警告を表示（silentFallbackWarn: false）
+
+*******************************************************************************
+10. Vuetify設定
+vuetify.js - Material Symbols対応
+
+// アイコンの使い方
+<v-icon>home</v-icon> // Material Symbols
+<v-icon>{{ ICONS.nav.home }}</v-icon> // 定数経由
+
+// 内部で自動変換されるアイコン
+// - v-pagination: prev/next
+// - v-data-table: sortAsc/sortDesc/expand
+// - v-checkbox: checkboxOn/checkboxOff
+// - v-radio: radioOn/radioOff
+
+カスタムアイコンセット:
+
+materialSymbols.componentで<span class="material-symbols-outlined">をレンダリング
+Vuetifyの内部アイコン（ページネーション、テーブルなど）も自動変換
+
+******************************************************************************************************
+
+1. ログイン画面 (Login.vue)
+特徴
+
+フルスクリーン中央配置のモーダルスタイル
+フェードイン/アウトのスムーズな遷移
+エラーメッセージのスライドアニメーション
+使い方
+
+<script setup>
+// バリデーションルールを取得
+const employeeIdRules = createRules.loginEmployeeId();
+const passwordRules = createRules.loginPassword();
+
+// フォーム送信
+async function onSubmit() {
+    const { valid } = await form.value.validate();
+    if (!valid) return;
+    
+    // ログイン処理
+    const result = await auth.loginSession(employeeId.value, password.value);
+    
+    if (result.success) {
+        // フェードアウトしてから遷移
+        isVisible.value = false;
+        setTimeout(() => router.push(redirect), 300);
+    }
+}
+</script>
+
+ポイント:
+
+form.value.validate()でバリデーション実行
+エラーはmessages.auth.invalidCredentialsで統一
+遷移前にフェードアウト（300ms待機）
+
+*******************************************************************************
+2. ユーザー一覧 (UserList.vue)
+特徴
+
+v-data-table-serverでサーバーサイドページネーション
+検索デバウンス（500ms）
+行クリックで詳細画面へ遷移
+URLパラメータ同期（検索・ページ・ソート）
+
+使い方
+<script setup>
+// デバウンス付き検索
+function handleSearchInput(value) {
+    searching.value = true;
+    
+    if (searchTimer) clearTimeout(searchTimer);
+    
+    searchTimer = setTimeout(() => {
+        currentPage.value = 1; // ページリセット
+        fetchUsers();
+        updateURLParams(); // URL同期
+    }, 500);
+}
+
+// テーブルオプション更新（ページ・ソート変更時）
+function handleOptionsUpdate(options) {
+    currentPage.value = options.page;
+    itemsPerPage.value = options.itemsPerPage;
+    sortBy.value = options.sortBy;
+    
+    fetchUsers();
+    updateURLParams();
+}
+
+// 行クリックで詳細へ
+function handleRowClick(event, { item }) {
+    router.push(routes.USER_DETAIL.replace(':id', item.id));
+}
+</script>
+
+URL同期の例:
+/users?search=test&page=2&sort=username&order=asc
+
+*******************************************************************************
+3. ユーザー作成 (UserCreate.vue)
+使い方
+
+<script setup>
+// フォームデータ
+const formData = ref({
+    username: '',
+    employee_id: '',
+    password: '',
+    is_admin: false,
+});
+
+// バリデーションルール
+const usernameRules = createRules.username();
+const employeeIdRules = [
+    (v) => !!v || t('form.validation.required', { field: t('form.fields.employeeId') }),
+    (v) => /^\d{1,10}$/.test(v) || t('form.validation.employeeIdFormat'),
+];
+const passwordRules = createRules.newPassword();
+
+// 送信処理
+async function submitForm() {
+    const { valid } = await form.value.validate();
+    if (!valid) return;
+    
+    try {
+        await usersAPI.create(formData.value);
+        notification.success(t('pages.users.createSuccess', { username: formData.value.username }));
+        router.replace(routes.USERS);
+    } catch (error) {
+        notification.error(error.response?.data?.detail || t('pages.users.createError'));
+    }
+}
+</script>
+
+*******************************************************************************
+4. ユーザー更新 (UserUpdate.vue)
+特徴
+
+パスワード変更はオプション（チェックボックスで制御）
+パスワード確認欄付き
+v-expand-transitionでスムーズな展開
+
+使い方
+<script setup>
+const changePassword = ref(false);
+const passwordConfirm = ref('');
+
+// パスワードルール（変更時のみ有効）
+const passwordRules = computed(() => {
+    if (!changePassword.value) return [];
+    return [
+        (v) => !!v || 'パスワードを入力してください',
+        (v) => v.length >= 8 || 'パスワードは8文字以上で入力してください',
+    ];
+});
+
+const passwordConfirmRules = computed(() => {
+    if (!changePassword.value) return [];
+    return [
+        (v) => !!v || '確認用パスワードを入力してください',
+        (v) => v === formData.value.password || 'パスワードが一致しません',
+    ];
+});
+
+// 送信処理
+async function submitForm() {
+    const updateData = {
+        username: formData.value.username,
+        employee_id: formData.value.employee_id,
+        is_admin: formData.value.is_admin,
+        is_active: formData.value.is_active,
+    };
+    
+    // パスワード変更が選択されている場合のみ送信
+    if (changePassword.value && formData.value.password) {
+        updateData.password = formData.value.password;
+    }
+    
+    await usersAPI.update(userId.value, updateData);
+}
+</script>
+
+*******************************************************************************
+5. ユーザー削除 (UserDelete.vue)
+特徴
+
+ConfirmDialogコンポーネント使用
+最後の管理者は削除不可
+
+使い方
+<script setup>
+const showConfirmDialog = ref(false);
+
+// 最後の管理者チェック
+const isLastAdmin = computed(() => {
+    if (!user.value.is_admin) return false;
+    const adminCount = allUsers.value.filter(u => u.is_admin && u.is_active).length;
+    return adminCount === 1;
+});
+
+// 削除処理
+async function deleteUser() {
+    if (isLastAdmin.value) return;
+    
+    deleting.value = true;
+    try {
+        await usersAPI.delete(userId.value);
+        notification.success(t('pages.users.deleteSuccess', { username: user.value.username }));
+        
+        showConfirmDialog.value = false;
+        router.replace(routes.USERS);
+    } catch (error) {
+        notification.error(error.response?.data?.detail || t('pages.users.deleteError'));
+    } finally {
+        deleting.value = false;
+    }
+}
+</script>
+
+<template>
+    <!-- 削除ボタン -->
+    <v-btn color="error" :disabled="isLastAdmin" @click="showConfirmDialog = true">
+        {{ t('common.delete') }}
+    </v-btn>
+    
+    <!-- 確認ダイアログ -->
+    <ConfirmDialog
+        v-model="showConfirmDialog"
+        :title="t('pages.userDelete.confirmTitle')"
+        :message="t('pages.userDelete.confirmMessage', { username: user.username })"
+        confirm-color="error"
+        :loading="deleting"
+        @confirm="deleteUser"
+    >
+        <template #content>
+            <v-alert type="error" variant="tonal">この操作は取り消せません</v-alert>
+        </template>
+    </ConfirmDialog>
+</template>
+
+*******************************************************************************
+6. ユーザー詳細 (UserDetail.vue)
+使い方
+<script setup>
+// 並列取得（ユーザー情報 + 全ユーザー一覧）
+async function fetchUser() {
+    const [userResponse, usersResponse] = await Promise.all([
+        usersAPI.get(userId.value),
+        usersAPI.list(),
+    ]);
+    user.value = userResponse.data;
+    allUsers.value = usersResponse.data.results || usersResponse.data;
+}
+
+// 最後の管理者チェック
+const isLastAdmin = computed(() => {
+    if (!user.value.is_admin) return false;
+    const adminCount = allUsers.value.filter(u => u.is_admin && u.is_active).length;
+    return adminCount === 1;
+});
+</script>
+
+*******************************************************************************
+7. ホーム画面 (Home.vue)
+特徴
+
+MenuCardGridで動的なメニュー表示
+権限フィルタリング（管理者専用メニュー）
+権限エラー通知（unauthorized=adminクエリパラメータ検出）
+
+使い方
+<script setup>
+// マウント時に権限エラーチェック
+onMounted(() => {
+    if (route.query.unauthorized === 'admin') {
+        notification.warning('この機能は管理者のみ利用できます', 5000);
+        router.replace({ path: routes.HOME, query: {} }); // URLクリーン
+    }
+});
+
+// メニューアイテムの定義
+const menuItems = [
+    {
+        icon: ICONS.nav.management,
+        title: '管理者メニュー',
+        to: routes.ADMIN,
+        color: 'primary',
+        requiresAdmin: true, // ⭐ 管理者専用
+    },
+    // ...
+];
+
+// 権限フィルタリング
+const filteredMenuItems = computed(() => {
+    return menuItems.filter(item => {
+        if (item.requiresAdmin) {
+            return isAdmin.value;
+        }
+        return true;
+    });
+});
+</script>
+
+*******************************************************************************
+8. App.vue - 初期化制御
+特徴
+
+フォント・アイコン読み込み待機
+チラつき防止（白画面 → 一気表示）
+main.jsと連携した二段階初期化
+
+使い方
+<script setup>
+const appReady = ref(false);
+
+onMounted(async () => {
+    await Promise.all([
+        // 認証初期化（main.jsで済んでいればスキップ）
+        auth.initialized ? Promise.resolve() : auth.initialize(),
+        // フォント・アイコン読み込み
+        waitForFontsAndIcons(),
+        // 最小表示時間（100ms）
+        new Promise(resolve => setTimeout(resolve, 100)),
+    ]);
+    
+    await nextTick(); // DOM更新待機
+    
+    appReady.value = true; // 一気に表示
+});
+</script>
+
+<template>
+    <!-- 準備完了後に表示 -->
+    <div v-show="appReady" :class="['app-content', { 'fade-in': appReady }]">
+        <NavBar v-if="auth.user" />
+        <SideBar v-if="auth.user" />
+        <v-main><router-view /></v-main>
+    </div>
+    
+    <!-- 準備中は白画面 -->
+    <div v-show="!appReady" class="loading-screen"></div>
+</template>
+
+*******************************************************************************
+9. main.js - 事前初期化
+使い方
+const initializeApp = async () => {
+    try {
+        const authStore = useAuthStore();
+        await authStore.initialize(); // ⭐ 事前に認証状態取得
+    } catch (error) {
+        console.error('事前初期化エラー:', error);
+        // エラーが発生してもマウントする
+    } finally {
+        app.mount('#app');
+    }
+};
+
+initializeApp();
+
+処理の流れ:
+
+main.js: authStore.initialize()実行（永続化データ確認 → サーバー同期）
+App.vue: auth.initializedがtrueなら再実行スキップ
+フォント・アイコン読み込み完了
+一気に画面表示
+
+********************************************************************************
+
+composables/useApiError.js
+
+🎯 useApiError とは？APIエラーを自動的に解析して、ユーザーに分かりやすいメッセージを表示するComposable
+
+📖 基本的な使い方1. インポート
+import { useApiError } from '@/composables/useApiError';
+
+const { handleApiError, showSuccess } = useApiError();
+
+2. API呼び出し時のエラーハンドリングパターンA: 基本形（フォールバックメッセージあり）
+async function submitForm() {
+    try {
+        await usersAPI.create(formData.value);
+        
+        // 成功メッセージ
+        showSuccess('pages.users.createSuccess', { username: formData.value.username });
+        
+        router.push(routes.USERS);
+    } catch (error) {
+        // ⭐ エラーハンドリング（1行で完結）
+        handleApiError(error, 'pages.users.createError');
+    }
+}
+
+動作:
+
+サーバーから詳細なエラーメッセージが返ってくる → それを表示
+サーバーからエラーメッセージがない → フォールバック「ユーザーの作成に失敗しました」を表示
+
+-------------------------------------------------------
+パターンB: フォールバックメッセージなし
+
+async function fetchUsers() {
+    try {
+        const response = await usersAPI.list();
+        users.value = response.data.results;
+    } catch (error) {
+        // フォールバックなし（サーバーのエラーメッセージのみ表示）
+        handleApiError(error);
+    }
+}
+
+--------------------------------------------------------
+パターンC: カスタム表示時間
+async function deleteUser() {
+    try {
+        await usersAPI.delete(userId.value);
+        showSuccess('pages.users.deleteSuccess', { username: user.value.username });
+    } catch (error) {
+        // 10秒間表示（デフォルトは7秒）
+        handleApiError(error, 'pages.users.deleteError', 10000);
+    }
+}
+
+---------------------------------------------------------
+3. 成功メッセージの表示
+基本形
+// i18nのキーを指定
+showSuccess('pages.users.createSuccess', { username: 'yamada' });
+// → 「ユーザー「yamada」を作成しました」
+
+
+カスタム表示時間
+// 3秒間表示（デフォルトは5秒）
+showSuccess('pages.users.updateSuccess', { username: 'yamada' }, 3000);
+
+
+4. 警告・情報メッセージ
+// 警告メッセージ（6秒表示）
+showWarning('pages.users.lastAdminWarning');
+
+// 情報メッセージ（5秒表示）
+showInfo('pages.users.accountLocked');
+
+
+🔍 エラーメッセージの解析ロジック
+handleApiError() は以下の優先順位でエラーメッセージを抽出します：
+
+1. error.response.data.detail        （DRF標準）
+   ↓
+2. error.response.data.error         （カスタムフィールド）
+   ↓
+3. error.response.data[field_name]   （Serializer Validation）
+   例: employee_id, username, email, password
+   ↓
+4. error.response.data.non_field_errors  （フォーム全体のエラー）
+   ↓
+5. ネットワークエラー
+   → "サーバーに接続できません。ネットワーク接続を確認してください。"
+   ↓
+6. フォールバックメッセージ（引数で指定したi18nキー）
+   ↓
+7. 最終フォールバック
+   → "エラーが発生しました"
+
+
+🎯 実際のエラーレスポンス例
+例1: 社員番号の重複エラー
+サーバーからのレスポンス:
+{
+  "employee_id": ["社員番号「E001」は既に使用されています。別の社員番号を入力してください。"]
+}
+
+フロントエンドでの処理:
+handleApiError(error, 'pages.users.createError');
+// → 通知: "社員番号「E001」は既に使用されています。別の社員番号を入力してください。"
+
+-------------------------------------------------
+例2: 最後の管理者削除エラー
+サーバーからのレスポンス:
+{
+  "detail": "管理者は最低1人必要です。最後の管理者を削除することはできません。"
+}
+
+フロントエンドでの処理:
+handleApiError(error, 'pages.users.deleteError');
+// → 通知: "管理者は最低1人必要です。最後の管理者を削除することはできません。"
+
+-------------------------------------------------
+例3: ネットワークエラー
+サーバーに接続できない:
+
+handleApiError(error, 'pages.users.fetchError');
+// → 通知: "サーバーに接続できません。ネットワーク接続を確認してください。"
+
+-------------------------------------------------
+例4: サーバーがエラーメッセージを返さない
+サーバーからのレスポンス:
+{
+  "status": 500
+}
+
+-------------------------------------------------
+フロントエンドでの処理:
+handleApiError(error, 'pages.users.createError');
+// → 通知: "ユーザーの作成に失敗しました"（フォールバック）
+
+
+
+********************************************************************************
+補足：
+🎯 theme.js と useDesignSystem.js の役割分担theme.js の役割：データの定義
+
+静的な定数の集約場所
+設定ファイルとして機能
+Single Source of Truth（信頼できる唯一の情報源）
+useDesignSystem.js の役割：データへのアクセス層
+
+Vuetifyのテーマと連携
+リアクティブな値を提供
+便利なヘルパー関数を提供
+
+🔄 データの流れ
+┌─────────────────┐
+│   theme.js      │  ⭐ データの定義（静的）
+│  - COLORS       │
+│  - ICON_SIZES   │
+│  - SPACING      │
+└────────┬────────┘
+         │
+         │ import
+         ↓
+┌─────────────────┐
+│ vuetify.js      │  ⭐ Vuetifyに設定を注入
+│ (plugins)       │
+└─────────────────┘
+         │
+         │ useTheme()
+         ↓
+┌─────────────────┐
+│useDesignSystem  │  ⭐ リアクティブなアクセス層
+│  - colors       │      + 便利なヘルパー関数
+│  - getSize()    │
+│  - getIcon()    │
+└────────┬────────┘
+         │
+         │ 使用
+         ↓
+┌─────────────────┐
+│ Vue Components  │  ⭐ コンポーネントで使用
+│  (*.vue)        │
+└─────────────────┘
+
+--------------------------------------------------------------
+使い分け
+// ✅ Vueコンポーネント内
+const { colors, getSize } = useDesignSystem();
+const iconSize = getSize('md');
+
+// ✅ Vuetify設定ファイル（vuetify.js）
+import { COLORS, ELEVATION } from '@/constants/theme';
+const primary = COLORS.brand.primary;
+
+// ✅ ユーティリティ関数（Vue外）
+import { ICON_SIZES, SPACING } from '@/constants/theme';
+const padding = SPACING.lg;
+
+// ❌ Vueコンポーネント内で定数を直接import（非推奨）
+// import { COLORS } from '@/constants/theme'; // これは非推奨
+// const primary = COLORS.brand.primary; // useDesignSystem()を推奨
+
+
+なぜ両方必要？
+
+theme.js: データの定義場所として必須
+
+Vuetify設定で使う
+ユーティリティ関数で使う
+全ての場所から参照できる
+
+
+useDesignSystem.js: Vueコンポーネントでの便利なアクセス層
+
+Vuetifyのテーマと連携
+リアクティブに対応
+ヘルパー関数で簡潔に
+
+
+
+結論: theme.jsはデータの倉庫、useDesignSystemは便利な窓口です(´・ω・｀)！
+********************************************************************************
+
+frontend/
+├── src/
+│   ├── api/
+│   │   ├── auth.js              ✅ 使用中
+│   │   └── users.js             ✅ 使用中
+│   │
+│   ├── assets/
+│   │   └── style/
+│   │       └── main.scss        ✅ 使用中
+│   │
+│   ├── components/
+│   │   ├── ConfirmDialog.vue    ✅ 使用中（UserDelete.vue）
+│   │   ├── Header.vue           ✅ 使用中（全ページ）
+│   │   ├── MenuCard.vue         ✅ 使用中（MenuCardGrid）
+│   │   ├── MenuCardGrid.vue     ✅ 使用中（Home.vue, AdminMenu.vue）
+│   │   ├── NavBar.vue           ✅ 使用中（App.vue）
+│   │   ├── Notification.vue     ✅ 使用中（App.vue）
+│   │   └── SideBar.vue          ✅ 使用中（App.vue）
+│   │
+│   ├── composables/
+│   │   ├── useApiError.js       ✅ 使用中（全CRUD画面）
+│   │   ├── useDesignSystem.js   ✅ 使用中（全コンポーネント）
+│   │   ├── usePermissions.js    ✅ 使用中（SideBar.vue, Home.vue）
+│   │   └── useValidation.js     ✅ 使用中（Login.vue, UserCreate.vue等）
+│   │
+│   ├── constants/
+│   │   ├── icons.js             ✅ 使用中（全コンポーネント）
+│   │   ├── messages.js          ✅ 使用中（Login.vue）
+│   │   ├── routes.js            ✅ 使用中（router, 全画面）
+│   │   └── theme.js             ✅ 使用中（vuetify.js, useDesignSystem）
+│   │
+│   ├── locales/
+│   │   ├── ja.json              ✅ 使用中
+│   │   └── en.json              ✅ 使用中
+│   │
+│   ├── plugins/
+│   │   ├── axios.js             ✅ 使用中（API通信）
+│   │   ├── i18n.js              ✅ 使用中（多言語対応）
+│   │   └── vuetify.js           ✅ 使用中（UI）
+│   │
+│   ├── router/
+│   │   ├── admin-guard.js       ✅ 使用中（router/index.js）
+│   │   ├── auth-guard.js        ✅ 使用中（router/index.js）
+│   │   └── index.js             ✅ 使用中（main.js）
+│   │
+│   ├── stores/
+│   │   ├── auth.js              ✅ 使用中（全画面）
+│   │   ├── notification.js      ✅ 使用中（useApiError経由）
+│   │   └── ui.js                ✅ 使用中（NavBar, SideBar）
+│   │
+│   ├── utils/
+│   │   └── validation.js        ✅ 使用中（useValidation経由）
+│   │
+│   ├── views/
+│   │   ├── admin/
+│   │   │   └── AdminMenu.vue    ✅ 使用中
+│   │   ├── users/
+│   │   │   ├── UserList.vue     ✅ 使用中
+│   │   │   ├── UserCreate.vue   ✅ 使用中
+│   │   │   ├── UserDetail.vue   ✅ 使用中
+│   │   │   ├── UserUpdate.vue   ✅ 使用中
+│   │   │   └── UserDelete.vue   ✅ 使用中
+│   │   ├── Home.vue             ✅ 使用中
+│   │   ├── Login.vue            ✅ 使用中
+│   │   └── Settings.vue         ✅ 使用中
+│   │
+│   ├── App.vue                  ✅ 使用中
+│   └── main.js                  ✅ 使用中
+│
+├── index.html                   ✅ 使用中
+├── vite.config.js               ✅ 使用中
+└── package.json                 ✅ 使用中

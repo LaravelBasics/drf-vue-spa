@@ -125,7 +125,7 @@
                                         color="primary"
                                         size="large"
                                         :loading="submitting"
-                                        :prepend-icon="ICONS.action.save"
+                                        prepend-icon="save"
                                     >
                                         {{ t('common.save') }}
                                     </v-btn>
@@ -167,17 +167,16 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useValidation } from '@/composables/useValidation';
+import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
 import { routes } from '@/constants/routes';
-import { useNotificationStore } from '@/stores/notification';
-import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
 const { createRules } = useValidation();
-const notification = useNotificationStore();
+const { handleApiError, showSuccess } = useApiError();
 
 const loading = ref(true);
 const submitting = ref(false);
@@ -250,8 +249,7 @@ async function fetchUser() {
             password: '',
         };
     } catch (error) {
-        console.error('ユーザー情報取得エラー:', error);
-        notification.error('ユーザー情報の取得に失敗しました');
+        handleApiError(error, 'pages.users.fetchError');
         router.push(routes.USERS);
     } finally {
         loading.value = false;
@@ -278,21 +276,13 @@ async function submitForm() {
 
         await usersAPI.update(userId.value, updateData);
 
-        notification.success(
-            t('pages.users.updateSuccess', {
-                username: formData.value.username,
-            }),
-        );
+        showSuccess('pages.users.updateSuccess', {
+            username: formData.value.username,
+        });
+
         router.replace(routes.USERS);
     } catch (error) {
-        console.error('ユーザー更新エラー:', error);
-
-        const errorMessage =
-            error.response?.data?.error ||
-            error.response?.data?.detail ||
-            t('pages.users.updateError');
-
-        notification.error(errorMessage);
+        handleApiError(error, 'pages.users.updateError');
     } finally {
         submitting.value = false;
     }

@@ -39,7 +39,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
         required=True,
         style={'input_type': 'password'},
         min_length=8,
-        max_length=128
+        max_length=128,
+        error_messages={
+            'min_length': 'パスワードは8文字以上で入力してください',
+            'max_length': 'パスワードは128文字以内で入力してください',
+            'required': 'パスワードは必須です',
+        }
     )
     
     class Meta:
@@ -54,22 +59,38 @@ class UserCreateSerializer(serializers.ModelSerializer):
     
     def validate_employee_id(self, value):
         """社員番号のバリデーション"""
-        if not value.strip():
+        if not value or not value.strip():
             raise serializers.ValidationError('社員番号は必須です')
         
+        value = value.strip()
+
         # 既存チェック（削除済みは除外）
         if User.objects.filter(employee_id=value).exists():
-            raise serializers.ValidationError('この社員番号は既に使用されています')
+            raise serializers.ValidationError(
+                f'社員番号「{value}」は既に使用されています。別の社員番号を入力してください。'
+            )
+        
+        return value
+    
+    def validate_username(self, value):
+        """ユーザー名のバリデーション"""
+        if not value or not value.strip():
+            raise serializers.ValidationError('ユーザー名は必須です')
         
         return value.strip()
     
     def validate_email(self, value):
         """メールアドレスのバリデーション"""
         if value:
-            # メールアドレスをユニークにしたい場合
+            value = value.strip().lower()
+            
+            # ⭐ メールアドレスをユニークにしたい場合
             # if User.objects.filter(email=value).exists():
-            #     raise serializers.ValidationError('このメールアドレスは既に使用されています')
-            return value.strip().lower()
+            #     raise serializers.ValidationError(
+            #         f'メールアドレス「{value}」は既に使用されています'
+            #     )
+            
+            return value
         return None
 
 
@@ -87,7 +108,11 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         allow_blank=True,
         style={'input_type': 'password'},
         min_length=8,
-        max_length=128
+        max_length=128,
+        error_messages={
+            'min_length': 'パスワードは8文字以上で入力してください',
+            'max_length': 'パスワードは128文字以内で入力してください',
+        }
     )
     
     class Meta:
@@ -109,25 +134,38 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         instance = self.instance
         value = value.strip()
         
-        # 自分以外で同じ社員番号が存在するかチェック（削除済みは除外）
+        # ⭐ 自分以外で同じ社員番号が存在するかチェック
         if User.objects.filter(employee_id=value).exclude(id=instance.id).exists():
-            raise serializers.ValidationError('この社員番号は既に使用されています')
+            raise serializers.ValidationError(
+                f'社員番号「{value}」は既に使用されています。別の社員番号を入力してください。'
+            )
         
         return value
+    
+    def validate_username(self, value):
+        """ユーザー名のバリデーション"""
+        if not value or not value.strip():
+            raise serializers.ValidationError('ユーザー名は必須です')
+        
+        return value.strip()
     
     def validate_email(self, value):
         """メールアドレスのバリデーション"""
         if value:
+            value = value.strip().lower()
             instance = self.instance
-            # 自分以外で同じメールアドレスがあるかチェック
+            
+            # ⭐ 自分以外で同じメールアドレスがあるかチェック
             # if User.objects.filter(email=value).exclude(id=instance.id).exists():
-            #     raise serializers.ValidationError('このメールアドレスは既に使用されています')
-            return value.strip().lower()
+            #     raise serializers.ValidationError(
+            #         f'メールアドレス「{value}」は既に使用されています'
+            #     )
+            
+            return value
         return None
     
     def validate_password(self, value):
         """パスワードのバリデーション"""
-        # 空文字列の場合はNoneを返す（更新しない）
         if not value or not value.strip():
             return None
         return value

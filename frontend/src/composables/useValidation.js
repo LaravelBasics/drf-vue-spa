@@ -8,7 +8,7 @@ export function useValidation() {
     // よく使われる組み合わせを定義
     const createRules = {
         // ログイン用ユーザー名（employeeIdに名前を変更）
-        loginUseremployeeId() {
+        loginEmployeeId() {
             // ★★★ 関数名を一致させる ★★★
             return [
                 rules.required('employeeId'), // 'username' も 'employeeId' に変更
