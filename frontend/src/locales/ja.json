@@ -8,6 +8,7 @@
         "login": "ログイン",
         "logout": "ログアウト",
         "loginTitle": "ログイン画面",
+        "loginSuccess": "ログインしました",
         "loginFailed": "ログインに失敗しました",
         "invalidCredentials": "ユーザー名またはパスワードが正しくありません",
         "sessionExpired": "セッションの有効期限が切れました。再度ログインしてください"
@@ -43,7 +44,9 @@
             "minLength": "{field}は{min}文字以上で入力してください",
             "email": "正しいメールアドレスの形式で入力してください",
             "alphaNumeric": "英数字のみで入力してください",
-            "employeeIdFormat": "社員番号は10桁以内の数字で入力してください"
+            "employeeIdFormat": "社員番号は10桁以内の数字で入力してください",
+            "passwordStrength": "パスワードは8文字以上で、英字、数字を含めてください",
+            "passwordMismatch": "パスワードが一致しません"
         }
     },
     "actions": {

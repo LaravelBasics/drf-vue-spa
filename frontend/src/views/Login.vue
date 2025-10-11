@@ -4,8 +4,8 @@ import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '@/stores/auth';
 import { useValidation } from '@/composables/useValidation';
+import { useApiError } from '@/composables/useApiError'; // ⭐ 追加
 import { useDesignSystem } from '@/composables/useDesignSystem';
-import { messages } from '@/constants/messages';
 import { routes } from '@/constants/routes';
 
 const auth = useAuthStore();
@@ -13,48 +13,60 @@ const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
 const { createRules } = useValidation();
+const { handleApiError, showSuccess } = useApiError(); // ⭐ 通知統一
 const { colors, getIcon, getSize } = useDesignSystem();
 
 const employeeId = ref('');
 const password = ref('');
-const error = ref('');
 const loading = ref(false);
-const isVisible = ref(false); // ⭐ フェードイン制御
-const form = ref(null); // ⭐ これを追加！フォームを参照するための ref を定義します ⭐
+const isVisible = ref(false);
+const form = ref(null);
 
-// ⭐ バリデーションルールを分離
-const employeeIdRules = createRules.loginEmployeeId(); // ⭐ 修正済み
+const employeeIdRules = createRules.loginEmployeeId();
 const passwordRules = createRules.loginPassword();
 
-// ⭐ マウント時にスムーズフェードイン
 onMounted(() => {
-    // 少し遅延してからフェードイン
     setTimeout(() => {
         isVisible.value = true;
     }, 100);
 });
 
 async function onSubmit() {
-    // onSubmit 関数でこれだけ書けばOK！
     const { valid } = await form.value.validate();
-    if (!valid) return; // 有効でなければ即座に終了
-    error.value = '';
+    if (!valid) return;
+
     loading.value = true;
 
-    const result = await auth.loginSession(employeeId.value, password.value);
-    loading.value = false;
+    try {
+        // ⭐ auth.loginSession が成功/失敗を返すのか、
+        //    例外を投げるのかで分岐する
+        const result = await auth.loginSession(
+            employeeId.value,
+            password.value,
+        );
 
-    if (result.success) {
-        // ⭐ ログイン成功時はフェードアウトしてから遷移
-        isVisible.value = false;
+        if (result.success) {
+            // ⭐ 成功通知を表示
+            showSuccess('auth.loginSuccess', {}, 3000); // 2秒に指定
 
-        setTimeout(async () => {
-            const redirect = route.query.next || routes.HOME;
-            await router.push(redirect);
-        }, 300); // フェードアウト時間と合わせる
-    } else {
-        // ⭐ エラーメッセージも統一管理
-        error.value = messages.auth.invalidCredentials;
+            // ⭐ フェードアウトしてから遷移
+            isVisible.value = false;
+            setTimeout(async () => {
+                const redirect = route.query.next || routes.HOME;
+                await router.push(redirect);
+            }, 300);
+        } else {
+            // ⭐ 失敗時はエラー通知
+            handleApiError(
+                new Error(result.message || 'ログインに失敗しました'),
+                'auth.loginFailed',
+            );
+        }
+    } catch (error) {
+        // ⭐ 例外発生時もエラー通知
+        handleApiError(error, 'auth.loginFailed');
+    } finally {
+        loading.value = false;
     }
 }
 </script>
@@ -90,6 +102,8 @@ async function onSubmit() {
                                 :prepend-inner-icon="getIcon('form', 'user')"
                                 variant="outlined"
                                 class="mt-1 mb-2"
+                                type="text"
+                                inputmode="numeric"
                                 :rules="employeeIdRules"
                             />
                             <v-text-field
@@ -122,20 +136,7 @@ async function onSubmit() {
                         </v-form>
                     </v-card-text>
 
-                    <!-- ⭐ エラーメッセージもスムーズに -->
-                    <transition name="error-slide">
-                        <v-card-actions v-if="error" class="pt-0 px-6 pb-6">
-                            <v-alert
-                                :icon="getIcon('status', 'error')"
-                                type="error"
-                                variant="tonal"
-                                class="w-100 text-center"
-                                density="compact"
-                            >
-                                {{ error }}
-                            </v-alert>
-                        </v-card-actions>
-                    </transition>
+                    <!-- ⭐ エラーメッセージはもう不要（通知で表示） -->
                 </v-card>
             </div>
         </transition>
@@ -143,7 +144,6 @@ async function onSubmit() {
 </template>
 
 <style scoped>
-/* ⭐ フルスクリーン背景 */
 .login-page {
     position: fixed;
     top: 0;
@@ -153,7 +153,6 @@ async function onSubmit() {
     z-index: 1000;
 }
 
-/* ⭐ 完全中央配置 */
 .login-center {
     position: absolute;
     top: 45%;
@@ -163,14 +162,11 @@ async function onSubmit() {
     max-width: 425px;
 }
 
-/* ⭐ カードスタイル */
 .login-card {
-    /* backdrop-filter: blur(10px); */
     background-color: rgba(255, 255, 255, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* ⭐ ログイン画面のフェード遷移 */
 .login-fade-enter-active,
 .login-fade-leave-active {
     transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -184,23 +180,5 @@ async function onSubmit() {
 .login-fade-leave-to {
     opacity: 0;
     transform: translate(-50%, -50%) translateY(-20px) scale(1.1);
-}
-
-/* ⭐ エラーメッセージのスライド遷移 */
-.error-slide-enter-active,
-.error-slide-leave-active {
-    transition: all 0.3s ease-out;
-}
-
-.error-slide-enter-from {
-    opacity: 0;
-    transform: translateY(-10px);
-    max-height: 0;
-}
-
-.error-slide-leave-to {
-    opacity: 0;
-    transform: translateY(-10px);
-    max-height: 0;
 }
 </style>

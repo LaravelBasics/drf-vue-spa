@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useValidation } from '@/composables/useValidation';
-import { useApiError } from '@/composables/useApiError'; // ⭐ 追加
+import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
 import { routes } from '@/constants/routes';
@@ -11,11 +11,11 @@ import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
 const { t } = useI18n();
-const { createRules } = useValidation();
-const { handleApiError, showSuccess } = useApiError(); // ⭐ 追加
+const { createRules } = useValidation(); // ⭐ コンポーザブルから取得
+const { handleApiError, showSuccess } = useApiError();
 
 const submitting = ref(false);
-const form = ref(null);
+const form = ref(null); // ⭐ フォーム参照
 
 const formData = ref({
     username: '',
@@ -24,6 +24,7 @@ const formData = ref({
     is_admin: false,
 });
 
+// ⭐ ブレッドクラム
 const breadcrumbs = computed(() => [
     { title: t('nav.home'), to: routes.HOME, disabled: false },
     { title: t('pages.admin.title'), to: routes.ADMIN, disabled: false },
@@ -31,31 +32,24 @@ const breadcrumbs = computed(() => [
     { title: t('pages.users.createTitle'), disabled: true },
 ]);
 
+// ⭐ バリデーションルールは createRules から直接取得
 const usernameRules = createRules.username();
-const employeeIdRules = [
-    (v) =>
-        !!v ||
-        t('form.validation.required', { field: t('form.fields.employeeId') }),
-    (v) => /^\d{1,10}$/.test(v) || t('form.validation.employeeIdFormat'),
-];
+const employeeIdRules = createRules.employeeId();
 const passwordRules = createRules.newPassword();
 
 async function submitForm() {
+    // ⭐ フォームバリデーション（Login.vueと同じパターン）
     const { valid } = await form.value.validate();
     if (!valid) return;
 
     submitting.value = true;
     try {
         await usersAPI.create(formData.value);
-
-        // ⭐ 成功メッセージ（シンプル）
         showSuccess('pages.users.createSuccess', {
             username: formData.value.username,
         });
-
         router.replace(routes.USERS);
     } catch (error) {
-        // ⭐ エラーハンドリング（1行で完結！）
         handleApiError(error, 'pages.users.createError');
     } finally {
         submitting.value = false;
@@ -83,7 +77,9 @@ function goBack() {
                         </v-card-title>
 
                         <v-card-text class="pa-6">
+                            <!-- ⭐ フォーム参照をセット -->
                             <v-form ref="form" @submit.prevent="submitForm">
+                                <!-- ⭐ ルールをバインド -->
                                 <v-text-field
                                     v-model="formData.username"
                                     :label="t('form.fields.username')"
@@ -98,7 +94,8 @@ function goBack() {
                                     :label="t('form.fields.employeeId')"
                                     :rules="employeeIdRules"
                                     variant="outlined"
-                                    type="number"
+                                    type="text"
+                                    inputmode="numeric"
                                     class="mb-4"
                                     required
                                     hint="10桁以内の数字"

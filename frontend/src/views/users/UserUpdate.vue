@@ -1,3 +1,126 @@
+<script setup>
+import { ref, computed, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import { useValidation } from '@/composables/useValidation';
+import { useApiError } from '@/composables/useApiError';
+import Header from '@/components/Header.vue';
+import { usersAPI } from '@/api/users';
+import { routes } from '@/constants/routes';
+
+const router = useRouter();
+const route = useRoute();
+const { t } = useI18n();
+const { createRules } = useValidation(); // ⭐ コンポーザブルから取得
+const { handleApiError, showSuccess } = useApiError();
+
+const loading = ref(true);
+const submitting = ref(false);
+const form = ref(null);
+
+const changePassword = ref(false);
+const showPassword = ref(false);
+const showPasswordConfirm = ref(false);
+
+const formData = ref({
+    username: '',
+    employee_id: '',
+    is_admin: false,
+    is_active: true,
+    password: '',
+});
+
+const passwordConfirm = ref('');
+
+const breadcrumbs = computed(() => [
+    { title: t('nav.home'), to: routes.HOME, disabled: false },
+    { title: t('pages.admin.title'), to: routes.ADMIN, disabled: false },
+    { title: t('pages.users.title'), to: routes.USERS, disabled: false },
+    {
+        title: t('pages.users.detailTitle2'),
+        to: routes.USER_DETAIL,
+        disabled: true,
+    },
+    { title: t('pages.users.updateTitle2'), disabled: true },
+]);
+
+// ⭐ 基本ルール
+const usernameRules = createRules.username();
+const employeeIdRules = createRules.employeeId();
+
+// ⭐ パスワード関連ルール（changePassword の状態に応じて切り替え）
+const passwordRules = computed(() => {
+    // パスワード変更チェックがOFFの場合は、ルールを適用しない
+    if (!changePassword.value) return [];
+    // ONの場合は新規パスワードルールを適用
+    return createRules.newPassword();
+});
+
+const passwordConfirmRules = computed(() => {
+    if (!changePassword.value) return [];
+    // パスワード確認用ルール（一致チェック）
+    return createRules.passwordConfirm(formData.value.password);
+});
+
+const userId = computed(() => route.params.id);
+
+async function fetchUser() {
+    loading.value = true;
+    try {
+        const response = await usersAPI.get(userId.value);
+        formData.value = {
+            username: response.data.username,
+            employee_id: response.data.employee_id,
+            is_admin: response.data.is_admin,
+            is_active: response.data.is_active,
+            password: '',
+        };
+    } catch (error) {
+        handleApiError(error, 'pages.users.fetchError');
+        router.push(routes.USERS);
+    } finally {
+        loading.value = false;
+    }
+}
+
+async function submitForm() {
+    // ⭐ フォームバリデーション
+    const { valid } = await form.value.validate();
+    if (!valid) return;
+
+    submitting.value = true;
+    try {
+        const updateData = {
+            username: formData.value.username,
+            employee_id: formData.value.employee_id,
+            is_admin: formData.value.is_admin,
+            is_active: formData.value.is_active,
+        };
+
+        // パスワード変更が選択されている場合のみ送信
+        if (changePassword.value && formData.value.password) {
+            updateData.password = formData.value.password;
+        }
+
+        await usersAPI.update(userId.value, updateData);
+
+        showSuccess('pages.users.updateSuccess', {
+            username: formData.value.username,
+        });
+
+        router.replace(routes.USERS);
+    } catch (error) {
+        handleApiError(error, 'pages.users.updateError');
+    } finally {
+        submitting.value = false;
+    }
+}
+
+onMounted(() => {
+    fetchUser();
+});
+</script>
+
 <template>
     <div>
         <Header
@@ -14,11 +137,13 @@
                         </v-card-title>
 
                         <v-card-text class="pa-6">
+                            <!-- ⭐ フォーム参照をセット -->
                             <v-form
                                 ref="form"
                                 @submit.prevent
                                 @keypress.enter.prevent
                             >
+                                <!-- ⭐ 基本情報 -->
                                 <v-text-field
                                     v-model="formData.username"
                                     :label="t('form.fields.username')"
@@ -33,7 +158,8 @@
                                     :label="t('form.fields.employeeId')"
                                     :rules="employeeIdRules"
                                     variant="outlined"
-                                    type="number"
+                                    type="text"
+                                    inputmode="numeric"
                                     class="mb-4"
                                     required
                                     hint="10桁以内の数字"
@@ -56,7 +182,7 @@
 
                                 <v-divider class="my-6" />
 
-                                <!-- パスワード変更セクション -->
+                                <!-- ⭐ パスワード変更セクション -->
                                 <div class="mb-4">
                                     <v-checkbox
                                         v-model="changePassword"
@@ -67,6 +193,7 @@
 
                                     <v-expand-transition>
                                         <div v-if="changePassword">
+                                            <!-- ⭐ ルール適用 -->
                                             <v-text-field
                                                 v-model="formData.password"
                                                 label="新しいパスワード"
@@ -86,10 +213,11 @@
                                                 "
                                                 variant="outlined"
                                                 class="mb-3"
-                                                hint="8文字以上で入力してください"
+                                                hint="8文字以上、英字と数字を含む"
                                                 persistent-hint
                                             />
 
+                                            <!-- ⭐ パスワード確認ルール適用 -->
                                             <v-text-field
                                                 v-model="passwordConfirm"
                                                 label="新しいパスワード（確認）"
@@ -161,134 +289,3 @@
         </v-container>
     </div>
 </template>
-
-<script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { useI18n } from 'vue-i18n';
-import { useValidation } from '@/composables/useValidation';
-import { useApiError } from '@/composables/useApiError';
-import Header from '@/components/Header.vue';
-import { usersAPI } from '@/api/users';
-import { routes } from '@/constants/routes';
-
-const router = useRouter();
-const route = useRoute();
-const { t } = useI18n();
-const { createRules } = useValidation();
-const { handleApiError, showSuccess } = useApiError();
-
-const loading = ref(true);
-const submitting = ref(false);
-const form = ref(null);
-
-const changePassword = ref(false);
-const showPassword = ref(false);
-const showPasswordConfirm = ref(false);
-const passwordConfirm = ref('');
-
-const formData = ref({
-    username: '',
-    employee_id: '',
-    is_admin: false,
-    is_active: true,
-    password: '',
-});
-
-const breadcrumbs = computed(() => [
-    { title: t('nav.home'), to: routes.HOME, disabled: false },
-    { title: t('pages.admin.title'), to: routes.ADMIN, disabled: false },
-    { title: t('pages.users.title'), to: routes.USERS, disabled: false },
-    {
-        title: t('pages.users.detailTitle2'),
-        to: routes.USER_DETAIL,
-        disabled: true,
-    },
-    { title: t('pages.users.updateTitle2'), disabled: true },
-]);
-
-const usernameRules = createRules.username();
-const employeeIdRules = [
-    (v) =>
-        !!v ||
-        t('form.validation.required', { field: t('form.fields.employeeId') }),
-    (v) => /^\d{1,10}$/.test(v) || t('form.validation.employeeIdFormat'),
-];
-
-const passwordRules = computed(() => {
-    if (!changePassword.value) return [];
-    return [
-        (v) => !!v || 'パスワードを入力してください',
-        (v) =>
-            (v && v.length >= 8) || 'パスワードは8文字以上で入力してください',
-        (v) =>
-            (v && v.length <= 128) ||
-            'パスワードは128文字以内で入力してください',
-    ];
-});
-
-const passwordConfirmRules = computed(() => {
-    if (!changePassword.value) return [];
-    return [
-        (v) => !!v || '確認用パスワードを入力してください',
-        (v) => v === formData.value.password || 'パスワードが一致しません',
-    ];
-});
-
-const userId = computed(() => route.params.id);
-
-async function fetchUser() {
-    loading.value = true;
-    try {
-        const response = await usersAPI.get(userId.value);
-        formData.value = {
-            username: response.data.username,
-            employee_id: response.data.employee_id,
-            is_admin: response.data.is_admin,
-            is_active: response.data.is_active,
-            password: '',
-        };
-    } catch (error) {
-        handleApiError(error, 'pages.users.fetchError');
-        router.push(routes.USERS);
-    } finally {
-        loading.value = false;
-    }
-}
-
-async function submitForm() {
-    const { valid } = await form.value.validate();
-    if (!valid) return;
-
-    submitting.value = true;
-    try {
-        const updateData = {
-            username: formData.value.username,
-            employee_id: formData.value.employee_id,
-            is_admin: formData.value.is_admin,
-            is_active: formData.value.is_active,
-        };
-
-        // パスワード変更が選択されている場合のみ送信
-        if (changePassword.value && formData.value.password) {
-            updateData.password = formData.value.password;
-        }
-
-        await usersAPI.update(userId.value, updateData);
-
-        showSuccess('pages.users.updateSuccess', {
-            username: formData.value.username,
-        });
-
-        router.replace(routes.USERS);
-    } catch (error) {
-        handleApiError(error, 'pages.users.updateError');
-    } finally {
-        submitting.value = false;
-    }
-}
-
-onMounted(() => {
-    fetchUser();
-});
-</script>

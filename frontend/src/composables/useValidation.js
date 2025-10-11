@@ -7,12 +7,14 @@ export function useValidation() {
 
     // よく使われる組み合わせを定義
     const createRules = {
-        // ログイン用ユーザー名（employeeIdに名前を変更）
+        // ログイン用社員番号
         loginEmployeeId() {
-            // ★★★ 関数名を一致させる ★★★
             return [
                 rules.required('employeeId'), // 'username' も 'employeeId' に変更
-                rules.maxLength('employeeId', 10),
+                rules.custom(
+                    (value) => /^\d{1,10}$/.test(value),
+                    'form.validation.employeeIdFormat',
+                ),
             ];
         },
 
@@ -24,13 +26,23 @@ export function useValidation() {
             ];
         },
 
-        // 一般的なユーザー名
+        // ユーザー管理用ユーザー名
         username() {
             return [
                 rules.required('username'),
                 rules.minLength('username', 3),
                 rules.maxLength('username', 20),
-                // rules.alphaNumeric(),
+            ];
+        },
+
+        // ユーザー管理用社員番号
+        employeeId() {
+            return [
+                rules.required('employeeId'),
+                rules.custom(
+                    (value) => /^\d{1,10}$/.test(value),
+                    'form.validation.employeeIdFormat',
+                ),
             ];
         },
 
@@ -44,6 +56,16 @@ export function useValidation() {
                     (value) => /(?=.*[a-zA-Z])(?=.*\d)/.test(value),
                     'form.validation.passwordStrength',
                 ),
+            ];
+        },
+
+        // パスワード確認用
+        passwordConfirm(originalPassword) {
+            return [
+                rules.required('password'),
+                (value) =>
+                    value === originalPassword ||
+                    t('form.validation.passwordMismatch'),
             ];
         },
 
