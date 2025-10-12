@@ -2,8 +2,8 @@
     <v-container fluid class="pa-6">
         <v-row>
             <v-col
-                v-for="(item, index) in items"
-                :key="index"
+                v-for="item in items"
+                :key="item.id || item.title"
                 cols="6"
                 sm="4"
                 md="3"
@@ -31,7 +31,8 @@ defineProps({
     items: {
         type: Array,
         required: true,
-        // ⭐ 例: [{ icon: 'admin_panel_settings', title: '管理', to: '/admin' }]
+        // ⭐ 例: [{ id: 'admin', icon: 'admin_panel_settings', title: '管理', to: '/admin' }]
+        // ⭐ id プロパティを追加することで、keyの問題を解決
         // Material Symbols アイコン名を使用
     },
 });

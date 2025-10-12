@@ -1,6 +1,6 @@
 {
     "app": {
-        "title": "Test Environment",
+        "tabTitle": "Test Environment",
         "loading": "Loading...",
         "ready": "Ready"
     },
@@ -8,64 +8,93 @@
         "login": "Login",
         "logout": "Logout",
         "loginTitle": "Login",
+        "loginSuccess": "Login successful",
         "loginFailed": "Login failed",
-        "invalidCredentials": "Invalid username or password",
+        "invalidCredentials": "Invalid employee ID or password",
         "sessionExpired": "Session expired. Please login again"
     },
     "nav": {
-        "home": "Home",
         "dashboard": "Dashboard",
-        "profile": "Profile",
-        "settings": "Settings",
-        "menu": "Menu",
-        "management": "Management"
-    },
-    "common": {
-        "yes": "Yes",
-        "no": "No",
-        "actions": "Actions",
-        "create": "Create",
-        "edit": "Edit",
-        "delete": "Delete",
-        "cancel": "Cancel",
-        "back": "Back",
-        "refresh": "Refresh",
-        "save": "Save",
-        "admin": "Admin",
-        "user": "User"
+        "profile": "Profile"
     },
     "form": {
         "fields": {
+            "id": "ID",
             "username": "Username",
             "password": "Password",
+            "email": "Email",
+            "name": "Name",
+            "phone": "Phone",
             "employeeId": "Employee ID",
-            "isAdmin": "Admin",
-            "isActive": "Active",
-            "createdAt": "Created At"
+            "isAdmin": "Administrator",
+            "isActive": "Account Active",
+            "createdAt": "Registration Date"
+        },
+        "labels": {
+            "newPassword": "New Password",
+            "newPasswordConfirmation": "Confirm New Password",
+            "changePassword": "Change Password"
         },
         "placeholders": {
+            "employeeId": "Enter {field}",
             "enterUseremployeeId": "Enter {field}",
             "enterPassword": "Enter {field}"
         },
+        "hint": {
+            "testEmployeeId": "Test: 9999",
+            "testPassword": "Test: test1234",
+            "required": "{field} is required",
+            "max": "Max {max} characters",
+            "maxLength": "{field} must be {max} characters or less",
+            "minLength": "{field} must be at least {min} characters",
+            "email": "Email format",
+            "alphaNumeric": "Alphanumeric only",
+            "employeeIdFormat": "Half-width numbers, max 10 digits",
+            "passwordStrength": "At least 8 characters with letters and numbers",
+            "newPasswordConfirmation": "Please enter again for confirmation",
+            "passwordMismatch": "Passwords do not match"
+        },
         "validation": {
             "required": "{field} is required",
-            "maxLength": "{field} must be {max} characters or less",
-            "minLength": "{field} must be {min} characters or more",
-            "email": "Please enter a valid email address",
-            "alphaNumeric": "Only alphanumeric characters allowed"
+            "max": "Please enter within {max} characters",
+            "maxLength": "Please enter {field} within {max} characters",
+            "minLength": "Please enter {field} with at least {min} characters",
+            "email": "Please enter a valid email format",
+            "alphaNumeric": "Please enter alphanumeric characters only",
+            "employeeIdFormat": "Please enter half-width numbers, max 10 digits",
+            "passwordStrength": "Please enter at least 8 characters with letters and numbers",
+            "passwordMismatch": "Passwords do not match"
         }
     },
-    "actions": {
-        "add": "Add New",
-        "edit": "Edit",
+    "buttons": {
+        "search": "Search",
+        "create": "Create",
+        "update": "Edit",
         "delete": "Delete",
         "save": "Save",
         "cancel": "Cancel",
-        "search": "Search",
-        "filter": "Filter",
-        "refresh": "Refresh",
-        "export": "Export",
-        "download": "Download"
+        "back": "Back",
+        "confirmDelete": "Confirm Delete",
+        "viewDetail": "View Details",
+        "csv": "CSV",
+        "users": {
+            "detail": {
+                "update": "Edit",
+                "delete": "Delete"
+            }
+        }
+    },
+    "breadcrumbs": {
+        "home": "Home",
+        "admin": "Admin",
+        "users": {
+            "list": "User Management",
+            "create": "Create",
+            "detail": "Details",
+            "update": "Edit",
+            "delete": "Delete"
+        },
+        "settings": "Settings"
     },
     "status": {
         "success": "Success",
@@ -73,19 +102,44 @@
         "warning": "Warning",
         "info": "Info"
     },
+    "common": {
+        "yes": "Yes",
+        "no": "No",
+        "number": "No",
+        "actions": "Actions",
+        "admin": "Admin",
+        "user": "User"
+    },
+    "notifications": {
+        "unauthorized": {
+            "admin": "This feature is only available to administrators",
+            "feature": "You do not have permission to use this feature"
+        },
+        "success": {
+            "saved": "Saved successfully",
+            "updated": "Updated successfully",
+            "deleted": "Deleted successfully",
+            "created": "Created successfully"
+        },
+        "error": {
+            "network": "Network error occurred. Please check your connection.",
+            "server": "Server error occurred. Please try again later.",
+            "unknown": "An unexpected error occurred"
+        },
+        "warning": {
+            "unsavedChanges": "You have unsaved changes"
+        },
+        "info": {
+            "processing": "Processing..."
+        }
+    },
     "pages": {
         "home": {
-            "title": "Order Management System",
+            "title": "Home",
             "orderList": "Order List"
         },
-        "users": {
-            "title": "User Management",
-            "searchPlaceholder": "Search by username",
-            "createButton": "New User",
-            "createTitle": "Create User",
-            "editTitle": "Edit User",
-            "deleteTitle": "Delete User",
-            "cannotDeleteLastAdmin": "Cannot delete last admin"
+        "admin": {
+            "title": "Admin Menu"
         },
         "settings": {
             "title": "Settings",
@@ -94,7 +148,42 @@
             "theme": "Theme Settings",
             "language": "Language Settings",
             "selectLanguage": "Select Language",
-            "generalDescription": "General configuration options will be displayed here."
+            "generalDescription": "General settings will be displayed here."
+        },
+        "users": {
+            "list": {
+                "title": "User Management",
+                "searchPlaceholder": "Username or Employee ID",
+                "createButton": "Create User"
+            },
+            "create": {
+                "title": "Create User",
+                "success": "User \"{username}\" has been created",
+                "error": "Failed to create user"
+            },
+            "detail": {
+                "title": "User Details",
+                "error": "Failed to retrieve user information"
+            },
+            "update": {
+                "title": "Edit User",
+                "success": "User \"{username}\" has been updated",
+                "error": "Failed to update user"
+            },
+            "delete": {
+                "title": "Delete User",
+                "success": "User \"{username}\" has been deleted",
+                "error": "Failed to delete user",
+                "warning": "Deleting this user may result in loss of related data.",
+                "lastAdminError": "Cannot delete the last administrator"
+            }
+        }
+    },
+    "modal": {
+        "deleteConfirm": {
+            "message": "Are you sure you want to delete \"{username}\"?",
+            "warning": "This action cannot be undone",
+            "button": "Delete"
         }
     }
 }

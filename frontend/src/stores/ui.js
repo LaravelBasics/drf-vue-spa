@@ -57,5 +57,4 @@ export const useUiStore = defineStore('ui', () => {
         toggleDrawer,
         toggleRail,
     };
-    // ⭐ 永続化オプションを削除
 });

@@ -9,8 +9,8 @@ export const routes = Object.freeze({
     HOME: '/',
 
     // サブページ
-    DASHBOARD: '/dashboard',
-    PROFILE: '/profile',
+    // DASHBOARD: '/dashboard',
+    // PROFILE: '/profile',
     SETTINGS: '/settings',
 
     // 管理機能

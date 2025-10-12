@@ -7,16 +7,22 @@ import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
 import { routes } from '@/constants/routes';
+import { ICONS } from '@/constants/icons.js';
 
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
-const { createRules } = useValidation(); // ⭐ コンポーザブルから取得
-const { handleApiError, showSuccess } = useApiError();
+const { createRules } = useValidation();
+const { handleApiError, showUpdateSuccess } = useApiError();
 
 const loading = ref(true);
 const submitting = ref(false);
 const form = ref(null);
+
+// ⭐ フィールド参照
+const usernameField = ref(null);
+const employeeIdField = ref(null);
+const passwordField = ref(null);
 
 const changePassword = ref(false);
 const showPassword = ref(false);
@@ -33,32 +39,27 @@ const formData = ref({
 const passwordConfirm = ref('');
 
 const breadcrumbs = computed(() => [
-    { title: t('nav.home'), to: routes.HOME, disabled: false },
-    { title: t('pages.admin.title'), to: routes.ADMIN, disabled: false },
-    { title: t('pages.users.title'), to: routes.USERS, disabled: false },
+    { title: t('breadcrumbs.home'), to: routes.HOME, disabled: false },
+    { title: t('breadcrumbs.admin'), to: routes.ADMIN, disabled: false },
+    { title: t('breadcrumbs.users.list'), to: routes.USERS, disabled: false },
     {
-        title: t('pages.users.detailTitle2'),
+        title: t('breadcrumbs.users.detail'),
         to: routes.USER_DETAIL,
         disabled: true,
     },
-    { title: t('pages.users.updateTitle2'), disabled: true },
+    { title: t('breadcrumbs.users.update'), disabled: true },
 ]);
 
-// ⭐ 基本ルール
 const usernameRules = createRules.username();
 const employeeIdRules = createRules.employeeId();
 
-// ⭐ パスワード関連ルール（changePassword の状態に応じて切り替え）
 const passwordRules = computed(() => {
-    // パスワード変更チェックがOFFの場合は、ルールを適用しない
     if (!changePassword.value) return [];
-    // ONの場合は新規パスワードルールを適用
     return createRules.newPassword();
 });
 
 const passwordConfirmRules = computed(() => {
     if (!changePassword.value) return [];
-    // パスワード確認用ルール（一致チェック）
     return createRules.passwordConfirm(formData.value.password);
 });
 
@@ -75,8 +76,12 @@ async function fetchUser() {
             is_active: response.data.is_active,
             password: '',
         };
+        // ⭐ 読み込み後にフォーカス
+        setTimeout(() => {
+            usernameField.value?.focus();
+        }, 100);
     } catch (error) {
-        handleApiError(error, 'pages.users.fetchError');
+        handleApiError(error, 'pages.users.detail.error');
         router.push(routes.USERS);
     } finally {
         loading.value = false;
@@ -84,9 +89,22 @@ async function fetchUser() {
 }
 
 async function submitForm() {
-    // ⭐ フォームバリデーション
-    const { valid } = await form.value.validate();
-    if (!valid) return;
+    const { valid, errors } = await form.value.validate();
+
+    if (!valid) {
+        // ⭐ バリデーションエラー時にフォーカス
+        if (errors && errors.length > 0) {
+            const firstErrorField = errors[0]?.id;
+            if (firstErrorField?.includes('username')) {
+                usernameField.value?.focus();
+            } else if (firstErrorField?.includes('employee')) {
+                employeeIdField.value?.focus();
+            } else if (firstErrorField?.includes('password')) {
+                passwordField.value?.focus();
+            }
+        }
+        return;
+    }
 
     submitting.value = true;
     try {
@@ -97,20 +115,19 @@ async function submitForm() {
             is_active: formData.value.is_active,
         };
 
-        // パスワード変更が選択されている場合のみ送信
         if (changePassword.value && formData.value.password) {
             updateData.password = formData.value.password;
         }
 
         await usersAPI.update(userId.value, updateData);
 
-        showSuccess('pages.users.updateSuccess', {
+        showUpdateSuccess('pages.users.update.success', {
             username: formData.value.username,
         });
 
         router.replace(routes.USERS);
     } catch (error) {
-        handleApiError(error, 'pages.users.updateError');
+        handleApiError(error, 'pages.users.update.error');
     } finally {
         submitting.value = false;
     }
@@ -124,7 +141,7 @@ onMounted(() => {
 <template>
     <div>
         <Header
-            :app-title="t('pages.users.updateTitle')"
+            :app-title="t('pages.users.update.title')"
             :breadcrumbs="breadcrumbs"
         ></Header>
 
@@ -132,12 +149,7 @@ onMounted(() => {
             <v-row justify="center">
                 <v-col cols="12" sm="12" md="10">
                     <v-card elevation="2" v-if="!loading">
-                        <!-- <v-card-title class="text-h5 pa-6 bg-grey-lighten-4">
-                            {{ t('pages.users.updateTitle2') }}
-                        </v-card-title> -->
-
                         <v-card-text class="pa-6">
-                            <!-- ⭐ フォーム参照をセット -->
                             <v-form
                                 ref="form"
                                 @submit.prevent
@@ -145,19 +157,24 @@ onMounted(() => {
                             >
                                 <v-row>
                                     <v-col cols="12" md="6" class="pb-0">
-                                        <!-- ⭐ 基本情報 -->
                                         <v-text-field
+                                            ref="usernameField"
                                             v-model="formData.username"
                                             :label="t('form.fields.username')"
                                             :rules="usernameRules"
                                             variant="outlined"
                                             class="mb-2"
                                             required
+                                            :hint="
+                                                t('form.hint.max', { max: 20 })
+                                            "
+                                            persistent-hint
                                         />
                                     </v-col>
 
                                     <v-col cols="12" md="6" class="pb-0">
                                         <v-text-field
+                                            ref="employeeIdField"
                                             v-model="formData.employee_id"
                                             :label="t('form.fields.employeeId')"
                                             :rules="employeeIdRules"
@@ -166,29 +183,38 @@ onMounted(() => {
                                             inputmode="numeric"
                                             class="mb-4"
                                             required
-                                            hint="10桁以内の数字"
+                                            :hint="
+                                                t('form.hint.employeeIdFormat')
+                                            "
                                             persistent-hint
                                         />
                                     </v-col>
 
                                     <v-col cols="12" md="6" class="pt-0">
-                                        <!-- ⭐ パスワード変更セクション -->
                                         <div class="mb-0">
                                             <v-checkbox
                                                 v-model="changePassword"
-                                                label="パスワードを変更する"
+                                                :label="
+                                                    t(
+                                                        'form.labels.changePassword',
+                                                    )
+                                                "
                                                 hide-details
                                                 class="mb-2"
                                             />
 
                                             <v-expand-transition>
                                                 <div v-if="changePassword">
-                                                    <!-- ⭐ ルール適用 -->
                                                     <v-text-field
+                                                        ref="passwordField"
                                                         v-model="
                                                             formData.password
                                                         "
-                                                        label="新しいパスワード"
+                                                        :label="
+                                                            t(
+                                                                'form.labels.newPassword',
+                                                            )
+                                                        "
                                                         :rules="passwordRules"
                                                         :type="
                                                             showPassword
@@ -206,16 +232,23 @@ onMounted(() => {
                                                         "
                                                         variant="outlined"
                                                         class="mb-3"
-                                                        hint="8文字以上、英字と数字を含む"
+                                                        :hint="
+                                                            t(
+                                                                'form.hint.passwordStrength',
+                                                            )
+                                                        "
                                                         persistent-hint
                                                     />
 
-                                                    <!-- ⭐ パスワード確認ルール適用 -->
                                                     <v-text-field
                                                         v-model="
                                                             passwordConfirm
                                                         "
-                                                        label="新しいパスワード（確認）"
+                                                        :label="
+                                                            t(
+                                                                'form.labels.newPasswordConfirmation',
+                                                            )
+                                                        "
                                                         :rules="
                                                             passwordConfirmRules
                                                         "
@@ -234,7 +267,11 @@ onMounted(() => {
                                                                 !showPasswordConfirm
                                                         "
                                                         variant="outlined"
-                                                        hint="確認のため再度入力してください"
+                                                        :hint="
+                                                            t(
+                                                                'form.hint.newPasswordConfirmation',
+                                                            )
+                                                        "
                                                         persistent-hint
                                                     />
                                                 </div>
@@ -271,11 +308,10 @@ onMounted(() => {
                                         @click="submitForm"
                                         color="primary"
                                         size="large"
-                                        variant="outlined"
                                         :loading="submitting"
-                                        prepend-icon="save"
+                                        :prepend-icon="ICONS.buttons.save"
                                     >
-                                        {{ t('common.save') }}
+                                        {{ t('buttons.save') }}
                                     </v-btn>
 
                                     <v-spacer></v-spacer>
@@ -283,11 +319,11 @@ onMounted(() => {
                                     <v-btn
                                         variant="outlined"
                                         size="large"
-                                        prepend-icon="arrow_back"
+                                        :prepend-icon="ICONS.buttons.arrowBack"
                                         @click="router.back()"
                                         type="button"
                                     >
-                                        {{ t('common.back') }}
+                                        {{ t('buttons.back') }}
                                     </v-btn>
                                 </div>
                             </v-form>

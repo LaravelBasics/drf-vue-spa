@@ -6,7 +6,6 @@ import en from '@/locales/en.json';
 // ブラウザの言語設定を取得
 const getDefaultLocale = () => {
     const browserLocale = navigator.language || navigator.userLanguage;
-    const supportedLocales = ['ja', 'en'];
 
     if (browserLocale.startsWith('ja')) return 'ja';
     if (browserLocale.startsWith('en')) return 'en';

@@ -1,20 +1,20 @@
 <template>
     <v-app>
         <Notification></Notification>
-        <!-- ⭐ 準備完了後に一気表示 -->
+
         <div
             v-show="appReady"
             :class="['app-content', { 'fade-in': appReady }]"
         >
             <NavBar v-if="auth.user" />
+
             <SideBar v-if="auth.user" />
+
             <v-main>
-                <!-- ⭐ router-viewにも遷移アニメーションを追加 -->
                 <router-view></router-view>
             </v-main>
         </div>
 
-        <!-- ⭐ 準備中は最小限のローディング（または完全に白画面） -->
         <div v-show="!appReady" class="loading-screen"></div>
     </v-app>
 </template>

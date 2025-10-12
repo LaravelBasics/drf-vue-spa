@@ -1,4 +1,4 @@
-// src/stores/auth.js - API層分離版
+// src/stores/auth.js - エラーハンドリング修正版
 
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
@@ -18,6 +18,7 @@ export const useAuthStore = defineStore(
         const isAuthenticated = computed(() => !!user.value);
         const isLoading = computed(() => loading.value);
 
+        // ⭐ 修正: エラーをそのまま throw する
         async function loginSession(employeeId, password) {
             loading.value = true;
             error.value = null;
@@ -25,15 +26,11 @@ export const useAuthStore = defineStore(
             try {
                 await authAPI.login(employeeId, password);
                 await fetchUser();
+                // ✅ 成功時のみ明示的に成功を返す（例外は throw）
                 return { success: true };
             } catch (e) {
-                const errorMessage =
-                    e.response?.data?.message ||
-                    e.response?.data?.detail ||
-                    'ログインに失敗しました';
-                error.value = errorMessage;
-                console.error('Login failed:', e);
-                return { success: false, error: errorMessage };
+                // ⭐ エラーをキャッチして返さず、そのまま throw
+                throw e;
             } finally {
                 loading.value = false;
             }

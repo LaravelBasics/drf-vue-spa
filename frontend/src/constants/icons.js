@@ -1,6 +1,11 @@
 // src/constants/icons.js - Material Symbols (Google公式) 版
 
 export const ICONS = Object.freeze({
+    // アプリケーションのタイトル・ロゴ
+    app: {
+        title: 'deployed_code',
+    },
+
     // ナビゲーション
     nav: {
         menu: 'menu',
@@ -13,8 +18,30 @@ export const ICONS = Object.freeze({
         management: 'admin_panel_settings',
     },
 
-    // アクション
-    action: {
+    menu: {
+        // ユーザー管理
+        users: 'group',
+        roles: 'security',
+        permissions: 'lock_person',
+
+        // ログ・監査
+        logs: 'history',
+        audit: 'verified_user',
+        activity: 'event',
+
+        // システム設定
+        settings: 'settings',
+        configuration: 'tune',
+        maintenance: 'build',
+
+        // レポート・分析
+        reports: 'assessment',
+        analytics: 'analytics',
+        export: 'download',
+    },
+
+    // ボタン
+    buttons: {
         add: 'add',
         edit: 'edit',
         delete: 'delete',
@@ -29,6 +56,10 @@ export const ICONS = Object.freeze({
         view: 'visibility',
         detail: 'info',
         close: 'close', // ⭐ 明示的に追加
+        arrowForward: 'arrow_forward',
+        arrowBack: 'arrow_back',
+        csv: 'table_chart',
+        pdf: 'picture_as_pdf',
     },
 
     // 状態
@@ -60,8 +91,6 @@ export const ICONS = Object.freeze({
     file: {
         document: 'description',
         pdf: 'picture_as_pdf',
-        excel: 'table_chart', // ⭐ Excel/スプレッドシートの表現
-        csv: 'dataset', // ⭐ CSV/データセットの表現
         image: 'image',
         folder: 'folder',
     },

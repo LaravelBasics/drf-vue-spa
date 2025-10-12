@@ -1,57 +1,10 @@
-<template>
-    <v-app-bar
-        :color="safeColors.surface"
-        :elevation="safeElevation"
-        :height="safeHeight"
-        app
-    >
-        <v-app-bar-title class="d-flex align-center">
-            <span class="text-h6 font-weight-bold">{{ props.appTitle }}</span>
-        </v-app-bar-title>
-
-        <!-- パンくずリスト -->
-        <v-breadcrumbs
-            v-if="breadcrumbs && breadcrumbs.length > 0"
-            :items="breadcrumbs"
-            class="pa-0 mx-4"
-            density="compact"
-        >
-            <template v-slot:divider>
-                <v-icon :size="getSize('md')">{{ ICONS.nav.divider }}</v-icon>
-            </template>
-
-            <template v-slot:item="{ item }">
-                <v-breadcrumbs-item
-                    :to="item.to"
-                    :disabled="item.disabled"
-                    class="text-subtitle-2"
-                    :color="item.disabled ? 'default' : 'primary'"
-                >
-                    {{ item.title }}
-                </v-breadcrumbs-item>
-            </template>
-        </v-breadcrumbs>
-
-        <v-spacer></v-spacer>
-
-        <v-btn
-            v-for="(button, index) in props.pageButtons"
-            :key="index"
-            variant="outlined"
-            :color="getButtonColor(button.type)"
-            class="mx-1 px-2 text-subtitle-2"
-            @click="button.action"
-        >
-            <v-icon :icon="button.icon" :size="safeIconSize"></v-icon>
-            {{ button.name }}
-        </v-btn>
-    </v-app-bar>
-</template>
-
 <script setup>
 import { computed } from 'vue';
-import { useDesignSystem } from '@/composables/useDesignSystem';
-import { ICONS } from '@/constants/icons.js';
+import { useTheme } from 'vuetify';
+import { ICONS } from '@/constants/icons';
+import { ICON_SIZES, THEME_CONFIG, COMPONENT_CONFIGS } from '@/constants/theme';
+
+const theme = useTheme();
 
 const props = defineProps({
     appTitle: {
@@ -60,7 +13,7 @@ const props = defineProps({
     },
     headerHeight: {
         type: [String, Number],
-        default: 64, // パンくず分少し高く
+        default: 64,
     },
     pageButtons: {
         type: Array,
@@ -72,43 +25,91 @@ const props = defineProps({
     },
 });
 
-const { colors, getSize, getComponentConfig } = useDesignSystem();
+const surfaceColor = computed(
+    () =>
+        theme.global.current.value?.colors?.surface ||
+        THEME_CONFIG.colors.light.surface,
+);
 
-const safeColors = computed(() => ({
-    surface:
-        colors.value.current?.surface ||
-        colors.value.background?.surface ||
-        '#FFFFFF',
-}));
+const elevation = computed(() => COMPONENT_CONFIGS.header?.elevation || 4);
 
-const safeElevation = computed(() => {
-    const headerConfig = getComponentConfig('header');
-    return headerConfig?.elevation || 4;
-});
-
-const safeHeight = computed(() => {
-    const headerConfig = getComponentConfig('header');
-    return headerConfig?.height?.desktop || 64;
-});
-
-const safeIconSize = computed(() => {
-    return getSize('sm') || 20;
-});
+const headerHeight = computed(
+    () => COMPONENT_CONFIGS.header?.height?.desktop || 64,
+);
 
 function getButtonColor(type = 'primary') {
-    if (!colors.value.current) {
-        return 'grey-darken-3';
-    }
-
+    const colors = theme.global.current.value?.colors;
     const colorMap = {
-        primary: colors.value.current.primary || '#1976D2',
-        secondary: colors.value.current.secondary || '#424242',
-        success: colors.value.current.success || '#4CAF50',
-        error: colors.value.current.error || '#F44336',
-        warning: colors.value.current.warning || '#FF9800',
-        info: colors.value.current.info || '#2196F3',
+        primary: colors?.primary || THEME_CONFIG.colors.light.primary,
+        secondary: colors?.secondary || THEME_CONFIG.colors.light.secondary,
+        success: colors?.success || THEME_CONFIG.colors.light.success,
+        error: colors?.error || THEME_CONFIG.colors.light.error,
+        warning: colors?.warning || THEME_CONFIG.colors.light.warning,
+        info: colors?.info || THEME_CONFIG.colors.light.info,
     };
 
     return colorMap[type] || colorMap.primary;
 }
 </script>
+
+<template>
+    <v-app-bar
+        :color="surfaceColor"
+        :elevation="elevation"
+        :height="headerHeight"
+        app
+    >
+        <div
+            class="ml-5 d-none d-sm-inline align-center"
+            style="min-width: 0; flex-shrink: 1"
+        >
+            <span class="text-h6 font-weight-bold text-truncate">
+                {{ props.appTitle }}
+            </span>
+        </div>
+
+        <div
+            v-if="breadcrumbs && breadcrumbs.length > 0"
+            class="flex-grow-1 d-flex justify-center"
+        >
+            <v-breadcrumbs
+                :items="breadcrumbs"
+                class="pa-0 d-none d-sm-inline"
+                density="compact"
+            >
+                <template v-slot:divider>
+                    <v-icon :size="ICON_SIZES.sm">{{
+                        ICONS.nav.divider
+                    }}</v-icon>
+                </template>
+
+                <template v-slot:item="{ item }">
+                    <v-breadcrumbs-item
+                        :to="item.to"
+                        :disabled="item.disabled"
+                        class="text-caption text-sm-subtitle-2"
+                        :color="item.disabled ? 'default' : 'primary'"
+                    >
+                        {{ item.title }}
+                    </v-breadcrumbs-item>
+                </template>
+            </v-breadcrumbs>
+        </div>
+
+        <v-spacer v-else></v-spacer>
+
+        <div class="d-flex align-center" style="flex-shrink: 0">
+            <v-btn
+                v-for="(button, index) in props.pageButtons"
+                :key="index"
+                variant="outlined"
+                :color="getButtonColor(button.type)"
+                class="mr-4 px-2 text-subtitle-2"
+                @click="button.action"
+            >
+                <v-icon :icon="button.icon" :size="ICON_SIZES.sm"></v-icon>
+                <span>{{ button.name }}</span>
+            </v-btn>
+        </div>
+    </v-app-bar>
+</template>

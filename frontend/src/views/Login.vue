@@ -1,20 +1,22 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
+import { useTheme } from 'vuetify';
 import { useAuthStore } from '@/stores/auth';
 import { useValidation } from '@/composables/useValidation';
-import { useApiError } from '@/composables/useApiError'; // ⭐ 追加
-import { useDesignSystem } from '@/composables/useDesignSystem';
+import { useApiError } from '@/composables/useApiError';
 import { routes } from '@/constants/routes';
+import { ICONS } from '@/constants/icons';
+import { THEME_CONFIG } from '@/constants/theme';
 
 const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
+const theme = useTheme();
 const { createRules } = useValidation();
-const { handleApiError, showInfo } = useApiError(); // ⭐ 通知統一
-const { colors, getIcon, getSize } = useDesignSystem();
+const { handleApiError, showLoginSuccess } = useApiError();
 
 const employeeId = ref('');
 const password = ref('');
@@ -24,6 +26,13 @@ const form = ref(null);
 
 const employeeIdRules = createRules.loginEmployeeId();
 const passwordRules = createRules.loginPassword();
+
+// テーマカラー
+const primaryColor = computed(
+    () =>
+        theme.global.current.value?.colors?.primary ||
+        THEME_CONFIG.colors.light.primary,
+);
 
 onMounted(() => {
     setTimeout(() => {
@@ -38,32 +47,20 @@ async function onSubmit() {
     loading.value = true;
 
     try {
-        // ⭐ auth.loginSession が成功/失敗を返すのか、
-        //    例外を投げるのかで分岐する
-        const result = await auth.loginSession(
-            employeeId.value,
-            password.value,
-        );
+        // ⭐ 修正: try/catch で例外をハンドリング
+        await auth.loginSession(employeeId.value, password.value);
 
-        if (result.success) {
-            // ⭐ 成功通知を表示
-            showInfo('auth.loginSuccess', {}, 3000); // デフォルトの設定は5秒
+        // ✅ ログイン成功
+        showLoginSuccess('auth.loginSuccess', {}, 3000);
 
-            // ⭐ フェードアウトしてから遷移
-            isVisible.value = false;
-            setTimeout(async () => {
-                const redirect = route.query.next || routes.HOME;
-                await router.push(redirect);
-            }, 300);
-        } else {
-            // ⭐ 失敗時はエラー通知
-            handleApiError(
-                new Error(result.message || 'ログインに失敗しました'),
-                'auth.loginFailed',
-            );
-        }
+        // ⭐ フェードアウトしてから遷移
+        isVisible.value = false;
+        setTimeout(async () => {
+            const redirect = route.query.next || routes.HOME;
+            await router.push(redirect);
+        }, 300);
     } catch (error) {
-        // ⭐ 例外発生時もエラー通知
+        // ⭐ エラーハンドリング（detail が自動抽出される）
         handleApiError(error, 'auth.loginFailed');
     } finally {
         loading.value = false;
@@ -72,17 +69,11 @@ async function onSubmit() {
 </script>
 
 <template>
-    <!-- ⭐ フルスクリーン中央配置コンテナ -->
     <div class="login-page">
         <transition name="login-fade" appear>
             <div v-show="isVisible" class="login-center">
                 <v-card rounded="lg" :elevation="12" class="login-card">
-                    <v-toolbar
-                        :color="colors.current.primary"
-                        dark
-                        flat
-                        class="rounded-t-lg"
-                    >
+                    <v-toolbar :color="primaryColor" dark flat>
                         <div class="d-flex w-100 justify-center align-center">
                             <span class="text-h5 font-weight-bold text-white">
                                 {{ t('auth.loginTitle') }}
@@ -99,12 +90,14 @@ async function onSubmit() {
                                         field: t('form.fields.employeeId'),
                                     })
                                 "
-                                :prepend-inner-icon="getIcon('form', 'user')"
+                                :prepend-inner-icon="ICONS.form.user"
                                 variant="outlined"
                                 class="mt-1 mb-2"
                                 type="text"
                                 inputmode="numeric"
                                 :rules="employeeIdRules"
+                                :hint="t('form.hint.testEmployeeId')"
+                                persistent-hint
                             />
                             <v-text-field
                                 v-model="password"
@@ -114,18 +107,18 @@ async function onSubmit() {
                                     })
                                 "
                                 type="password"
-                                :prepend-inner-icon="
-                                    getIcon('form', 'password')
-                                "
+                                :prepend-inner-icon="ICONS.form.password"
                                 variant="outlined"
                                 class="mb-3"
                                 :rules="passwordRules"
+                                :hint="t('form.hint.testPassword')"
+                                persistent-hint
                             />
 
                             <v-btn
                                 type="submit"
                                 :loading="loading"
-                                :color="colors.current.primary"
+                                :color="primaryColor"
                                 block
                                 size="large"
                                 rounded

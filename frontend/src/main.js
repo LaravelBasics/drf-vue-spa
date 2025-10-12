@@ -9,7 +9,7 @@ import vuetify from './plugins/vuetify';
 import i18n from './plugins/i18n';
 
 import 'material-symbols/outlined.css';
-// ⭐ 他のスタイルも選べます（どれか1つだけimport）
+// ⭐ 他のスタイルも選べます（どれか1つだけimportしてvuetify.jsも変更）
 // import 'material-symbols/rounded.css';  // 丸みあり
 // import 'material-symbols/sharp.css';    // シャープ
 import './assets/style/main.scss';

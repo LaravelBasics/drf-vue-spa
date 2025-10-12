@@ -1111,3 +1111,25 @@ UserUpdate.vue では、パスワード変更チェックボックスの状態�
 UserUpdate.vue では、パスワード変更チェックボックスの状態に応じてルールが切り替わります：
 
 これで「パスワード変更にチェックを入れたときだけ、パスワード入力欄が必須になる」という挙動が実現できます！
+
+
+********************************************************************************
+📚 通知の使い分けルール（ノーティフィケーション）
+
+状況                    使う方法                        import
+
+API エラー              handleApiError(error, 'key')    useApiError
+
+API 成功                showSuccess('key', params)      useApiError
+
+汎用通知（権限エラー等）  notification.warning(t('key'))  useNotificationStore + useI18n
+
+処理中・情報             notification.info(t('key'))     useNotificationStore + useI18n
+
+簡単な覚え方
+
+API関係あり → useApiError
+API関係なし → useNotificationStore + t()
+
+これで迷わないはずです(´・ω・｀)!
+

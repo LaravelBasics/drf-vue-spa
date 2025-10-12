@@ -17,7 +17,7 @@
         <template v-slot:actions>
             <v-btn
                 variant="text"
-                :icon="ICONS.action.close"
+                :icon="ICONS.buttons.close"
                 size="x-small"
                 @click="notification.close()"
             />
@@ -38,7 +38,7 @@ const getColor = computed(() => {
     const colorMap = {
         success: 'success',
         error: 'error',
-        warning: 'amber-darken-1',
+        warning: 'warning',
         info: 'info',
     };
     return colorMap[notification.type] || 'info';

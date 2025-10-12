@@ -1,6 +1,6 @@
 {
     "app": {
-        "title": "テスト環境",
+        "tabTitle": "テスト環境",
         "loading": "読み込み中...",
         "ready": "準備完了"
     },
@@ -10,19 +10,16 @@
         "loginTitle": "ログイン画面",
         "loginSuccess": "ログインしました",
         "loginFailed": "ログインに失敗しました",
-        "invalidCredentials": "ユーザー名またはパスワードが正しくありません",
+        "invalidCredentials": "社員番号またはパスワードが正しくありません",
         "sessionExpired": "セッションの有効期限が切れました。再度ログインしてください"
     },
     "nav": {
-        "home": "ホーム",
         "dashboard": "ダッシュボード",
-        "profile": "プロフィール",
-        "settings": "設定",
-        "menu": "メニュー",
-        "management": "管理者メニュー"
+        "profile": "プロフィール"
     },
     "form": {
         "fields": {
+            "id": "ID",
             "username": "ユーザー名",
             "password": "パスワード",
             "email": "メールアドレス",
@@ -33,34 +30,71 @@
             "isActive": "アカウント有効",
             "createdAt": "登録日"
         },
+        "labels": {
+            "newPassword": "新しいパスワード",
+            "newPasswordConfirmation": "新しいパスワード（確認）",
+            "changePassword": "パスワードを変更する"
+        },
         "placeholders": {
             "employeeId": "{field}を入力してください",
             "enterUseremployeeId": "{field}を入力してください",
             "enterPassword": "{field}を入力してください"
         },
+        "hint": {
+            "testEmployeeId": "テスト用: 9999 ",
+            "testPassword": "テスト用: test1234 ",
+            "required": "{field}は必須です",
+            "max": "{max}文字以内",
+            "maxLength": "{field}は{max}文字以内",
+            "minLength": "{field}は{min}文字以上",
+            "email": "メールアドレスの形式",
+            "alphaNumeric": "英数字のみ",
+            "employeeIdFormat": "半角数字、10桁以内",
+            "passwordStrength": "英字、数字を含む、8文字以上",
+            "newPasswordConfirmation": "確認のため再度入力してください",
+            "passwordMismatch": "パスワードが一致しません"
+        },
         "validation": {
             "required": "{field}は必須です",
+            "max": "{max}文字以内で入力してください",
             "maxLength": "{field}は{max}文字以内で入力してください",
             "minLength": "{field}は{min}文字以上で入力してください",
             "email": "正しいメールアドレスの形式で入力してください",
             "alphaNumeric": "英数字のみで入力してください",
-            "employeeIdFormat": "社員番号は10桁以内の数字で入力してください",
-            "passwordStrength": "パスワードは8文字以上で、英字、数字を含めてください",
+            "employeeIdFormat": "半角数字、10桁以内で入力してください",
+            "passwordStrength": "英字、数字を含む、8文字以上で入力してください",
             "passwordMismatch": "パスワードが一致しません"
         }
     },
-    "actions": {
-        "add": "新規",
-        "edit": "編集",
+    "buttons": {
+        "search": "検索",
+        "create": "登録",
+        "update": "編集",
         "delete": "削除",
         "save": "保存",
         "cancel": "キャンセル",
-        "search": "検索",
-        "filter": "フィルター",
-        "refresh": "更新",
-        "export": "エクスポート",
-        "download": "ダウンロード",
-        "back": "戻る"
+        "back": "戻る",
+        "confirmDelete": "削除の確認",
+        "viewDetail": "詳細を見る",
+        "csv": "CSV",
+        "users": {
+            "detail": {
+                "update": "編集画面",
+                "delete": "削除画面"
+            }
+        }
+    },
+    "breadcrumbs": {
+        "home": "ホーム",
+        "admin": "管理者",
+        "users": {
+            "list": "ユーザー管理",
+            "create": "登録",
+            "detail": "詳細",
+            "update": "編集",
+            "delete": "削除"
+        },
+        "settings": "設定"
     },
     "status": {
         "success": "成功",
@@ -73,16 +107,31 @@
         "no": "いいえ",
         "number": "No",
         "actions": "操作",
-        "create": "登録",
-        "edit": "編集",
-        "delete": "削除",
-        "cancel": "キャンセル",
-        "back": "戻る",
-        "refresh": "更新",
-        "save": "保存",
         "admin": "管理",
-        "user": "一般",
-        "detail": "詳細"
+        "user": "一般"
+    },
+    "notifications": {
+        "unauthorized": {
+            "admin": "この機能は管理者のみ利用できます",
+            "feature": "この機能を利用する権限がありません"
+        },
+        "success": {
+            "saved": "保存しました",
+            "updated": "更新しました",
+            "deleted": "削除しました",
+            "created": "作成しました"
+        },
+        "error": {
+            "network": "ネットワークエラーが発生しました。接続を確認してください。",
+            "server": "サーバーエラーが発生しました。しばらくしてから再度お試しください。",
+            "unknown": "予期しないエラーが発生しました"
+        },
+        "warning": {
+            "unsavedChanges": "保存されていない変更があります"
+        },
+        "info": {
+            "processing": "処理中です..."
+        }
     },
     "pages": {
         "home": {
@@ -90,7 +139,7 @@
             "orderList": "受注一覧"
         },
         "admin": {
-            "title": "管理者"
+            "title": "管理者メニュー"
         },
         "settings": {
             "title": "設定",
@@ -102,38 +151,39 @@
             "generalDescription": "一般的な設定項目がここに表示されます。"
         },
         "users": {
-            "title": "ユーザー管理",
-            "searchPlaceholder": "ユーザー名",
-            "createButton": "ユーザー登録",
-            "createTitle": "ユーザー登録",
-            "createTitle2": "登録",
-            "detailTitle": "ユーザー詳細",
-            "detailTitle2": "詳細",
-            "updateTitle": "ユーザー編集",
-            "updateTitle2": "編集",
-            "deleteTitle": "ユーザー削除",
-            "deleteTitle2": "削除",
-            "cannotDeleteLastAdmin": "最後の管理者は削除できません",
-            "createSuccess": "ユーザー「{username}」を登録しました",
-            "updateSuccess": "ユーザー「{username}」を更新しました",
-            "deleteSuccess": "ユーザー「{username}」を削除しました",
-            "createError": "ユーザーの登録に失敗しました",
-            "updateError": "ユーザーの更新に失敗しました",
-            "deleteError": "ユーザーの削除に失敗しました",
-            "fetchError": "ユーザー情報の取得に失敗しました"
-        },
-        "userCreate": {
-            "title": "新規登録"
-        },
-        "userEdit": {
-            "title": "ユーザー編集"
-        },
-        "userDelete": {
-            "title": "ユーザー削除確認",
-            "confirmTitle": "削除の確認",
-            "confirmMessage": "本当に社員番号「 {employee_id} 」を削除しますか？",
-            "warningMessage": "このユーザーを削除すると、関連するデータも失われる可能性があります。",
-            "lastAdminError": "最後の管理者は削除できません"
+            "list": {
+                "title": "ユーザー管理",
+                "searchPlaceholder": "ユーザー名または社員番号",
+                "createButton": "ユーザー登録"
+            },
+            "create": {
+                "title": "ユーザー登録",
+                "success": "ユーザー「 {username} 」を登録しました",
+                "error": "ユーザーの登録に失敗しました"
+            },
+            "detail": {
+                "title": "ユーザー詳細",
+                "error": "ユーザー情報の取得に失敗しました"
+            },
+            "update": {
+                "title": "ユーザー編集",
+                "success": "ユーザー「 {username} 」を更新しました",
+                "error": "ユーザーの更新に失敗しました"
+            },
+            "delete": {
+                "title": "ユーザー削除",
+                "success": "ユーザー「 {username} 」を削除しました",
+                "error": "ユーザーの削除に失敗しました",
+                "warning": "このユーザーを削除すると、関連するデータも失われる可能性があります。",
+                "lastAdminError": "最後の管理者は削除できません"
+            }
+        }
+    },
+    "modal": {
+        "deleteConfirm": {
+            "message": "本当に「 {username} 」を削除しますか？",
+            "warning": "この操作は取り消せません",
+            "button": "削除する"
         }
     }
 }

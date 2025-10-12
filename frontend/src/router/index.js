@@ -4,6 +4,8 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { authGuard } from './auth-guard.js';
 import { adminGuard } from './admin-guard.js';
 import { routes } from '@/constants/routes';
+import i18n from '@/plugins/i18n';
+const { t } = i18n.global;
 
 const router = createRouter({
     history: createWebHistory(),
@@ -119,7 +121,7 @@ router.afterEach((to, from) => {
     document.body.style.cursor = '';
 
     // ページタイトル更新
-    document.title = to.meta.title || 'ページタイトル更新';
+    document.title = to.meta.title || t('app.tabTitle');
 
     // アクセシビリティ: スクリーンリーダー用
     const main = document.querySelector('main, [role="main"], #app');

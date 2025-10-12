@@ -2,8 +2,8 @@
 <template>
     <v-dialog
         v-model="dialog"
-        max-width="500"
         persistent
+        max-width="500"
         class="dialog-offset-up"
     >
         <v-card>
@@ -48,7 +48,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { computed } from 'vue';
 
 const props = defineProps({
     // モーダルの表示/非表示
@@ -173,5 +173,7 @@ function handleCancel() {
 .dialog-offset-up :deep(.v-overlay__content) {
     /* 垂直方向の上端から30pxの位置に配置 */
     top: 50px !important;
+    width: 80%;
+    height: 40%;
 }
 </style>
