@@ -3,10 +3,8 @@
         :app-title="t('pages.settings.title')"
         :breadcrumbs="breadcrumbs"
         :page-buttons="headerButtons"
-    >
-    </Header>
+    />
 
-    <!-- メニューカードグリッド -->
     <MenuCardGrid :items="filteredMenuItems" />
 </template>
 

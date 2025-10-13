@@ -1,52 +1,3 @@
-<!-- src/components/ConfirmDialog.vue -->
-<template>
-    <v-dialog
-        v-model="dialog"
-        persistent
-        max-width="500"
-        class="dialog-offset-up"
-    >
-        <v-card>
-            <!-- ヘッダー -->
-            <v-card-title class="text-h5 pa-4" :class="headerClass">
-                <v-icon :icon="icon" class="me-2"></v-icon>
-                {{ title }}
-            </v-card-title>
-
-            <!-- メッセージ -->
-            <v-card-text class="pa-6">
-                <p class="text-body-1">{{ message }}</p>
-
-                <!-- 追加情報（オプション） -->
-                <slot name="content"></slot>
-            </v-card-text>
-
-            <!-- ボタン -->
-            <v-card-actions class="pa-4">
-                <v-btn
-                    :color="confirmColor"
-                    @click="handleConfirm"
-                    :loading="loading"
-                    class="custom-confirm"
-                >
-                    <v-icon class="me-2">{{ confirmIcon }}</v-icon>
-                    {{ confirmText }}
-                </v-btn>
-
-                <v-spacer></v-spacer>
-
-                <v-btn
-                    variant="outlined"
-                    @click="handleCancel"
-                    :disabled="loading"
-                >
-                    {{ cancelText }}
-                </v-btn>
-            </v-card-actions>
-        </v-card>
-    </v-dialog>
-</template>
-
 <script setup>
 import { computed } from 'vue';
 
@@ -134,17 +85,55 @@ function handleCancel() {
 }
 </script>
 
+<template>
+    <v-dialog
+        v-model="dialog"
+        persistent
+        max-width="500"
+        class="dialog-offset-up"
+    >
+        <v-card>
+            <!-- ヘッダー -->
+            <v-card-title class="text-h5 pa-4" :class="headerClass">
+                <v-icon :icon="icon" class="me-2"></v-icon>
+                {{ title }}
+            </v-card-title>
+
+            <!-- メッセージ -->
+            <v-card-text class="pa-6">
+                <p class="text-body-1">{{ message }}</p>
+
+                <!-- 追加情報（オプション） -->
+                <slot name="content"></slot>
+            </v-card-text>
+
+            <!-- ボタン -->
+            <v-card-actions class="pa-4">
+                <v-btn
+                    :color="confirmColor"
+                    @click="handleConfirm"
+                    :loading="loading"
+                    class="custom-confirm"
+                >
+                    <v-icon class="me-2">{{ confirmIcon }}</v-icon>
+                    {{ confirmText }}
+                </v-btn>
+
+                <v-spacer></v-spacer>
+
+                <v-btn
+                    variant="outlined"
+                    @click="handleCancel"
+                    :disabled="loading"
+                >
+                    {{ cancelText }}
+                </v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+</template>
+
 <style scoped>
-/*
- * Vuetify のボタンのクラスと色変数を利用してボーダーを追加します。
- * .v-btn--theme-${color} は、:color="color" が指定されたときに付与されるクラスです。
- * rgb(var(--v-theme-${color})) は、その色の CSS 変数から色を取得する記法です。
- */
-
-/* ------------------------------------------- */
-/* 実行ボタンにボーダーを追加 */
-/* ------------------------------------------- */
-
 .v-btn.custom-confirm {
     /* ボーダーをボタン全体に追加 */
     border: 2px solid;

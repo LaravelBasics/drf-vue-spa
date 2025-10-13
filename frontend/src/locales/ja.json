@@ -154,7 +154,8 @@
             "list": {
                 "title": "ユーザー管理",
                 "searchPlaceholder": "ユーザー名または社員番号",
-                "createButton": "ユーザー登録"
+                "createButton": "ユーザー登録",
+                "itemCount": "{start} - {end} / {total} 件"
             },
             "create": {
                 "title": "ユーザー登録",
@@ -184,6 +185,26 @@
             "message": "本当に「 {username} 」を削除しますか？",
             "warning": "この操作は取り消せません",
             "button": "削除する"
+        }
+    },
+    "footer": {
+        "copyright": "© {year} {company}. All rights reserved.",
+        "company": "株式会社サンプル",
+        "version": "バージョン {version}",
+        "links": {
+            "terms": "利用規約",
+            "privacy": "プライバシーポリシー",
+            "contact": "お問い合わせ",
+            "help": "ヘルプ"
+        }
+    },
+    "errors": {
+        "unsupportedDevice": {
+            "home": "ホーム",
+            "title": "デバイス非対応",
+            "message": "PC・タブレットでの使用を想定しています。",
+            "currentSize": "現在の画面サイズ",
+            "requiresSize": "推奨サイズ"
         }
     }
 }

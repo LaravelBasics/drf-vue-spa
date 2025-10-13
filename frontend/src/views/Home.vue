@@ -1,8 +1,6 @@
 <template>
-    <!-- ヘッダーコンポーネント -->
-    <Header :app-title="t('pages.home.title')" />
+    <Header :app-title="t('pages.home.title')" :breadcrumbs="breadcrumbs" />
 
-    <!-- メニューカードグリッド -->
     <MenuCardGrid :items="filteredMenuItems" />
 </template>
 
@@ -23,6 +21,15 @@ const router = useRouter();
 const route = useRoute();
 const notification = useNotificationStore();
 const { isAdmin } = usePermissions();
+
+// パンくずリスト
+const breadcrumbs = computed(() => [
+    {
+        title: t('breadcrumbs.home'),
+        to: routes.HOME,
+        disabled: true,
+    },
+]);
 
 // ⭐ マウント時に権限エラーチェック
 onMounted(() => {

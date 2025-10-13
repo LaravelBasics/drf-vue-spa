@@ -1,7 +1,6 @@
 <template>
     <!-- ヘッダーコンポーネント -->
-    <Header :app-title="t('pages.admin.title')" :breadcrumbs="breadcrumbs">
-    </Header>
+    <Header :app-title="t('pages.admin.title')" :breadcrumbs="breadcrumbs" />
 
     <!-- 管理者メニューカードグリッド -->
     <MenuCardGrid :items="adminMenuItems" />

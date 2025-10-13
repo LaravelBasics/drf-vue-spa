@@ -1,30 +1,3 @@
-<!-- Desktop\template\frontend\src\components\Notification.vue -->
-<template>
-    <v-snackbar
-        v-model="notification.show"
-        :timeout="notification.timeout"
-        :color="getColor"
-        :location="auth.user ? 'top' : 'top center'"
-        :content-class="!auth.user ? 'snackbar-login-center' : ''"
-        :multi-line="false"
-        class="custom-snackbar-width"
-    >
-        <div class="d-flex align-center">
-            <v-icon :icon="getIcon" class="mr-3" />
-            <span class="text-body-1">{{ notification.message }}</span>
-        </div>
-
-        <template v-slot:actions>
-            <v-btn
-                variant="text"
-                :icon="ICONS.buttons.close"
-                size="x-small"
-                @click="notification.close()"
-            />
-        </template>
-    </v-snackbar>
-</template>
-
 <script setup>
 import { computed } from 'vue';
 import { useAuthStore } from '@/stores/auth';
@@ -54,6 +27,32 @@ const getIcon = computed(() => {
     return iconMap[notification.type] || ICONS.status.info;
 });
 </script>
+
+<template>
+    <v-snackbar
+        v-model="notification.show"
+        :timeout="notification.timeout"
+        :color="getColor"
+        :location="auth.user ? 'top' : 'top center'"
+        :content-class="!auth.user ? 'snackbar-login-center' : ''"
+        :multi-line="false"
+        class="custom-snackbar-width"
+    >
+        <div class="d-flex align-center">
+            <v-icon :icon="getIcon" class="mr-3" />
+            <span class="text-body-1">{{ notification.message }}</span>
+        </div>
+
+        <template v-slot:actions>
+            <v-btn
+                variant="text"
+                :icon="ICONS.buttons.close"
+                size="x-small"
+                @click="notification.close()"
+            />
+        </template>
+    </v-snackbar>
+</template>
 
 <style scoped>
 /* ⭐ Vuetifyの内部要素にスタイルを適用するため、:deep() を使用します */

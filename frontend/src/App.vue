@@ -1,33 +1,22 @@
-<template>
-    <v-app>
-        <Notification></Notification>
-
-        <div
-            v-show="appReady"
-            :class="['app-content', { 'fade-in': appReady }]"
-        >
-            <NavBar v-if="auth.user" />
-
-            <SideBar v-if="auth.user" />
-
-            <v-main>
-                <router-view></router-view>
-            </v-main>
-        </div>
-
-        <div v-show="!appReady" class="loading-screen"></div>
-    </v-app>
-</template>
-
 <script setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, computed } from 'vue';
 import { useAuthStore } from '@/stores/auth';
+import { useRoute } from 'vue-router';
 import NavBar from '@/components/NavBar.vue';
 import SideBar from '@/components/SideBar.vue';
+import Footer from '@/components/Footer.vue';
 import Notification from '@/components/Notification.vue';
+import { routes } from '@/constants/routes';
 
 const auth = useAuthStore();
+const route = useRoute();
 const appReady = ref(false);
+
+// ⭐ 計算プロパティで現在のルートが非対応デバイス画面かどうかを判定
+const isUnsupportedRoute = computed(() => {
+    // routes.UNSUPPORTED_DEVICE と一致するかどうかで判定します
+    return route.path === routes.UNSUPPORTED_DEVICE;
+});
 
 const waitForFontsAndIcons = () => {
     return new Promise((resolve) => {
@@ -70,10 +59,37 @@ onMounted(async () => {
 });
 </script>
 
+<template>
+    <v-app>
+        <Notification />
+
+        <div
+            v-show="appReady"
+            :class="['app-content', { 'fade-in': appReady }]"
+        >
+            <NavBar v-if="auth.user && !isUnsupportedRoute" />
+
+            <SideBar v-if="auth.user && !isUnsupportedRoute" />
+
+            <v-main>
+                <router-view />
+            </v-main>
+
+            <!-- ⭐ フッター追加 -->
+            <Footer v-if="auth.user && !isUnsupportedRoute" />
+        </div>
+
+        <div v-show="!appReady" class="loading-screen"></div>
+    </v-app>
+</template>
+
 <style scoped>
 .app-content {
     opacity: 0;
     transition: opacity 0.2s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* ⭐ フッターを下に固定するため */
 }
 
 .app-content.fade-in {
@@ -88,65 +104,5 @@ onMounted(async () => {
     height: 100vh;
     background-color: #ffffff;
     z-index: 9999;
-}
-</style>
-
-<style>
-/* ⭐ グローバルなページ遷移スタイル */
-
-/* 通常のページ遷移（ホーム等） */
-.page-transition-enter-active,
-.page-transition-leave-active {
-    transition: all 0.25s ease-out;
-}
-
-.page-transition-enter-from {
-    opacity: 0;
-    transform: translateY(10px);
-}
-
-.page-transition-leave-to {
-    opacity: 0;
-    transform: translateY(-10px);
-}
-
-/* ログインページ専用の遷移 */
-.login-page-transition-enter-active,
-.login-page-transition-leave-active {
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
-
-.login-page-transition-enter-from {
-    opacity: 0;
-    transform: scale(0.95);
-}
-
-.login-page-transition-leave-to {
-    opacity: 0;
-    transform: scale(1.05);
-}
-
-/* ⭐ ちらつき防止 */
-.v-main {
-    min-height: 100vh;
-    background-color: #fafafa;
-}
-
-/* レイアウトシフト防止 */
-*,
-*::before,
-*::after {
-    box-sizing: border-box;
-}
-
-body {
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden;
-}
-
-/* Vue Router link遷移も滑らかに */
-.router-link-active {
-    transition: all 0.2s ease;
 }
 </style>

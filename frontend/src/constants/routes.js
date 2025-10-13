@@ -1,4 +1,4 @@
-// src/constants/routes.js (詳細画面追加版)
+// src/constants/routes.js
 
 export const routes = Object.freeze({
     // 認証関連
@@ -17,7 +17,10 @@ export const routes = Object.freeze({
     ADMIN: '/admin',
     USERS: '/users',
     USER_CREATE: '/users/create',
-    USER_DETAIL: '/users/:id', // ⭐ 詳細画面（新規）
-    USER_UPDATE: '/users/:id/update', // ⭐ 更新画面（リネーム）
+    USER_DETAIL: '/users/:id',
+    USER_UPDATE: '/users/:id/update',
     USER_DELETE: '/users/:id/delete',
+
+    // ⭐ エラーページ
+    UNSUPPORTED_DEVICE: '/unsupported-device',
 });

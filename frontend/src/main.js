@@ -1,5 +1,3 @@
-// src/main.js (初期化併用版 - より安全)
-
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
@@ -9,12 +7,10 @@ import vuetify from './plugins/vuetify';
 import i18n from './plugins/i18n';
 
 import 'material-symbols/outlined.css';
-// ⭐ 他のスタイルも選べます（どれか1つだけimportしてvuetify.jsも変更）
-// import 'material-symbols/rounded.css';  // 丸みあり
-// import 'material-symbols/sharp.css';    // シャープ
 import './assets/style/main.scss';
 
 import { useAuthStore } from '@/stores/auth';
+import { useNotificationStore } from '@/stores/notification';
 
 const app = createApp(App);
 
@@ -26,32 +22,67 @@ app.use(router);
 app.use(vuetify);
 app.use(i18n);
 
+// ⭐ グローバルエラーハンドラー - ユーザーに通知も表示
 app.config.errorHandler = (err, instance, info) => {
     console.error('Global error:', err);
     console.error('Component:', instance);
     console.error('Error info:', info);
+
+    // ⭐ Piniaストアにアクセスして通知を表示
+    try {
+        const notificationStore = useNotificationStore();
+        const { t } = app.config.globalProperties.$i18n || {};
+
+        // エラーメッセージを抽出
+        let errorMessage = err?.message || 'Unknown error occurred';
+
+        // i18n が利用可能なら翻訳を使用
+        if (t) {
+            errorMessage = t('notifications.error.unknown');
+        }
+
+        // ユーザーにエラーを通知
+        notificationStore.error(errorMessage, 7000);
+    } catch (notificationError) {
+        console.error('Failed to show notification:', notificationError);
+        // 通知の表示に失敗してもアプリは動作する
+    }
 };
 
-// ⭐ 事前初期化（App.vueでの重複実行は自動的に回避される）
+// ⭐ 未処理のPromise拒否もキャッチ（重要）
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+
+    try {
+        const notificationStore = useNotificationStore();
+        const { t } = app.config.globalProperties.$i18n || {};
+
+        let errorMessage = 'An unexpected error occurred';
+        if (t) {
+            errorMessage = t('notifications.error.unknown');
+        }
+
+        notificationStore.error(errorMessage, 7000);
+    } catch (error) {
+        console.error('Failed to show rejection notification:', error);
+    }
+});
+
+// ⭐ 事前初期化
 const initializeApp = async () => {
     try {
         console.log('🔄 アプリケーション事前初期化...');
 
         const authStore = useAuthStore();
-
-        // ⭐ 事前に認証状態を初期化（App.vueでの処理を軽くする）
         await authStore.initialize();
 
         console.log('✅ 事前初期化完了');
     } catch (error) {
         console.error('❌ 事前初期化エラー（継続します）:', error);
-        // エラーが発生してもアプリは起動する
     } finally {
-        // ⭐ 初期化結果に関係なくマウント
         app.mount('#app');
         console.log('✅ アプリケーション起動');
     }
 };
 
-// 初期化実行
 initializeApp();

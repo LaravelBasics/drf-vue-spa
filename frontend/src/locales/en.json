@@ -154,7 +154,8 @@
             "list": {
                 "title": "User Management",
                 "searchPlaceholder": "Username or Employee ID",
-                "createButton": "Create User"
+                "createButton": "Create User",
+                "itemCount": "{start} - {end} of {total} items"
             },
             "create": {
                 "title": "Create User",
@@ -184,6 +185,26 @@
             "message": "Are you sure you want to delete \"{username}\"?",
             "warning": "This action cannot be undone",
             "button": "Delete"
+        }
+    },
+    "footer": {
+        "copyright": "© {year} {company}. All rights reserved.",
+        "company": "Sample Co., Ltd.",
+        "version": "Version {version}",
+        "links": {
+            "terms": "Terms of Service",
+            "privacy": "Privacy Policy",
+            "contact": "Contact Us",
+            "help": "Help"
+        }
+    },
+    "errors": {
+        "unsupportedDevice": {
+            "home": "Home",
+            "title": "Unsupported Device",
+            "message": "This application is designed for use on a PC or tablet.",
+            "currentSize": "Current Screen Size",
+            "requiresSize": "Required Size"
         }
     }
 }

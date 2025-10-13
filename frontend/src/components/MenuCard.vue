@@ -1,28 +1,3 @@
-<template>
-    <v-card
-        :to="to"
-        :href="href"
-        class="menu-card"
-        elevation="2"
-        hover
-        @click="handleClick"
-    >
-        <v-card-text
-            class="d-flex flex-column align-center justify-center pa-6"
-        >
-            <v-icon
-                :icon="icon"
-                :color="color"
-                :size="iconSize"
-                class="mb-3"
-            ></v-icon>
-            <div class="text-subtitle-1 font-weight-medium text-center">
-                {{ title }}
-            </div>
-        </v-card-text>
-    </v-card>
-</template>
-
 <script setup>
 const props = defineProps({
     // ⭐ Material Symbols アイコン名（admin_panel_settings など）
@@ -66,6 +41,31 @@ const handleClick = (event) => {
     }
 };
 </script>
+
+<template>
+    <v-card
+        :to="to"
+        :href="href"
+        class="menu-card"
+        elevation="2"
+        hover
+        @click="handleClick"
+    >
+        <v-card-text
+            class="d-flex flex-column align-center justify-center pa-6"
+        >
+            <v-icon
+                :icon="icon"
+                :color="color"
+                :size="iconSize"
+                class="mb-3"
+            ></v-icon>
+            <div class="text-subtitle-1 font-weight-medium text-center">
+                {{ title }}
+            </div>
+        </v-card-text>
+    </v-card>
+</template>
 
 <style scoped>
 .menu-card {

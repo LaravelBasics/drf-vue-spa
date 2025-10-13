@@ -57,6 +57,19 @@ class UserService:
             password=password or 'defaultpassword123',
             **validated_data
         )
+
+        # 監査ログを記録
+        create_audit_log(
+            action='CREATE',
+            model_name='User',
+            object_id=user.id,
+            changes={
+                'username': {'old': None, 'new': user.username},
+                'employee_id': {'old': None, 'new': user.employee_id},
+                'is_admin': {'old': None, 'new': user.is_admin},
+                'password': {'old': None, 'new': '***'},  # パスワードは隠す
+            }
+        )
         
         return user
 

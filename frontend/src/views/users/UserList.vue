@@ -112,7 +112,8 @@
                 <v-pagination
                     v-model="currentPage"
                     :length="totalPages"
-                    :total-visible="7"
+                    :total-visible="5"
+                    density="compact"
                     @update:model-value="handlePageChange"
                 />
             </div>
