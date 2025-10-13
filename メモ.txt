@@ -1,0 +1,275 @@
+使い方の例
+1. 削除確認（現在の使い方）
+
+<ConfirmDialog
+    v-model="showDialog"
+    :title="t('modal.deleteConfirm.warning')"
+    :message="t('modal.deleteConfirm.message', { username: user.username })"
+    :confirm-text="t('buttons.delete')"
+    confirm-color="error"
+    :icon="ICONS.status.info"
+    :confirm-icon="ICONS.buttons.delete"
+    :loading="deleting"
+    @confirm="deleteUser"
+/>
+
+2. 保存確認（定数無しの場合）
+
+<ConfirmDialog
+    v-model="showSaveDialog"
+    title="変更を保存"
+    message="この内容で保存してもよろしいですか？"
+    confirm-text="保存"
+    cancel-text="キャンセル"
+    confirm-color="primary"
+    icon="save"
+    confirm-icon="check"
+    :loading="saving"
+    @confirm="saveChanges"
+/>
+
+
+
+Props一覧
+
+Props          型         デフォルト         説明          
+modelValue     Boolean    false             モーダル表示/非表示
+title          String     '確認'             タイトル
+message        String      必須              メッセージ
+confirmText    String     '実行'             確認ボタンのテキスト
+cancelText     String     'キャンセル'       キャンセルボタンのテキスト
+confirmColor   String     'error'           確認ボタンの色（error/warning/primary/success）
+icon           String     'alert-circle'    ヘッダーアイコン
+confirmIcon    String     'check'           確認ボタンのアイコン
+loading        Boolean     false            ローディング状態
+
+イベント
+Event             説明
+@confirm          確認ボタンクリック
+@cancel           キャンセルボタンクリック
+
+スロット
+Slot              説明
+content           メッセージ下に追加コンテンツを挿入
+
+---------------------------------------------------------------------------------------------------
+
+/**
+ * 通知システムの使用ガイド
+ * 
+ * useApiError composable を使用して、一貫性のある通知を実装します
+ */
+
+// ============================================================================
+// 📘 基本的な使い方
+// ============================================================================
+
+// src/composables/useApiError.js からインポート
+import { useApiError } from '@/composables/useApiError';
+import { useNotificationStore } from '@/stores/notification';
+import { useI18n } from 'vue-i18n';
+
+const { handleApiError, showLoginSuccess, showCreateSuccess, showUpdateSuccess, showDeleteSuccess, showWarning, showInfo } = useApiError();
+
+// ============================================================================
+// 📊 使用例パターン集
+// ============================================================================
+
+// ------ パターン1: ログイン成功（Login.vue で使用） ------
+async function handleLogin() {
+    try {
+        await auth.loginSession(employeeId, password);
+        // ✅ ログイン成功は「情報」（青）で表示
+        showLoginSuccess('auth.loginSuccess', {}, 3000);
+        // → 画面遷移
+    } catch (error) {
+        // ❌ エラーは自動抽出 + 「エラー」（赤）で表示
+        handleApiError(error, 'auth.loginFailed');
+    }
+}
+
+// ------ パターン2: ログアウト成功（NavBar.vue で使用） ------
+async function handleLogout() {
+    try {
+        await auth.logout(false); // false: 自動リダイレクトなし
+        // ✅ ログアウト成功を通知
+        showInfo('auth.logoutSuccess', {}, 3000);
+        // → 手動で LOGIN にリダイレクト
+        router.push(routes.LOGIN);
+    } catch (error) {
+        console.error('Logout failed:', error);
+        showWarning('auth.logoutFailed', {}, 5000);
+    }
+}
+
+// ------ パターン3: ユーザー作成成功（UserCreate.vue で使用） ------
+async function createUser() {
+    try {
+        const response = await usersAPI.create(formData);
+        // ✅ 作成成功は「成功」（緑）で表示
+        showCreateSuccess('pages.users.create.success', {
+            username: formData.username,
+        });
+        // → 一覧画面へ遷移
+        router.replace(routes.USERS);
+    } catch (error) {
+        // ❌ エラーハンドリング
+        handleApiError(error, 'pages.users.create.error');
+    }
+}
+
+// ------ パターン4: ユーザー更新成功（UserUpdate.vue で使用） ------
+async function updateUser() {
+    try {
+        await usersAPI.update(userId, formData);
+        showUpdateSuccess('pages.users.update.success');
+        router.replace(routes.USERS);
+    } catch (error) {
+        handleApiError(error, 'pages.users.update.error');
+    }
+}
+
+// ------ パターン5: ユーザー削除成功（UserDelete.vue で使用） ------
+async function deleteUser() {
+    try {
+        await usersAPI.delete(userId);
+        showDeleteSuccess('pages.users.delete.success');
+        router.replace(routes.USERS);
+    } catch (error) {
+        handleApiError(error, 'pages.users.delete.error');
+    }
+}
+
+// ------ パターン6: 警告通知（Home.vue で使用） ------
+onMounted(() => {
+    if (route.query.unauthorized === 'admin') {
+        // ⚠️ 権限不足を警告
+        showWarning('notifications.unauthorized.admin', {}, 5000);
+        router.replace({ path: routes.HOME, query: {} });
+    }
+});
+
+// ------ パターン7: 情報通知（汎用） ------
+async function someAction() {
+    try {
+        // ... 何か実行
+        showInfo('notifications.info.actionCompleted', {}, 4000);
+    } catch (error) {
+        handleApiError(error);
+    }
+}
+
+// ============================================================================
+// 📋 関数リファレンス
+// ============================================================================
+
+/**
+ * handleApiError(error, fallbackMessageKey, duration)
+ * 
+ * APIエラーを自動的に処理して通知を表示します
+ * 
+ * @param {Error} error - APIから返されたエラーオブジェクト
+ * @param {string} [fallbackMessageKey] - i18nキー（エラーメッセージがない場合のフォールバック）
+ * @param {number} [duration=7000] - 通知表示時間（ms）
+ * 
+ * 使い方:
+ *   handleApiError(error) → エラーメッセージ自動抽出
+ *   handleApiError(error, 'pages.users.create.error') → フォールバック指定
+ *   handleApiError(error, 'messages.error', 10000) → 表示時間カスタマイズ
+ */
+
+/**
+ * showLoginSuccess(messageKey, params, duration)
+ * ログイン成功（青の情報通知）
+ * 
+ * @param {string} messageKey - i18nキー（例: 'auth.loginSuccess'）
+ * @param {object} [params={}] - i18nパラメータ
+ * @param {number} [duration=3000] - 表示時間（ms）
+ */
+
+/**
+ * showCreateSuccess(messageKey, params, duration)
+ * 作成成功（緑の成功通知）
+ */
+
+/**
+ * showUpdateSuccess(messageKey, params, duration)
+ * 更新成功（緑の成功通知）
+ */
+
+/**
+ * showDeleteSuccess(messageKey, params, duration)
+ * 削除成功（緑の成功通知）
+ */
+
+/**
+ * showWarning(messageKey, params, duration)
+ * 警告（オレンジの警告通知）
+ * 用途: 権限不足、セッション期限切れ間近、非推奨操作など
+ */
+
+/**
+ * showInfo(messageKey, params, duration)
+ * 情報（青の情報通知）
+ * 用途: 一般的な情報、完了メッセージ、ログアウトなど
+ */
+
+// ============================================================================
+// 🎨 通知タイプと表示色の対応
+// ============================================================================
+
+/**
+ * success（緑） - showCreateSuccess, showUpdateSuccess, showDeleteSuccess
+ *   → 作成・更新・削除などの"肯定的な変更"が成功したとき
+ * 
+ * error（赤） - handleApiError
+ *   → エラーが発生したとき（自動的に error 通知）
+ * 
+ * warning（オレンジ） - showWarning
+ *   → 警告・注意が必要なとき（権限不足、セッション期限切れ間近など）
+ * 
+ * info（青） - showLoginSuccess, showInfo
+ *   → 情報提供・ログアウト成功・一般的な完了メッセージ
+ */
+
+// ============================================================================
+// 📝 i18n定義の例
+// ============================================================================
+
+/**
+ * ja.json に以下を追加:
+ * 
+ * {
+ *   "auth": {
+ *     "loginSuccess": "ログインしました",
+ *     "loginFailed": "ログインに失敗しました",
+ *     "logoutSuccess": "ログアウトしました",
+ *     "logoutFailed": "ログアウトに失敗しました"
+ *   },
+ *   "pages": {
+ *     "users": {
+ *       "create": {
+ *         "success": "{username} を作成しました",
+ *         "error": "ユーザー作成に失敗しました"
+ *       },
+ *       "update": {
+ *         "success": "ユーザーを更新しました",
+ *         "error": "ユーザー更新に失敗しました"
+ *       },
+ *       "delete": {
+ *         "success": "ユーザーを削除しました",
+ *         "error": "ユーザー削除に失敗しました"
+ *       }
+ *     }
+ *   },
+ *   "notifications": {
+ *     "unauthorized": {
+ *       "admin": "管理者権限が必要です"
+ *     },
+ *     "error": {
+ *       "network": "ネットワークエラーが発生しました",
+ *       "unknown": "予期しないエラーが発生しました"
+ *     }
+ *   }
+ * }
+ */

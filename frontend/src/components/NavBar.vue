@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useTheme } from 'vuetify';
 import { useUiStore } from '@/stores/ui';
 import { useAuthStore } from '@/stores/auth';
+import { useApiError } from '@/composables/useApiError'; // ⭐ 追加
 import { routes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 import { ICON_SIZES, THEME_CONFIG } from '@/constants/theme';
@@ -14,6 +15,7 @@ const { t } = useI18n();
 const ui = useUiStore();
 const auth = useAuthStore();
 const theme = useTheme();
+const { showInfo, handleApiError } = useApiError(); // ⭐ 追加
 
 const displayName = computed(() => {
     return auth.user?.username || auth.user?.employee_id || 'ゲスト';
@@ -25,8 +27,23 @@ const primaryColor = computed(
         THEME_CONFIG.colors.light.primary,
 );
 
+// ⭐ ログアウト関数を修正
 async function handleLogout() {
-    await auth.logout();
+    try {
+        // logout(false) で自動リダイレクトを無効化
+        await auth.logout(false);
+
+        // ✅ ログアウト成功を通知
+        showInfo('auth.logoutSuccess', {}, 3000);
+
+        // 少し遅延させてからログインページへ遷移
+        setTimeout(() => {
+            router.push(routes.LOGIN);
+        }, 100);
+    } catch (error) {
+        // ❌ APIエラーハンドリング（Login.vue と同じパターン）
+        handleApiError(error, 'auth.logoutFailed');
+    }
 }
 
 function goToSettings() {

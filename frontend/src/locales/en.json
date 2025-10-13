@@ -7,11 +7,13 @@
     "auth": {
         "login": "Login",
         "logout": "Logout",
-        "loginTitle": "Login",
-        "loginSuccess": "Login successful",
+        "loginTitle": "Login Screen",
+        "loginSuccess": "Logged in successfully",
         "loginFailed": "Login failed",
+        "logoutSuccess": "Logged out successfully",
+        "logoutFailed": "Logout failed",
         "invalidCredentials": "Invalid employee ID or password",
-        "sessionExpired": "Session expired. Please login again"
+        "sessionExpired": "Your session has expired. Please log in again"
     },
     "nav": {
         "dashboard": "Dashboard",

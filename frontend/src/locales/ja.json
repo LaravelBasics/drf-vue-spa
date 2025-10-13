@@ -10,6 +10,8 @@
         "loginTitle": "ログイン画面",
         "loginSuccess": "ログインしました",
         "loginFailed": "ログインに失敗しました",
+        "logoutSuccess": "ログアウトしました",
+        "logoutFailed": "ログアウトに失敗しました",
         "invalidCredentials": "社員番号またはパスワードが正しくありません",
         "sessionExpired": "セッションの有効期限が切れました。再度ログインしてください"
     },
