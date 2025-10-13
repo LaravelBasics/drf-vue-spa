@@ -148,7 +148,7 @@ watch(searchQuery, () => {
         currentPage.value = 1; // 検索時は1ページ目に戻す
         fetchUsers();
         updateURLParams();
-    }, 0); // 500ミリ秒後に実行
+    }, 500); // 500ミリ秒後に実行
 });
 
 // ページ変更ハンドラー
