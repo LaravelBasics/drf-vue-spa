@@ -96,7 +96,7 @@ onMounted(() => {
                                 <v-col cols="8">{{ user.id }}</v-col>
                             </v-row>
 
-                            <v-divider class="my-3"></v-divider>
+                            <v-divider class="my-3" />
 
                             <v-row class="mb-3">
                                 <v-col cols="4" class="font-weight-bold">
@@ -105,7 +105,7 @@ onMounted(() => {
                                 <v-col cols="8">{{ user.username }}</v-col>
                             </v-row>
 
-                            <v-divider class="my-3"></v-divider>
+                            <v-divider class="my-3" />
 
                             <v-row class="mb-3">
                                 <v-col cols="4" class="font-weight-bold">
@@ -114,7 +114,7 @@ onMounted(() => {
                                 <v-col cols="8">{{ user.employee_id }}</v-col>
                             </v-row>
 
-                            <v-divider class="my-3"></v-divider>
+                            <v-divider class="my-3" />
 
                             <v-row class="mb-3">
                                 <v-col cols="4" class="font-weight-bold">
@@ -138,7 +138,7 @@ onMounted(() => {
                                 </v-col>
                             </v-row>
 
-                            <v-divider class="my-3"></v-divider>
+                            <v-divider class="my-3" />
 
                             <v-row class="mb-3">
                                 <v-col cols="4" class="font-weight-bold">
@@ -160,7 +160,7 @@ onMounted(() => {
                                 </v-col>
                             </v-row>
 
-                            <v-divider class="my-3"></v-divider>
+                            <v-divider class="my-3" />
 
                             <v-row class="mb-3">
                                 <v-col cols="4" class="font-weight-bold">
@@ -184,7 +184,7 @@ onMounted(() => {
                                     {{ t('buttons.users.detail.update') }}
                                 </v-btn>
 
-                                <v-spacer></v-spacer>
+                                <v-spacer />
 
                                 <v-btn
                                     color="error"
@@ -197,7 +197,7 @@ onMounted(() => {
                                     {{ t('buttons.users.detail.delete') }}
                                 </v-btn>
 
-                                <v-spacer></v-spacer>
+                                <v-spacer />
 
                                 <v-btn
                                     variant="outlined"

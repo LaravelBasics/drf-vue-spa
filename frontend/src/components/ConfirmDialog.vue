@@ -119,7 +119,7 @@ function handleCancel() {
                     {{ confirmText }}
                 </v-btn>
 
-                <v-spacer></v-spacer>
+                <v-spacer />
 
                 <v-btn
                     variant="outlined"

@@ -1,126 +1,3 @@
-<template>
-    <div>
-        <Header
-            :app-title="t('pages.users.list.title')"
-            :page-buttons="headerButtons"
-            :breadcrumbs="breadcrumbs"
-        />
-
-        <v-container fluid class="pa-4">
-            <!-- 検索・操作エリア -->
-
-            <v-row class="mb-1 align-center">
-                <v-col cols="12" sm="5" md="3">
-                    <v-text-field
-                        v-model="searchQuery"
-                        :label="t('pages.users.list.searchPlaceholder')"
-                        :prepend-inner-icon="ICONS.buttons.search"
-                        variant="outlined"
-                        density="compact"
-                        hide-details
-                    >
-                        <!-- ⭐ 手動管理: 検索中はスピナー（回転）、それ以外はクリアボタン -->
-                        <template v-slot:append-inner>
-                            <v-progress-circular
-                                v-if="loading"
-                                indeterminate
-                                size="20"
-                                width="2"
-                                color="primary"
-                            />
-                            <v-icon
-                                v-else-if="searchQuery"
-                                icon="close"
-                                size="small"
-                                class="cursor-pointer"
-                                @click="searchQuery = ''"
-                            />
-                        </template>
-                    </v-text-field>
-                </v-col>
-
-                <v-col cols="12" sm="4" md="3">
-                    <div class="text-body-2 text-grey-darken-1">
-                        {{ startItem }} - {{ endItem }} / {{ totalItems }} 件
-                    </div>
-                </v-col>
-
-                <v-spacer />
-
-                <v-col cols="12" sm="3" md="3" class="d-flex justify-end">
-                    <v-btn
-                        variant="outlined"
-                        color="primary"
-                        size="default"
-                        :prepend-icon="ICONS.buttons.add"
-                        @click="goToCreate"
-                    >
-                        {{ t('pages.users.list.createButton') }}
-                    </v-btn>
-                </v-col>
-            </v-row>
-
-            <!-- データテーブル -->
-            <v-data-table-server
-                :headers="headers"
-                :items="users"
-                :items-length="totalItems"
-                :loading="loading"
-                v-model:items-per-page="itemsPerPage"
-                v-model:page="currentPage"
-                v-model:sort-by="sortBy"
-                class="elevation-2 clickable-table"
-                density="compact"
-                hover
-                hide-default-footer
-                @update:options="handleOptionsUpdate"
-                @click:row="handleRowClick"
-            >
-                <!-- ID列 -->
-                <template v-slot:item.id="{ item }">
-                    <RouterLink
-                        :to="routes.USER_DETAIL.replace(':id', item.id)"
-                        class="font-weight-medium text-decoration-none text-primary"
-                        @click.stop
-                    >
-                        {{ item.id }}
-                    </RouterLink>
-                </template>
-
-                <!-- 管理者フラグ -->
-                <template v-slot:item.is_admin="{ item }">
-                    <v-icon
-                        :color="item.is_admin ? 'success' : 'grey'"
-                        :size="item.is_admin ? 'default' : 'small'"
-                    >
-                        {{
-                            item.is_admin
-                                ? ICONS.status.check
-                                : ICONS.status.minus
-                        }}
-                    </v-icon>
-                </template>
-
-                <!-- 登録日 -->
-                <template v-slot:item.created_at="{ item }">
-                    {{ formatDate(item.created_at) }}
-                </template>
-            </v-data-table-server>
-
-            <!-- ページネーション -->
-            <div class="d-flex justify-center mt-4">
-                <v-pagination
-                    v-model="currentPage"
-                    :length="totalPages"
-                    :total-visible="5"
-                    density="compact"
-                    @update:model-value="handlePageChange"
-                />
-            </div>
-        </v-container>
-    </div>
-</template>
-
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
@@ -272,10 +149,6 @@ watch(searchQuery, () => {
         fetchUsers();
         updateURLParams();
     }, 0); // 500ミリ秒後に実行
-
-    // 注意: 検索中は即座にURLパラメータを更新しても良いですが、
-    // 実際にAPIコールが行われるのはデバウンス後です。
-    // updateURLParams(); // デバウンス後に実行されるため不要
 });
 
 // ページ変更ハンドラー
@@ -367,6 +240,129 @@ onMounted(() => {
     fetchUsers();
 });
 </script>
+
+<template>
+    <div>
+        <Header
+            :app-title="t('pages.users.list.title')"
+            :page-buttons="headerButtons"
+            :breadcrumbs="breadcrumbs"
+        />
+
+        <v-container fluid class="pa-4">
+            <!-- 検索・操作エリア -->
+
+            <v-row class="mb-1 align-center">
+                <v-col cols="12" sm="5" md="3">
+                    <v-text-field
+                        v-model="searchQuery"
+                        :label="t('pages.users.list.searchPlaceholder')"
+                        :prepend-inner-icon="ICONS.buttons.search"
+                        variant="outlined"
+                        density="compact"
+                        hide-details
+                    >
+                        <!-- ⭐ 手動管理: 検索中はスピナー（回転）、それ以外はクリアボタン -->
+                        <template v-slot:append-inner>
+                            <v-progress-circular
+                                v-if="loading"
+                                indeterminate
+                                size="20"
+                                width="2"
+                                color="primary"
+                            />
+                            <v-icon
+                                v-else-if="searchQuery"
+                                icon="close"
+                                size="small"
+                                class="cursor-pointer"
+                                @click="searchQuery = ''"
+                            />
+                        </template>
+                    </v-text-field>
+                </v-col>
+
+                <v-col cols="12" sm="4" md="3">
+                    <div class="text-body-2 text-grey-darken-1">
+                        {{ startItem }} - {{ endItem }} / {{ totalItems }} 件
+                    </div>
+                </v-col>
+
+                <v-spacer />
+
+                <v-col cols="12" sm="3" md="3" class="d-flex justify-end">
+                    <v-btn
+                        variant="outlined"
+                        color="primary"
+                        size="default"
+                        :prepend-icon="ICONS.buttons.arrowForward"
+                        @click="goToCreate"
+                    >
+                        {{ t('pages.users.list.createButton') }}
+                    </v-btn>
+                </v-col>
+            </v-row>
+
+            <!-- データテーブル -->
+            <v-data-table-server
+                :headers="headers"
+                :items="users"
+                :items-length="totalItems"
+                :loading="loading"
+                v-model:items-per-page="itemsPerPage"
+                v-model:page="currentPage"
+                v-model:sort-by="sortBy"
+                class="elevation-2 clickable-table"
+                density="compact"
+                hover
+                hide-default-footer
+                @update:options="handleOptionsUpdate"
+                @click:row="handleRowClick"
+            >
+                <!-- ID列 -->
+                <template v-slot:item.id="{ item }">
+                    <RouterLink
+                        :to="routes.USER_DETAIL.replace(':id', item.id)"
+                        class="font-weight-medium text-decoration-none text-primary"
+                        @click.stop
+                    >
+                        {{ item.id }}
+                    </RouterLink>
+                </template>
+
+                <!-- 管理者フラグ -->
+                <template v-slot:item.is_admin="{ item }">
+                    <v-icon
+                        :color="item.is_admin ? 'success' : 'grey'"
+                        :size="item.is_admin ? 'default' : 'small'"
+                    >
+                        {{
+                            item.is_admin
+                                ? ICONS.status.check
+                                : ICONS.status.minus
+                        }}
+                    </v-icon>
+                </template>
+
+                <!-- 登録日 -->
+                <template v-slot:item.created_at="{ item }">
+                    {{ formatDate(item.created_at) }}
+                </template>
+            </v-data-table-server>
+
+            <!-- ページネーション -->
+            <div class="d-flex justify-center mt-4">
+                <v-pagination
+                    v-model="currentPage"
+                    :length="totalPages"
+                    :total-visible="5"
+                    density="compact"
+                    @update:model-value="handlePageChange"
+                />
+            </div>
+        </v-container>
+    </div>
+</template>
 
 <style scoped>
 /* 行をクリック可能に */

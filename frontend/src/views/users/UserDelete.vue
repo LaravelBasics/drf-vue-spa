@@ -83,7 +83,7 @@ onMounted(() => {
         <Header
             :app-title="t('pages.users.delete.title')"
             :breadcrumbs="breadcrumbs"
-        ></Header>
+        />
 
         <v-container class="pa-4">
             <v-row justify="center">
@@ -109,7 +109,9 @@ onMounted(() => {
                                         </v-col>
                                         <v-col cols="8">{{ user.id }}</v-col>
                                     </v-row>
-                                    <v-divider class="my-2"></v-divider>
+
+                                    <v-divider class="my-2" />
+
                                     <v-row>
                                         <v-col
                                             cols="4"
@@ -121,7 +123,9 @@ onMounted(() => {
                                             user.username
                                         }}</v-col>
                                     </v-row>
-                                    <v-divider class="my-2"></v-divider>
+
+                                    <v-divider class="my-2" />
+
                                     <v-row>
                                         <v-col
                                             cols="4"
@@ -133,7 +137,9 @@ onMounted(() => {
                                             user.employee_id
                                         }}</v-col>
                                     </v-row>
-                                    <v-divider class="my-2"></v-divider>
+
+                                    <v-divider class="my-2" />
+
                                     <v-row>
                                         <v-col
                                             cols="4"
@@ -184,7 +190,7 @@ onMounted(() => {
                                     {{ t('buttons.confirmDelete') }}
                                 </v-btn>
 
-                                <v-spacer></v-spacer>
+                                <v-spacer />
 
                                 <v-btn
                                     variant="outlined"
@@ -222,13 +228,6 @@ onMounted(() => {
             :confirm-icon="ICONS.buttons.delete"
             :loading="deleting"
             @confirm="deleteUser"
-        >
-            <!-- 追加情報（オプション） -->
-            <!-- <template #content>
-                <v-alert type="error" variant="tonal" class="mt-4">
-                    この操作は取り消せません
-                </v-alert>
-            </template> -->
-        </ConfirmDialog>
+        />
     </div>
 </template>

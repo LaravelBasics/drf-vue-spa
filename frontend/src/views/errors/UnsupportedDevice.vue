@@ -54,7 +54,7 @@ onBeforeUnmount(() => {
                     {{ t('errors.unsupportedDevice.message') }}
                 </p>
 
-                <v-divider class="my-4"></v-divider>
+                <v-divider class="my-4" />
 
                 <div class="text-caption text-grey">
                     <p>{{ t('errors.unsupportedDevice.currentSize') }}:</p>

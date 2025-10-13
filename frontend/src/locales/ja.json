@@ -154,7 +154,7 @@
             "list": {
                 "title": "ユーザー管理",
                 "searchPlaceholder": "ユーザー名または社員番号",
-                "createButton": "ユーザー登録",
+                "createButton": "登録画面",
                 "itemCount": "{start} - {end} / {total} 件"
             },
             "create": {

@@ -75,7 +75,6 @@ onMounted(async () => {
                 <router-view />
             </v-main>
 
-            <!-- ⭐ フッター追加 -->
             <Footer v-if="auth.user && !isUnsupportedRoute" />
         </div>
 

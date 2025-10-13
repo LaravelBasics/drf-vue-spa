@@ -156,13 +156,14 @@ function goBack() {
                                         type="submit"
                                         color="primary"
                                         size="large"
+                                        variant="outlined"
                                         :loading="submitting"
-                                        :prepend-icon="ICONS.buttons.save"
+                                        :prepend-icon="ICONS.buttons.add"
                                     >
                                         {{ t('buttons.create') }}
                                     </v-btn>
 
-                                    <v-spacer></v-spacer>
+                                    <v-spacer />
 
                                     <v-btn
                                         variant="outlined"

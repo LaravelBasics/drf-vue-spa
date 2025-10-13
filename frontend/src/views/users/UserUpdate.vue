@@ -143,7 +143,7 @@ onMounted(() => {
         <Header
             :app-title="t('pages.users.update.title')"
             :breadcrumbs="breadcrumbs"
-        ></Header>
+        />
 
         <v-container class="pa-4">
             <v-row justify="center">
@@ -308,13 +308,14 @@ onMounted(() => {
                                         @click="submitForm"
                                         color="primary"
                                         size="large"
+                                        variant="outlined"
                                         :loading="submitting"
                                         :prepend-icon="ICONS.buttons.save"
                                     >
                                         {{ t('buttons.save') }}
                                     </v-btn>
 
-                                    <v-spacer></v-spacer>
+                                    <v-spacer />
 
                                     <v-btn
                                         variant="outlined"
