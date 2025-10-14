@@ -7,13 +7,20 @@
     "auth": {
         "login": "Login",
         "logout": "Logout",
-        "loginTitle": "Login Screen",
-        "loginSuccess": "Logged in successfully",
+        "loginTitle": "Login",
+        "loginSuccess": "Login successful",
         "loginFailed": "Login failed",
-        "logoutSuccess": "Logged out successfully",
+        "logoutSuccess": "Logout successful",
         "logoutFailed": "Logout failed",
-        "invalidCredentials": "Invalid employee ID or password",
-        "sessionExpired": "Your session has expired. Please log in again"
+        "invalidCredentials": "Employee ID or password is incorrect.",
+        "sessionExpired": "Your session has expired. Please log in again",
+        "errors": {
+            "INVALID_CREDENTIALS": "Employee ID or password is incorrect",
+            "ACCOUNT_DELETED": "This account has been deleted",
+            "ACCOUNT_INACTIVE": "This account is inactive",
+            "LOGOUT_FAILED": "Logout failed",
+            "SESSION_EXPIRED": "Your session has expired. Please log in again"
+        }
     },
     "nav": {
         "dashboard": "Dashboard",
@@ -24,17 +31,17 @@
             "id": "ID",
             "username": "Username",
             "password": "Password",
-            "email": "Email",
+            "email": "Email Address",
             "name": "Name",
-            "phone": "Phone",
+            "phone": "Phone Number",
             "employeeId": "Employee ID",
             "isAdmin": "Administrator",
             "isActive": "Account Active",
-            "createdAt": "Registration Date"
+            "createdAt": "Created Date"
         },
         "labels": {
             "newPassword": "New Password",
-            "newPasswordConfirmation": "Confirm New Password",
+            "newPasswordConfirmation": "New Password (Confirmation)",
             "changePassword": "Change Password"
         },
         "placeholders": {
@@ -46,25 +53,25 @@
             "testEmployeeId": "Test: 9999",
             "testPassword": "Test: test1234",
             "required": "{field} is required",
-            "max": "Max {max} characters",
+            "max": "Maximum {max} characters",
             "maxLength": "{field} must be {max} characters or less",
             "minLength": "{field} must be at least {min} characters",
-            "email": "Email format",
+            "email": "Valid email format",
             "alphaNumeric": "Alphanumeric only",
-            "employeeIdFormat": "Half-width numbers, max 10 digits",
-            "passwordStrength": "At least 8 characters with letters and numbers",
+            "employeeIdFormat": "Half-width numbers, up to 10 digits",
+            "passwordStrength": "Must contain letters and numbers, at least 8 characters",
             "newPasswordConfirmation": "Please enter again for confirmation",
             "passwordMismatch": "Passwords do not match"
         },
         "validation": {
             "required": "{field} is required",
-            "max": "Please enter within {max} characters",
-            "maxLength": "Please enter {field} within {max} characters",
-            "minLength": "Please enter {field} with at least {min} characters",
-            "email": "Please enter a valid email format",
+            "max": "Please enter {max} characters or less",
+            "maxLength": "{field} must be {max} characters or less",
+            "minLength": "{field} must be at least {min} characters",
+            "email": "Please enter a valid email address",
             "alphaNumeric": "Please enter alphanumeric characters only",
-            "employeeIdFormat": "Please enter half-width numbers, max 10 digits",
-            "passwordStrength": "Please enter at least 8 characters with letters and numbers",
+            "employeeIdFormat": "Please enter half-width numbers, up to 10 digits",
+            "passwordStrength": "Must contain letters and numbers, at least 8 characters",
             "passwordMismatch": "Passwords do not match"
         }
     },
@@ -102,7 +109,7 @@
         "success": "Success",
         "error": "Error",
         "warning": "Warning",
-        "info": "Info"
+        "info": "Information"
     },
     "common": {
         "yes": "Yes",
@@ -124,9 +131,12 @@
             "created": "Created successfully"
         },
         "error": {
-            "network": "Network error occurred. Please check your connection.",
-            "server": "Server error occurred. Please try again later.",
-            "unknown": "An unexpected error occurred"
+            "network": "A network error occurred. Please check your connection.",
+            "server": "A server error occurred. Please try again later.",
+            "unknown": "An unexpected error occurred",
+            "PERMISSION_DENIED": "You do not have permission to perform this operation",
+            "NOT_FOUND": "Resource not found",
+            "VALIDATION_ERROR": "Please check your input"
         },
         "warning": {
             "unsavedChanges": "You have unsaved changes"
@@ -150,35 +160,60 @@
             "theme": "Theme Settings",
             "language": "Language Settings",
             "selectLanguage": "Select Language",
-            "generalDescription": "General settings will be displayed here."
+            "generalDescription": "General settings are displayed here."
         },
         "users": {
             "list": {
                 "title": "User Management",
                 "searchPlaceholder": "Username or Employee ID",
                 "createButton": "Create User",
-                "itemCount": "{start} - {end} of {total} items"
+                "itemCount": "{start} - {end} / {total} items",
+                "noData": "No data available"
             },
             "create": {
                 "title": "Create User",
                 "success": "User \"{username}\" has been created",
-                "error": "Failed to create user"
+                "error": "Failed to create user",
+                "errors": {
+                    "EMPLOYEE_ID_EXISTS": "This Employee ID is already in use",
+                    "USERNAME_REQUIRED": "Username is required",
+                    "EMPLOYEE_ID_REQUIRED": "Employee ID is required",
+                    "PASSWORD_TOO_SHORT": "Password must be at least 8 characters",
+                    "INVALID_EMAIL": "Please enter a valid email address"
+                }
             },
             "detail": {
                 "title": "User Details",
-                "error": "Failed to retrieve user information"
+                "error": "Failed to retrieve user information",
+                "errors": {
+                    "NOT_FOUND": "User not found",
+                    "DELETED": "This user has been deleted"
+                }
             },
             "update": {
                 "title": "Edit User",
                 "success": "User \"{username}\" has been updated",
-                "error": "Failed to update user"
+                "error": "Failed to update user",
+                "errors": {
+                    "EMPLOYEE_ID_EXISTS": "This Employee ID is already in use",
+                    "USERNAME_REQUIRED": "Username is required",
+                    "CANNOT_UPDATE_DELETED": "Deleted users cannot be edited",
+                    "PASSWORD_TOO_SHORT": "Password must be at least 8 characters",
+                    "LAST_ADMIN_CANNOT_DEACTIVATE": "The last remaining administrator's account cannot be deactivated.",
+                    "LAST_ADMIN_CANNOT_REMOVE": "The last remaining administrator's status cannot be changed."
+                }
             },
             "delete": {
                 "title": "Delete User",
                 "success": "User \"{username}\" has been deleted",
                 "error": "Failed to delete user",
                 "warning": "Deleting this user may result in loss of related data.",
-                "lastAdminError": "Cannot delete the last administrator"
+                "lastAdminError": "The last administrator cannot be deleted",
+                "errors": {
+                    "LAST_ADMIN": "The last administrator user cannot be deleted",
+                    "ALREADY_DELETED": "This user has already been deleted",
+                    "CANNOT_DELETE_SELF": "You cannot delete yourself"
+                }
             }
         }
     },
@@ -191,7 +226,7 @@
     },
     "footer": {
         "copyright": "© {year} {company}. All rights reserved.",
-        "company": "Sample Co., Ltd.",
+        "company": "Sample Corporation",
         "version": "Version {version}",
         "links": {
             "terms": "Terms of Service",
@@ -203,10 +238,10 @@
     "errors": {
         "unsupportedDevice": {
             "home": "Home",
-            "title": "Unsupported Device",
-            "message": "This application is designed for use on a PC or tablet.",
+            "title": "Device Not Supported",
+            "message": "This application is intended for use on PCs and tablets.",
             "currentSize": "Current Screen Size",
-            "requiresSize": "Required Size"
+            "requiresSize": "Recommended Size"
         }
     }
 }

@@ -1,4 +1,3 @@
-# backend/users/views.py
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -91,7 +90,12 @@ class UserViewSet(viewsets.ModelViewSet):
         }
         """
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            # ⭐ バリデーションエラーをエラーコード化
+            return self._handle_validation_error(e)
         
         user = UserService.create_user(serializer.validated_data)
         
@@ -101,6 +105,21 @@ class UserViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED
         )
     
+    def retrieve(self, request, *args, **kwargs):
+        """ユーザー詳細取得（エラーコード対応）"""
+        try:
+            instance = self.get_object()
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except User.DoesNotExist:
+            return Response(
+                {
+                    'error_code': 'NOT_FOUND',
+                    'detail': 'ユーザーが見つかりません'
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
     def update(self, request, *args, **kwargs):
         """
         ユーザー更新
@@ -109,23 +128,82 @@ class UserViewSet(viewsets.ModelViewSet):
         {
             "username": "山田次郎",
             "email": "yamada2@example.com",
-            "is_admin": true
+            "is_admin": true,
+            "is_active": false
         }
         """
         partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
         
         try:
-            user = UserService.update_user(instance, serializer.validated_data)
+            instance = self.get_object()
+        except User.DoesNotExist:
+            return Response(
+                {
+                    'error_code': 'NOT_FOUND',
+                    'detail': 'ユーザーが見つかりません'
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # 削除済みユーザーチェック
+        if hasattr(instance, 'deleted_at') and instance.deleted_at:
+            return Response(
+                {
+                    'error_code': 'CANNOT_UPDATE_DELETED',
+                    'detail': '削除済みユーザーは編集できません'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            return self._handle_validation_error(e)
+        
+        try:
+            # ⭐ 最後の管理者のチェック
+            validated_data = serializer.validated_data
+            
+            # 現在、管理者かつアクティブな場合
+            if instance.is_admin and instance.is_active:
+                # 他の管理者（アクティブ）がいるかチェック
+                other_admins = User.objects.filter(
+                    is_admin=True,
+                    is_active=True
+                ).exclude(id=instance.id).count()
+                
+                if other_admins == 0:
+                    # ケース1: アカウント無効化しようとしている
+                    if 'is_active' in validated_data and not validated_data['is_active']:
+                        return Response(
+                            {
+                                'error_code': 'LAST_ADMIN_CANNOT_DEACTIVATE',
+                                'detail': '最後の管理者はアカウントを無効化できません'
+                            },
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    
+                    # ケース2: 管理者権限を外そうとしている
+                    if 'is_admin' in validated_data and not validated_data['is_admin']:
+                        return Response(
+                            {
+                                'error_code': 'LAST_ADMIN_CANNOT_REMOVE',
+                                'detail': '最後の管理者は変更できません'
+                            },
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+            
+            user = UserService.update_user(instance, validated_data)
             response_serializer = UserSerializer(user)
             return Response(response_serializer.data)
         except ValidationError as e:
-            # DRF標準形式でエラーを返す
             return Response(
-                {'detail': str(e.detail[0]) if isinstance(e.detail, list) else str(e.detail)},
+                {
+                    'error_code': 'VALIDATION_ERROR',
+                    'detail': str(e.detail[0]) if isinstance(e.detail, list) else str(e.detail)
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -135,17 +213,125 @@ class UserViewSet(viewsets.ModelViewSet):
         
         DELETE /api/users/{id}/
         """
-        instance = self.get_object()
+        try:
+            instance = self.get_object()
+        except User.DoesNotExist:
+            return Response(
+                {
+                    'error_code': 'NOT_FOUND',
+                    'detail': 'ユーザーが見つかりません'
+                },
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # 自分自身の削除を防止
+        if instance.id == request.user.id:
+            return Response(
+                {
+                    'error_code': 'CANNOT_DELETE_SELF',
+                    'detail': '自分自身を削除することはできません'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         try:
             UserService.delete_user(instance)
             return Response(status=status.HTTP_204_NO_CONTENT)
         except ValidationError as e:
+            # 最後の管理者削除エラー
+            error_message = str(e.detail[0]) if isinstance(e.detail, list) else str(e.detail)
+            
+            error_code = 'VALIDATION_ERROR'
+            if '最後の管理者' in error_message:
+                error_code = 'LAST_ADMIN'
+            
             return Response(
-                {'detail': str(e.detail[0]) if isinstance(e.detail, list) else str(e.detail)},
+                {
+                    'error_code': error_code,
+                    'detail': error_message
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
     
+    # ==================== ヘルパーメソッド ====================
+    
+    def _handle_validation_error(self, validation_error):
+        """
+        DRF ValidationError をエラーコード付きレスポンスに変換
+        
+        Args:
+            validation_error: rest_framework.exceptions.ValidationError
+        
+        Returns:
+            Response: エラーコード付きレスポンス
+        """
+        error_detail = validation_error.detail
+        
+        # フィールド別エラーの場合
+        if isinstance(error_detail, dict):
+            # 最初のフィールドエラーを取得
+            first_field = next(iter(error_detail))
+            first_error = error_detail[first_field]
+            
+            if isinstance(first_error, list):
+                error_message = str(first_error[0])
+            else:
+                error_message = str(first_error)
+            
+            # エラーコードの判定
+            error_code = self._detect_error_code(first_field, error_message)
+            
+            return Response(
+                {
+                    'error_code': error_code,
+                    'detail': error_message,
+                    'field': first_field
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # non_field_errors の場合
+        if isinstance(error_detail, list):
+            error_message = str(error_detail[0])
+        else:
+            error_message = str(error_detail)
+        
+        return Response(
+            {
+                'error_code': 'VALIDATION_ERROR',
+                'detail': error_message
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    def _detect_error_code(self, field_name, error_message):
+        """エラーメッセージからエラーコードを判定"""
+        error_message_lower = error_message.lower()
+        
+        # 社員番号関連
+        if field_name == 'employee_id':
+            if '既に使用' in error_message or 'already exists' in error_message_lower:
+                return 'EMPLOYEE_ID_EXISTS'
+            if '必須' in error_message or 'required' in error_message_lower:
+                return 'EMPLOYEE_ID_REQUIRED'
+        
+        # ユーザー名関連
+        if field_name == 'username':
+            if '必須' in error_message or 'required' in error_message_lower:
+                return 'USERNAME_REQUIRED'
+        
+        # パスワード関連
+        if field_name == 'password':
+            if '8文字' in error_message or 'at least 8' in error_message_lower:
+                return 'PASSWORD_TOO_SHORT'
+        
+        # メールアドレス関連
+        if field_name == 'email':
+            if 'メールアドレス' in error_message or 'email' in error_message_lower:
+                return 'INVALID_EMAIL'
+        
+        return 'VALIDATION_ERROR'
+
     # ==================== カスタムアクション ====================
     
     @action(detail=False, methods=['post'], url_path='bulk-delete')
@@ -162,13 +348,19 @@ class UserViewSet(viewsets.ModelViewSet):
         
         if not user_ids:
             return Response(
-                {'detail': '削除対象のIDを指定してください'},
+                {
+                    'error_code': 'VALIDATION_ERROR',
+                    'detail': '削除対象のIDを指定してください'
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         if not isinstance(user_ids, list):
             return Response(
-                {'detail': 'ids は配列で指定してください'},
+                {
+                    'error_code': 'VALIDATION_ERROR',
+                    'detail': 'ids は配列で指定してください'
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -179,8 +371,20 @@ class UserViewSet(viewsets.ModelViewSet):
                 'deleted_count': deleted_count
             }, status=status.HTTP_200_OK)
         except ValidationError as e:
+            error_message = str(e.detail[0]) if isinstance(e.detail, list) else str(e.detail)
+            
+            # エラーコード判定
+            error_code = 'VALIDATION_ERROR'
+            if '最後の管理者' in error_message:
+                error_code = 'LAST_ADMIN'
+            elif '自分自身' in error_message:
+                error_code = 'CANNOT_DELETE_SELF'
+            
             return Response(
-                {'detail': str(e.detail[0]) if isinstance(e.detail, list) else str(e.detail)},
+                {
+                    'error_code': error_code,
+                    'detail': error_message
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
     
@@ -200,7 +404,10 @@ class UserViewSet(viewsets.ModelViewSet):
             }, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response(
-                {'detail': '対象のユーザーが見つかりません'},
+                {
+                    'error_code': 'NOT_FOUND',
+                    'detail': '対象のユーザーが見つかりません'
+                },
                 status=status.HTTP_404_NOT_FOUND
             )
     
@@ -218,21 +425,38 @@ class UserViewSet(viewsets.ModelViewSet):
         
         if not user_ids:
             return Response(
-                {'detail': '復元対象のIDを指定してください'},
+                {
+                    'error_code': 'VALIDATION_ERROR',
+                    'detail': '復元対象のIDを指定してください'
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         if not isinstance(user_ids, list):
             return Response(
-                {'detail': 'ids は配列で指定してください'},
+                {
+                    'error_code': 'VALIDATION_ERROR',
+                    'detail': 'ids は配列で指定してください'
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        restored_count = UserService.bulk_restore_users(user_ids)
-        return Response({
-            'message': f'{restored_count}件のユーザーを復元しました',
-            'restored_count': restored_count
-        }, status=status.HTTP_200_OK)
+        try:
+            restored_count = UserService.bulk_restore_users(user_ids)
+            return Response({
+                'message': f'{restored_count}件のユーザーを復元しました',
+                'restored_count': restored_count
+            }, status=status.HTTP_200_OK)
+        except ValidationError as e:
+            error_message = str(e.detail[0]) if isinstance(e.detail, list) else str(e.detail)
+            
+            return Response(
+                {
+                    'error_code': 'VALIDATION_ERROR',
+                    'detail': error_message
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     @action(detail=False, methods=['get'])
     def deleted(self, request):

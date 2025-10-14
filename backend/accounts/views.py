@@ -60,7 +60,10 @@ class LoginAPIView(APIView):
                     request=request
                 )
                 return Response(
-                    {'detail': 'このアカウントは削除されています'}, 
+                    {
+                        'error_code': 'ACCOUNT_DELETED',  # ⭐ エラーコード
+                        'detail': 'このアカウントは削除されています'  # デフォルトメッセージ（フォールバック用）
+                    }, 
                     status=status.HTTP_401_UNAUTHORIZED
                 )
             
@@ -76,7 +79,10 @@ class LoginAPIView(APIView):
                     request=request
                 )
                 return Response(
-                    {'detail': 'このアカウントは無効化されています'}, 
+                    {
+                        'error_code': 'ACCOUNT_INACTIVE',  # ⭐ エラーコード
+                        'detail': 'このアカウントは無効化されています'
+                    }, 
                     status=status.HTTP_401_UNAUTHORIZED
                 )
             
@@ -111,7 +117,10 @@ class LoginAPIView(APIView):
         )
 
         return Response(
-            {'detail': '社員番号またはパスワードが正しくありません'}, 
+            {
+                'error_code': 'INVALID_CREDENTIALS',  # ⭐ エラーコード
+                'detail': '社員番号またはパスワードが正しくありません'
+            }, 
             status=status.HTTP_401_UNAUTHORIZED
         )
 
@@ -121,15 +130,23 @@ class LogoutAPIView(APIView):
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
-        # ⭐ ログアウトを記録
-        create_audit_log(
-            action='LOGOUT',
-            model_name='User',
-            object_id=request.user.id,
-            request=request
-        )
-        logout(request)
-        return Response({'detail': 'logged_out'})
+        try:
+            create_audit_log(
+                action='LOGOUT',
+                model_name='User',
+                object_id=request.user.id,
+                request=request
+            )
+            logout(request)
+            return Response({'detail': 'logged_out'})
+        except Exception as e:
+            return Response(
+                {
+                    'error_code': 'LOGOUT_FAILED',  # ⭐ エラーコード
+                    'detail': 'ログアウトに失敗しました'
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class MeAPIView(APIView):

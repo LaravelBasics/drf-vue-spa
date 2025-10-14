@@ -67,16 +67,16 @@ const menuItems = computed(() => [
 ]);
 
 // ⭐ マウント時に権限エラーチェック
-onMounted(() => {
-    // クエリパラメータに unauthorized=admin がある場合
-    if (route.query.unauthorized === 'admin') {
-        // 警告通知を表示
-        notification.warning(t('notifications.unauthorized.admin'), 5000);
+// onMounted(() => {
+//     // クエリパラメータに unauthorized=admin がある場合
+//     if (route.query.unauthorized === 'admin') {
+//         // 警告通知を表示
+//         notification.warning(t('notifications.unauthorized.admin'), 5000);
 
-        // ⭐ URLをクリーンにする（クエリパラメータ削除）
-        router.replace({ path: routes.HOME, query: {} });
-    }
-});
+//         // ⭐ URLをクリーンにする（クエリパラメータ削除）
+//         router.replace({ path: routes.HOME, query: {} });
+//     }
+// });
 
 // ⭐ 権限に応じてフィルタリング
 const filteredMenuItems = computed(() => {

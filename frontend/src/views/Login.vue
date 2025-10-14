@@ -60,7 +60,7 @@ async function onSubmit() {
             await router.push(redirect);
         }, 300);
     } catch (error) {
-        // ⭐ エラーハンドリング（detail が自動抽出される）
+        // ⭐ エラーハンドリング（error_codeがなければdetail が自動抽出される）
         handleApiError(error, 'auth.loginFailed');
     } finally {
         loading.value = false;
