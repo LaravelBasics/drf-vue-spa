@@ -1,13 +1,15 @@
 <script setup>
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useLocaleStore } from '@/stores/locale'; // ⭐ 追加
 import { useUiStore } from '@/stores/ui';
 import { usePermissions } from '@/composables/usePermissions';
 import { routes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 import { ICON_SIZES } from '@/constants/theme';
 
-const { t, locale } = useI18n();
+const { t } = useI18n(); // ⭐ locale を削除
+const localeStore = useLocaleStore(); // ⭐ 追加
 const ui = useUiStore();
 const { isAdmin } = usePermissions();
 
@@ -35,8 +37,9 @@ const filteredNavItems = computed(() => {
     });
 });
 
+// ⭐ localeStore.locale を参照するように変更
 const languageDisplayText = computed(() => {
-    return locale.value === 'ja' ? '日本語' : 'English';
+    return localeStore.locale === 'ja' ? '日本語' : 'English';
 });
 
 const handleNavItemClick = () => {
@@ -45,8 +48,10 @@ const handleNavItemClick = () => {
     }
 };
 
+// ⭐ localeStore.setLocale を使うように変更
 function toggleLanguage() {
-    locale.value = locale.value === 'ja' ? 'en' : 'ja';
+    const newLocale = localeStore.locale === 'ja' ? 'en' : 'ja';
+    localeStore.setLocale(newLocale);
 }
 </script>
 

@@ -1,3 +1,4 @@
+// src/main.js
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
@@ -11,6 +12,7 @@ import './assets/style/main.scss';
 
 import { useAuthStore } from '@/stores/auth';
 import { useNotificationStore } from '@/stores/notification';
+import { useLocaleStore } from '@/stores/locale'; // ⭐ 追加
 
 const app = createApp(App);
 
@@ -21,6 +23,9 @@ app.use(pinia);
 app.use(router);
 app.use(vuetify);
 app.use(i18n);
+
+// ⭐ Vuetify インスタンスをグローバルに登録
+window.$vuetify = vuetify;
 
 // ⭐ グローバルエラーハンドラー - ユーザーに通知も表示
 app.config.errorHandler = (err, instance, info) => {
@@ -74,7 +79,12 @@ const initializeApp = async () => {
         console.log('🔄 アプリケーション事前初期化...');
 
         const authStore = useAuthStore();
+        const localeStore = useLocaleStore(); // ⭐ 追加
+
         await authStore.initialize();
+
+        // ⭐ Vuetify の初期言語を設定
+        vuetify.locale.current = localeStore.locale;
 
         console.log('✅ 事前初期化完了');
     } catch (error) {

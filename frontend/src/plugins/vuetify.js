@@ -1,17 +1,15 @@
-// src/plugins/vuetify.js - Material Symbols (Google公式) 対応版
+// src/plugins/vuetify.js - i18n完全対応版
 import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
-// import { aliases, md } from 'vuetify/iconsets/md'; // ⭐ Google公式アイコン
 import { h } from 'vue';
-import { ja } from 'vuetify/locale';
+import { ja, en } from 'vuetify/locale'; // ⭐ 英語も追加
 import { THEME_CONFIG } from '@/constants/theme';
 
 import 'vuetify/styles';
 
-// ⭐ 変更点 2: Material Symbols (MS) のカスタムアイコンセットを定義します
+// ⭐ Material Symbols のカスタムアイコンセット
 const materialSymbols = {
-    // ページネーションなどが内部的に使用するアイコンを Material Symbols にマッピング
     aliases: {
         // ページネーション
         prev: 'navigate_before',
@@ -46,36 +44,27 @@ const materialSymbols = {
         menu: 'menu',
         subgroup: 'arrow_right',
         delimiter: 'more_horiz',
-        // ... (他のデフォルトアイコンも必要に応じて追加)
     },
-    // 重要な変更: アイコンをレンダリングするためのコンポーネント関数
     component: (props) => {
-        // props.icon の値（例: 'home' や 'md:home'）からアイコン名のみを抽出
         let iconName = props.icon.startsWith('md:')
             ? props.icon.substring(3)
             : props.icon;
 
-        // <span>タグと Material Symbols のクラスでレンダリング
         return h('span', {
-            // main.js でインポートしたCSSに依存するクラス
             class: 'material-symbols-outlined',
-            // アイコン名がテキストコンテンツとして挿入される
             innerHTML: iconName,
         });
     },
 };
 
-export default createVuetify({
+const vuetify = createVuetify({
     components,
     directives,
     icons: {
-        // ⭐ 変更点 3: デフォルトセットをカスタムセット 'ms' に変更
         defaultSet: 'ms',
-        aliases: materialSymbols.aliases, // ⭐ これが重要
+        aliases: materialSymbols.aliases,
         sets: {
-            // ⭐ 変更点 4: 'ms' という名前で Material Symbols のカスタム定義を登録
             ms: materialSymbols,
-            // md, // ⬅️ 元の md セットは不要
         },
     },
     theme: {
@@ -91,8 +80,10 @@ export default createVuetify({
     },
     defaults: THEME_CONFIG.defaults,
     locale: {
-        locale: 'ja',
+        locale: 'ja', // ⭐ デフォルトは日本語
         fallback: 'ja',
-        messages: { ja },
+        messages: { ja, en }, // ⭐ 日本語と英語の両方を登録
     },
 });
+
+export default vuetify;

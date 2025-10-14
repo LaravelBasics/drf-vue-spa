@@ -75,6 +75,24 @@ const headers = computed(() => {
     return baseHeaders;
 });
 
+// ⭐ 修正後：t()に置き換え
+const noDataText = computed(() => t('dataTable.noData'));
+const loadingText = computed(() => t('dataTable.loading'));
+
+const itemCountText = computed(() => {
+    return t('dataTable.itemCount', {
+        start: startItem.value,
+        end: endItem.value,
+        total: totalItems.value,
+    });
+});
+
+// ⭐ ホバー時のツールチップテキスト（言語対応）
+const hoverTooltipText = computed(() => {
+    const text = t('tooltips.viewDetails');
+    return `"${text}"`;
+});
+
 // ページ数計算
 const totalPages = computed(() =>
     Math.ceil(totalItems.value / itemsPerPage.value),
@@ -124,7 +142,6 @@ async function fetchUsers() {
         console.error('ユーザー一覧取得エラー:', error);
     } finally {
         loading.value = false;
-        // searching.value = false;
     }
 }
 
@@ -140,15 +157,12 @@ function handleOptionsUpdate(options) {
 
 // ⭐ watch: 検索クエリの変更を監視してデバウンス処理
 watch(searchQuery, () => {
-    // 1. 既存のタイマーがあればキャンセル
     clearTimeout(searchTimer);
-
-    // 2. 検索クエリが空でない場合、または空にした場合に、500ms後に検索を実行する新しいタイマーを設定
     searchTimer = setTimeout(() => {
-        currentPage.value = 1; // 検索時は1ページ目に戻す
+        currentPage.value = 1;
         fetchUsers();
         updateURLParams();
-    }, 500); // 500ミリ秒後に実行
+    }, 1000);
 });
 
 // ページ変更ハンドラー
@@ -174,7 +188,6 @@ function updateURLParams() {
         query.per_page = itemsPerPage.value;
     }
 
-    // ソート条件
     if (sortBy.value.length > 0) {
         const sort = sortBy.value[0];
         query.sort = sort.key;
@@ -200,7 +213,6 @@ function initFromURLParams() {
         itemsPerPage.value = parseInt(query.per_page);
     }
 
-    // ソート条件復元
     if (query.sort && query.order) {
         sortBy.value = [
             {
@@ -250,8 +262,6 @@ onMounted(() => {
         />
 
         <v-container fluid class="pa-4">
-            <!-- 検索・操作エリア -->
-
             <v-row class="mb-1 align-center">
                 <v-col cols="12" sm="5" md="3">
                     <v-text-field
@@ -262,7 +272,6 @@ onMounted(() => {
                         density="compact"
                         hide-details
                     >
-                        <!-- ⭐ 手動管理: 検索中はスピナー（回転）、それ以外はクリアボタン -->
                         <template v-slot:append-inner>
                             <v-progress-circular
                                 v-if="loading"
@@ -284,7 +293,7 @@ onMounted(() => {
 
                 <v-col cols="12" sm="4" md="3">
                     <div class="text-body-2 text-grey-darken-1">
-                        {{ startItem }} - {{ endItem }} / {{ totalItems }} 件
+                        {{ itemCountText }}
                     </div>
                 </v-col>
 
@@ -303,12 +312,14 @@ onMounted(() => {
                 </v-col>
             </v-row>
 
-            <!-- データテーブル -->
+            <!-- ⭐ no-data-text と loading-text を追加 -->
             <v-data-table-server
                 :headers="headers"
                 :items="users"
                 :items-length="totalItems"
                 :loading="loading"
+                :no-data-text="noDataText"
+                :loading-text="loadingText"
                 v-model:items-per-page="itemsPerPage"
                 v-model:page="currentPage"
                 v-model:sort-by="sortBy"
@@ -319,7 +330,6 @@ onMounted(() => {
                 @update:options="handleOptionsUpdate"
                 @click:row="handleRowClick"
             >
-                <!-- ID列 -->
                 <template v-slot:item.id="{ item }">
                     <RouterLink
                         :to="routes.USER_DETAIL.replace(':id', item.id)"
@@ -330,7 +340,6 @@ onMounted(() => {
                     </RouterLink>
                 </template>
 
-                <!-- 管理者フラグ -->
                 <template v-slot:item.is_admin="{ item }">
                     <v-icon
                         :color="item.is_admin ? 'success' : 'grey'"
@@ -344,13 +353,11 @@ onMounted(() => {
                     </v-icon>
                 </template>
 
-                <!-- 登録日 -->
                 <template v-slot:item.created_at="{ item }">
                     {{ formatDate(item.created_at) }}
                 </template>
             </v-data-table-server>
 
-            <!-- ページネーション -->
             <div class="d-flex justify-center mt-4">
                 <v-pagination
                     v-model="currentPage"
@@ -365,15 +372,14 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 行をクリック可能に */
 :deep(.clickable-table tbody tr) {
     cursor: pointer;
     position: relative;
 }
 
-/* ホバー時のツールチップ（プライマリカラー） */
+/* ⭐ CSSカスタムプロパティでツールチップテキストを動的に変更 */
 :deep(.clickable-table tbody tr:hover::after) {
-    content: '詳細を表示';
+    content: v-bind(hoverTooltipText);
     position: absolute;
     right: 12px;
     top: 50%;

@@ -235,6 +235,14 @@
             "help": "Help"
         }
     },
+    "dataTable": {
+        "itemCount": "{start} - {end} of {total} items",
+        "noData": "No data available",
+        "loading": "Loading..."
+    },
+    "tooltips": {
+        "viewDetails": "View Details"
+    },
     "errors": {
         "unsupportedDevice": {
             "home": "Home",
