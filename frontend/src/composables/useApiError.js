@@ -15,29 +15,23 @@ export function useApiError() {
         if (error.response?.data) {
             const errorData = error.response.data;
 
-            // ⭐ 優先順位1: error_code があれば backend.errors から翻訳
-            if (errorData.error_code) {
-                const backendErrorKey = `backend.errors.${errorData.error_code}`;
-                if (t(backendErrorKey) !== backendErrorKey) {
-                    errorMessage = t(backendErrorKey);
-                }
-            }
-
-            // ⭐ 優先順位2: 翻訳がなければ detail をそのまま使用
-            if (!errorMessage && errorData.detail) {
+            // ⭐ 優先順位1: detail（Django が翻訳済み）
+            if (errorData.detail) {
                 errorMessage = errorData.detail;
             }
 
-            // ⭐ 優先順位3: フィールド別エラーを抽出
+            // ⭐ 優先順位2: フィールド別エラー
             if (!errorMessage) {
                 errorMessage = extractFirstFieldError(errorData);
             }
 
-            // ⭐ 優先順位4: non_field_errors
-            if (!errorMessage && errorData.non_field_errors) {
-                errorMessage = Array.isArray(errorData.non_field_errors)
-                    ? errorData.non_field_errors[0]
-                    : errorData.non_field_errors;
+            // ⭐ 優先順位3: error_code から翻訳（フォールバック）
+            if (!errorMessage && errorData.error_code) {
+                const backendErrorKey = `backend.errors.${errorData.error_code}`;
+                const translated = t(backendErrorKey);
+                if (translated !== backendErrorKey) {
+                    errorMessage = translated;
+                }
             }
         } else if (error.request) {
             // ネットワークエラー
@@ -62,14 +56,7 @@ export function useApiError() {
     }
 
     function extractFirstFieldError(errorData) {
-        const fieldErrors = [
-            'employee_id',
-            'username',
-            'email',
-            'password',
-            'name',
-            'phone',
-        ];
+        const fieldErrors = ['employee_id', 'username', 'email', 'password'];
 
         for (const field of fieldErrors) {
             if (errorData[field]) {
@@ -114,3 +101,65 @@ export function useApiError() {
         showInfo,
     };
 }
+
+// # ==================== エラー処理の優先順位（推奨） ====================
+// """
+// 【優先順位】
+
+// 1. detail（Django が翻訳済み）
+//    → バックエンドで gettext_lazy を使って翻訳
+//    → フロントエンドはそのまま表示
+
+// 2. フィールド別エラー（employee_id, username など）
+//    → Django の ValidationError が翻訳済み
+
+// 3. error_code から翻訳（フォールバック）
+//    → Django で翻訳されなかった場合のみ
+//    → フロントエンドの ja.json から翻訳
+
+// 【なぜ detail を優先するか】
+
+// ✅ Django が標準で提供する翻訳を活用できる
+// ✅ バックエンドでメッセージを管理できる
+// ✅ フロントエンドの翻訳ファイルが肥大化しない
+// ✅ バックエンドの変更がフロントエンドに影響しにくい
+
+// 【フロントエンドの翻訳が必要なケース】
+
+// - UI独自のメッセージ（例: 「本当に削除しますか？」）
+// - バックエンドから返されないメッセージ
+// - ネットワークエラー、タイムアウトなど
+// """
+
+// # ==================== 実務でのベストプラクティス ====================
+// """
+// 【小規模プロジェクト】
+// → Django の gettext_lazy のみ使用
+// → フロントエンドは detail をそのまま表示
+
+// 【中規模プロジェクト】
+// → Django + フロントエンドの両方で翻訳
+// → error_code はフォールバック用
+
+// 【大規模プロジェクト】
+// → Django + フロントエンド + 翻訳管理ツール（Lokalise, Crowdin）
+// → エラーコードを統一管理
+
+// 【メンテナンス性】
+
+// バックエンドで翻訳するメリット:
+// ✅ メッセージを一箇所で管理
+// ✅ バリデーションロジックと翻訳が近い
+// ✅ フロントエンドがシンプル
+
+// フロントエンドで翻訳するメリット:
+// ✅ API レスポンスが小さい
+// ✅ 言語切り替えが即座に反映
+// ✅ オフライン対応しやすい
+
+// 【推奨される組み合わせ】
+
+// 1. バックエンドのバリデーションエラー → Django で翻訳
+// 2. ビジネスロジックエラー → error_code + フロントエンド翻訳
+// 3. UI独自のメッセージ → フロントエンド翻訳のみ
+// """

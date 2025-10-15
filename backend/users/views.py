@@ -187,9 +187,43 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
             return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
         
         except ValidationError as e:
+            # ⭐ ValidationError から error_code を抽出
+            error_code = self._extract_error_code(e)
+
             # バリデーションエラー
             error_msg = self.extract_error_message(e.detail)
-            return self.error_response('VALIDATION_ERROR', error_msg)
+            return self.error_response(error_code, error_msg)
+        
+
+    def _extract_error_code(self, validation_error):
+        """
+        ValidationError から error_code を抽出
+    
+        DRF の ValidationError は以下の形式:
+        {
+            'employee_id': [
+                ErrorDetail(string='...', code='EMPLOYEE_ID_EXISTS')
+            ]
+        }
+        """
+        detail = validation_error.detail
+    
+        # フィールドごとのエラー（dict）
+        if isinstance(detail, dict):
+            for field_errors in detail.values():
+                if isinstance(field_errors, list) and len(field_errors) > 0:
+                    error = field_errors[0]
+                    if hasattr(error, 'code') and error.code != 'invalid':
+                        return error.code
+    
+        # リストのエラー
+        elif isinstance(detail, list) and len(detail) > 0:
+            error = detail[0]
+            if hasattr(error, 'code') and error.code != 'invalid':
+                return error.code
+        
+        # デフォルト
+        return 'VALIDATION_ERROR'
     
     def retrieve(self, request, *args, **kwargs):
         """

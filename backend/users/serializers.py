@@ -12,6 +12,7 @@
 - フロントエンド ⇔ Django ⇔ データベース の間でデータを変換
 """
 
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
@@ -134,17 +135,17 @@ class UserCreateSerializer(serializers.ModelSerializer):
         エラー:
             ValidationError: 検証失敗時
         """
-        # 空文字列・空白のみをチェック
+        # 空文字列・空白のみをチェック（国際化対応）
         if not value or not value.strip():
-            raise serializers.ValidationError('社員番号は必須です')
+            raise serializers.ValidationError(_('社員番号は必須です'))
         
-        # 前後の空白を削除
         value = value.strip()
-
-        # 重複チェック（削除済みは除外）
+        
+        # ⭐ gettext_lazy を使って翻訳可能にする
         if User.objects.filter(employee_id=value).exists():
             raise serializers.ValidationError(
-                f'社員番号「{value}」は既に使用されています。別の社員番号を入力してください。'
+                _('社員番号「%(value)s」は既に使用されています') % {'value': value},
+                code='EMPLOYEE_ID_EXISTS'
             )
         
         return value
@@ -157,7 +158,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
         - 空文字列でないか
         """
         if not value or not value.strip():
-            raise serializers.ValidationError('ユーザー名は必須です')
+            raise serializers.ValidationError(_('ユーザー名は必須です'))
         
         return value.strip()
     

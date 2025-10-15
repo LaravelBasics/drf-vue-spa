@@ -12,6 +12,7 @@ Django プロジェクトの設定ファイル
 """
 
 from pathlib import Path
+from django.utils.translation import gettext_lazy as _
 
 # ==================== 基本設定 ====================
 
@@ -118,6 +119,8 @@ MIDDLEWARE = [
     # ==================== Django標準ミドルウェア ====================
     'django.middleware.security.SecurityMiddleware',      # セキュリティ対策
     'django.contrib.sessions.middleware.SessionMiddleware',  # セッション管理
+    'common.middleware.LanguageMiddleware',  # ← カスタムミドルウェア
+    'django.middleware.locale.LocaleMiddleware',  # ← 言語切り替え用（追加）
     'django.middleware.common.CommonMiddleware',          # 共通処理
     'django.middleware.csrf.CsrfViewMiddleware',          # CSRF対策
     'django.contrib.auth.middleware.AuthenticationMiddleware',  # 認証処理
@@ -271,7 +274,13 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # ==================== 国際化（i18n）設定 ====================
 
-# 言語コード
+# 対応言語
+LANGUAGES = [
+    ('ja', _('日本語')),
+    ('en', _('English')),
+]
+
+# デフォルト言語
 LANGUAGE_CODE = 'ja'  # 日本語
 
 # タイムゾーン
@@ -279,6 +288,14 @@ TIME_ZONE = 'Asia/Tokyo'  # 日本時間（JST）
 
 # 国際化を有効化
 USE_I18N = True
+USE_I18N = True
+USE_L10N = True
+USE_TZ = True
+
+# 翻訳ファイルの場所
+LOCALE_PATHS = [
+    BASE_DIR / 'locale',
+]
 
 # タイムゾーンを有効化
 # True = データベースに UTC で保存し、表示時に変換

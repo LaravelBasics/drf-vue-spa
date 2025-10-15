@@ -2,6 +2,7 @@
 
 import axios from 'axios';
 import Cookies from 'js-cookie';
+import { useLocaleStore } from '@/stores/locale';
 
 const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/';
@@ -54,6 +55,10 @@ const csrfManager = new CSRFManager();
 
 // リクエストインターセプター
 api.interceptors.request.use(async (config) => {
+    // ⭐ 言語ヘッダーを追加
+    const localeStore = useLocaleStore();
+    config.headers['Accept-Language'] = localeStore.locale;
+
     const method = config.method?.toLowerCase();
     const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
 

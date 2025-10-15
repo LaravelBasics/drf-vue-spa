@@ -244,5 +244,30 @@
             "currentSize": "Current Screen Size",
             "requiresSize": "Recommended Size"
         }
+    },
+    "backend": {
+        "errors": {
+            "INVALID_CREDENTIALS": "社員番号またはパスワードが正しくありません",
+            "ACCOUNT_DELETED": "このアカウントは削除されています",
+            "ACCOUNT_INACTIVE": "このアカウントは無効化されています",
+            "ACCOUNT_LOCKED": "ログイン試行が10回失敗しました。1分後に再度お試しください",
+            "LOGOUT_FAILED": "ログアウトに失敗しました",
+            "SESSION_EXPIRED": "セッションの有効期限が切れました。再度ログインしてください",
+            "USERNAME_REQUIRED": "ユーザー名は必須です",
+            "EMPLOYEE_ID_REQUIRED": "社員番号は必須です",
+            "EMPLOYEE_ID_EXISTS": "この社員番号は既に使用されています",
+            "PASSWORD_TOO_SHORT": "パスワードは8文字以上で入力してください",
+            "INVALID_EMAIL": "正しいメールアドレスの形式で入力してください",
+            "ALREADY_DELETED": "このユーザーは既に削除されています",
+            "CANNOT_UPDATE_DELETED": "削除済みユーザーは編集できません",
+            "LAST_ADMIN_CANNOT_REMOVE": "最後の管理者権限を外すことはできません",
+            "LAST_ADMIN_CANNOT_DEACTIVATE": "最後の管理者はアカウントを無効化できません",
+            "LAST_ADMIN": "最後の管理者は削除できません",
+            "CANNOT_DELETE_SELF": "自分自身を削除することはできません",
+            "NETWORK_ERROR": "ネットワークエラーが発生しました",
+            "UNKNOWN_ERROR": "予期しないエラーが発生しました",
+            "NOT_FOUND": "ユーザーが見つかりません",
+            "VALIDATION_ERROR": "入力内容に誤りがあります"
+        }
     }
 }
