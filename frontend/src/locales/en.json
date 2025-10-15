@@ -12,12 +12,12 @@
         "loginFailed": "Login failed",
         "logoutSuccess": "Logout successful",
         "logoutFailed": "Logout failed",
-        "invalidCredentials": "Employee ID or password is incorrect.",
         "sessionExpired": "Your session has expired. Please log in again",
         "errors": {
             "INVALID_CREDENTIALS": "Employee ID or password is incorrect",
             "ACCOUNT_DELETED": "This account has been deleted",
             "ACCOUNT_INACTIVE": "This account is inactive",
+            "ACCOUNT_LOCKED": "Login attempts failed 10 times. Please try again in 1 minute",
             "LOGOUT_FAILED": "Logout failed",
             "SESSION_EXPIRED": "Your session has expired. Please log in again"
         }
@@ -135,14 +135,7 @@
             "server": "A server error occurred. Please try again later.",
             "unknown": "An unexpected error occurred",
             "PERMISSION_DENIED": "You do not have permission to perform this operation",
-            "NOT_FOUND": "Resource not found",
-            "VALIDATION_ERROR": "Please check your input"
-        },
-        "warning": {
-            "unsavedChanges": "You have unsaved changes"
-        },
-        "info": {
-            "processing": "Processing..."
+            "NOT_FOUND": "Resource not found"
         }
     },
     "pages": {

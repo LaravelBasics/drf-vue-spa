@@ -12,12 +12,12 @@
         "loginFailed": "ログインに失敗しました",
         "logoutSuccess": "ログアウトしました",
         "logoutFailed": "ログアウトに失敗しました",
-        "invalidCredentials": "社員番号またはパスワードが正しくありません。",
         "sessionExpired": "セッションの有効期限が切れました。再度ログインしてください",
         "errors": {
             "INVALID_CREDENTIALS": "社員番号またはパスワードが正しくありません",
             "ACCOUNT_DELETED": "このアカウントは削除されています",
             "ACCOUNT_INACTIVE": "このアカウントは無効化されています",
+            "ACCOUNT_LOCKED": "ログイン試行が10回失敗しました。1分後に再度お試しください",
             "LOGOUT_FAILED": "ログアウトに失敗しました",
             "SESSION_EXPIRED": "セッションの有効期限が切れました。再度ログインしてください"
         }
@@ -135,14 +135,7 @@
             "server": "サーバーエラーが発生しました。しばらくしてから再度お試しください。",
             "unknown": "予期しないエラーが発生しました",
             "PERMISSION_DENIED": "この操作を実行する権限がありません",
-            "NOT_FOUND": "リソースが見つかりません",
-            "VALIDATION_ERROR": "入力内容に誤りがあります"
-        },
-        "warning": {
-            "unsavedChanges": "保存されていない変更があります"
-        },
-        "info": {
-            "processing": "処理中です..."
+            "NOT_FOUND": "リソースが見つかりません"
         }
     },
     "pages": {
