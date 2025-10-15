@@ -12,7 +12,7 @@ import { ICONS } from '@/constants/icons';
 const router = useRouter();
 const { t } = useI18n();
 const { createRules } = useValidation();
-const { handleApiError, showCreateSuccess } = useApiError();
+const { showSuccess, handleApiError } = useApiError();
 
 const submitting = ref(false);
 const form = ref(null);
@@ -69,12 +69,12 @@ async function submitForm() {
     submitting.value = true;
     try {
         await usersAPI.create(formData.value);
-        showCreateSuccess('pages.users.create.success', {
+        showSuccess('pages.users.create.success', {
             username: formData.value.username,
         });
         router.replace(routes.USERS);
     } catch (error) {
-        handleApiError(error, 'pages.users.create.error');
+        handleApiError(error);
     } finally {
         submitting.value = false;
     }

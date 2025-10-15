@@ -13,7 +13,7 @@ const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
 const { createRules } = useValidation();
-const { handleApiError, showUpdateSuccess } = useApiError();
+const { showSuccess, handleApiError } = useApiError();
 
 const loading = ref(true);
 const submitting = ref(false);
@@ -121,13 +121,13 @@ async function submitForm() {
 
         await usersAPI.update(userId.value, updateData);
 
-        showUpdateSuccess('pages.users.update.success', {
+        showSuccess('pages.users.update.success', {
             username: formData.value.username,
         });
 
         router.replace(routes.USERS);
     } catch (error) {
-        handleApiError(error, 'pages.users.update.error');
+        handleApiError(error);
     } finally {
         submitting.value = false;
     }

@@ -9,7 +9,7 @@ import { computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter, useRoute } from 'vue-router';
 import { usePermissions } from '@/composables/usePermissions';
-import { useNotificationStore } from '@/stores/notification';
+import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import MenuCardGrid from '@/components/MenuCardGrid.vue';
 import { routes } from '@/constants/routes';
@@ -19,7 +19,7 @@ import { COLORS } from '@/constants/theme';
 const { t } = useI18n();
 const router = useRouter();
 const route = useRoute();
-const notification = useNotificationStore();
+const { showWarning } = useApiError();
 const { isAdmin } = usePermissions();
 
 // パンくずリスト
@@ -36,7 +36,7 @@ onMounted(() => {
     // クエリパラメータに unauthorized=admin がある場合
     if (route.query.unauthorized === 'admin') {
         // 警告通知を表示
-        notification.warning(t('notifications.unauthorized.admin'), 5000);
+        showWarning('notifications.unauthorized.admin');
 
         // ⭐ URLをクリーンにする（クエリパラメータ削除）
         router.replace({ path: routes.HOME, query: {} });

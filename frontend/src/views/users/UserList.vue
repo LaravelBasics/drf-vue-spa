@@ -54,7 +54,7 @@ const breadcrumbs = computed(() => [
 const headers = computed(() => {
     const baseHeaders = [
         { title: t('form.fields.id'), key: 'id', sortable: true },
-        { title: t('form.fields.username'), key: 'username', sortable: true },
+        { title: t('form.fields.username'), key: 'username', sortable: false },
         {
             title: t('form.fields.employeeId'),
             key: 'employee_id',

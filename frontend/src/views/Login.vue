@@ -16,7 +16,7 @@ const route = useRoute();
 const { t } = useI18n();
 const theme = useTheme();
 const { createRules } = useValidation();
-const { handleApiError, showLoginSuccess } = useApiError();
+const { showInfo, handleApiError } = useApiError();
 
 const employeeId = ref('');
 const password = ref('');
@@ -51,7 +51,7 @@ async function onSubmit() {
         await auth.loginSession(employeeId.value, password.value);
 
         // ✅ ログイン成功
-        showLoginSuccess('auth.loginSuccess', {}, 3000);
+        showInfo('auth.loginSuccess', {}, 3000);
 
         // ⭐ フェードアウトしてから遷移
         isVisible.value = false;
@@ -60,8 +60,7 @@ async function onSubmit() {
             await router.push(redirect);
         }, 300);
     } catch (error) {
-        // ⭐ エラーハンドリング（error_codeがなければdetail が自動抽出される）
-        handleApiError(error, 'auth.loginFailed');
+        handleApiError(error);
     } finally {
         loading.value = false;
     }

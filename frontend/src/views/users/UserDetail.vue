@@ -44,7 +44,7 @@ async function fetchUser() {
         user.value = userResponse.data;
         allUsers.value = usersResponse.data.results || usersResponse.data;
     } catch (error) {
-        handleApiError(error, 'pages.users.detail.error');
+        handleApiError(error);
         router.push(routes.USERS);
     } finally {
         loading.value = false;

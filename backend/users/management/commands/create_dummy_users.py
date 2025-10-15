@@ -1,4 +1,16 @@
 # backend/users/management/commands/create_dummy_users.py
+"""
+ダミーユーザー作成コマンド
+
+このファイルの役割:
+- 開発・テスト用に大量のダミーユーザーを作成
+- 日本人名でランダムに生成
+- 既存ユーザーは保持（上書きしない）
+
+使い方:
+python manage.py create_dummy_users --count=100 --password=test1234
+"""
+
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
@@ -10,9 +22,12 @@ User = get_user_model()
 
 
 class Command(BaseCommand):
+    """Django管理コマンド"""
+    
     help = 'ダミーユーザーを効率的に作成（既存ユーザーは保持）'
     
-    # 日本人の名字・名前リスト
+    # ==================== 日本人名リスト ====================
+    
     LAST_NAMES = [
         '佐藤', '鈴木', '高橋', '田中', '伊藤', '渡辺', '山本', '中村', '小林', '加藤',
         '吉田', '山田', '佐々木', '山口', '松本', '井上', '木村', '林', '斎藤', '清水',
@@ -25,7 +40,15 @@ class Command(BaseCommand):
         '正樹', '彩', '隆', '千鶴', '誠', '美穂', '修', '奈々', '剛', '恵',
     ]
     
+    # ==================== コマンドライン引数 ====================
+    
     def add_arguments(self, parser):
+        """
+        コマンドライン引数を定義
+        
+        --count: 作成するユーザー数
+        --password: デフォルトパスワード
+        """
         parser.add_argument(
             '--count',
             type=int,
@@ -36,23 +59,39 @@ class Command(BaseCommand):
             '--password',
             type=str,
             default='test1234',
-            help='デフォルトパスワード（デフォルト: password123）'
+            help='デフォルトパスワード（デフォルト: test1234）'
         )
     
+    # ==================== メイン処理 ====================
+    
     def handle(self, *args, **options):
+        """
+        ダミーユーザー作成の実行処理
+        
+        処理の流れ:
+        1. コマンドライン引数を取得
+        2. パスワードをハッシュ化（1回だけ）
+        3. 既存の社員番号・ユーザー名を取得
+        4. ランダムにユーザーを生成
+        5. バルク作成（一括登録）
+        """
         count = options['count']
         default_password = options['password']
         
-        # パスワードを事前にハッシュ化（1回だけ）
+        # パスワードを事前にハッシュ化（効率化のため1回だけ）
         hashed_password = make_password(default_password)
         
-        # 既存の社員番号を取得
+        # ==================== 既存データのチェック ====================
+        
+        # 既存の社員番号を取得（重複を避ける）
+        # employee_id = 認証ID（ユニーク制約あり）
         existing_employee_ids = set(
             User.all_objects.values_list('employee_id', flat=True)
             .filter(employee_id__isnull=False)
         )
         
-        # 既存のユーザー名を取得（重複チェック用・ユニーク制約なしなので参考程度）
+        # 既存のユーザー名を取得（参考程度・ユニーク制約なし）
+        # username = 表示名（重複OK）
         existing_usernames = set(
             User.all_objects.values_list('username', flat=True)
             .filter(username__isnull=False)
@@ -61,26 +100,30 @@ class Command(BaseCommand):
         # 管理者が存在するかチェック
         has_admin = User.objects.filter(is_admin=True, is_active=True).exists()
         
-        users_to_create = []
-        skipped_count = 0
+        # ==================== ユーザー生成 ====================
+        
+        users_to_create = []  # 作成するユーザーのリスト
+        skipped_count = 0     # スキップした件数
         
         self.stdout.write('ダミーユーザー作成開始...')
         
-        attempt = 0
-        created = 0
+        attempt = 0  # 試行回数
+        created = 0  # 作成成功数
         
-        while created < count and attempt < count * 2:  # 無限ループ防止
+        # 無限ループ防止のため最大 count * 2 回まで試行
+        while created < count and attempt < count * 2:
             attempt += 1
             
-            # 日本人名生成
+            # ① 日本人名をランダム生成
             last_name = random.choice(self.LAST_NAMES)
             first_name = random.choice(self.FIRST_NAMES)
             full_name = f'{last_name}{first_name}'
             
-            # ユーザー名: 日本語のフルネーム（ユニーク制約なし）
+            # ② ユーザー名（表示名・ユニーク制約なし）
             username = full_name
             
-            # 重複しない5桁の社員番号生成（認証ID・ユニーク制約あり）
+            # ③ 社員番号（認証ID・ユニーク制約あり）
+            # 5桁のランダムな数字（10000～99999）
             employee_id = self.generate_unique_employee_id(existing_employee_ids)
             
             if employee_id is None:
@@ -88,22 +131,22 @@ class Command(BaseCommand):
                 skipped_count += 1
                 continue
             
-            # ランダムな作成日（過去30日以内）
+            # ④ ランダムな作成日（過去30日以内）
             created_at = timezone.now() - timedelta(
                 days=random.randint(0, 30),
                 hours=random.randint(0, 23),
                 minutes=random.randint(0, 59),
             )
             
-            # 最初のユーザーのみ管理者（既に管理者がいない場合）
+            # ⑤ 最初のユーザーのみ管理者（管理者がいない場合）
             is_admin = (created == 0 and not has_admin)
             
-            # ユーザーオブジェクト作成
+            # ⑥ ユーザーオブジェクト作成
             user = User(
-                employee_id=employee_id,  # ← 認証ID（ユニーク制約あり）
-                username=username,         # ← 表示名（ユニーク制約なし）
-                email=f'{employee_id}@example.com',  # 仮メール
-                password=hashed_password,
+                employee_id=employee_id,        # ← 認証ID（ユニーク）
+                username=username,              # ← 表示名（重複OK）
+                email=f'{employee_id}@example.com',
+                password=hashed_password,       # ← 事前にハッシュ化済み
                 is_admin=is_admin,
                 is_active=True,
                 is_staff=False,
@@ -116,18 +159,23 @@ class Command(BaseCommand):
             existing_usernames.add(username)
             created += 1
         
-        # バルク作成
+        # ==================== バルク作成（一括登録） ====================
+        
         if users_to_create:
             try:
+                # bulk_create = 一括でデータベースに登録（高速）
+                # ignore_conflicts=True = 重複エラーをスキップ
                 User.objects.bulk_create(users_to_create, ignore_conflicts=True)
                 created_count = len(users_to_create)
                 
+                # 成功メッセージ
                 self.stdout.write(
                     self.style.SUCCESS(
                         f'\n✅ {created_count}人のダミーユーザーを作成しました'
                     )
                 )
                 
+                # スキップした件数を表示
                 if skipped_count > 0:
                     self.stdout.write(
                         self.style.WARNING(
@@ -135,7 +183,8 @@ class Command(BaseCommand):
                         )
                     )
                 
-                # 作成されたユーザーを表示
+                # ==================== 作成結果の表示 ====================
+                
                 self.stdout.write('\n作成されたユーザー（サンプル）:')
                 for user in users_to_create[:5]:
                     self.stdout.write(
@@ -146,6 +195,7 @@ class Command(BaseCommand):
                 if len(users_to_create) > 5:
                     self.stdout.write(f'  ... 他 {len(users_to_create) - 5}人')
                 
+                # ログイン情報の表示
                 self.stdout.write(f'\nログイン情報:')
                 self.stdout.write(f'  社員番号: {users_to_create[0].employee_id}')
                 self.stdout.write(f'  パスワード: {default_password}')
@@ -159,10 +209,25 @@ class Command(BaseCommand):
                 self.style.WARNING('作成するユーザーがありません')
             )
     
+    # ==================== ヘルパーメソッド ====================
+    
     def generate_unique_employee_id(self, existing_ids, max_attempts=100):
         """
         重複しない5桁の社員番号を生成
-        重複が続く場合は None を返す（スキップさせる）
+        
+        引数:
+            existing_ids: 既存の社員番号のセット
+            max_attempts: 最大試行回数
+        
+        戻り値:
+            str: 重複しない社員番号
+            None: max_attempts 回試行しても重複した場合
+        
+        仕組み:
+        1. 10000～99999 のランダムな5桁の数値を生成
+        2. 既存IDと重複していないかチェック
+        3. 重複していなければ返す
+        4. 最大100回まで試行
         """
         for _ in range(max_attempts):
             # 10000～99999 のランダムな5桁の数値
@@ -171,5 +236,34 @@ class Command(BaseCommand):
             if employee_id not in existing_ids:
                 return employee_id
         
-        # max_attempts回試行しても重複した場合は None
+        # max_attempts 回試行しても重複した場合は None
         return None
+
+
+# ==================== 使用例 ====================
+"""
+1. 基本的な使い方（100人作成）
+python manage.py create_dummy_users
+
+2. 人数を指定
+python manage.py create_dummy_users --count=500
+
+3. パスワードを指定
+python manage.py create_dummy_users --count=100 --password=mypassword
+
+4. 人数とパスワードを両方指定
+python manage.py create_dummy_users --count=200 --password=test1234
+
+
+生成されるユーザー例:
+- 社員番号: 12345 / 名前: 佐藤太郎
+- 社員番号: 67890 / 名前: 鈴木花子
+- 社員番号: 34567 / 名前: 田中次郎 [管理者]
+
+
+注意点:
+- employee_id（社員番号）はユニーク制約あり
+- username（表示名）はユニーク制約なし（重複OK）
+- 最初のユーザーは管理者になる（既に管理者がいない場合）
+- 既存ユーザーは上書きしない
+"""

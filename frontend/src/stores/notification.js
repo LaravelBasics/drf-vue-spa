@@ -19,19 +19,19 @@ export const useNotificationStore = defineStore('notification', () => {
         show.value = true;
     }
 
-    function success(msg, duration = 5000) {
+    function success(msg, duration = 10000) {
         showNotification(msg, 'success', duration);
     }
 
-    function error(msg, duration = 7000) {
+    function error(msg, duration = 10000) {
         showNotification(msg, 'error', duration);
     }
 
-    function warning(msg, duration = 6000) {
+    function warning(msg, duration = 10000) {
         showNotification(msg, 'warning', duration);
     }
 
-    function info(msg, duration = 5000) {
+    function info(msg, duration = 10000) {
         showNotification(msg, 'info', duration);
     }
 

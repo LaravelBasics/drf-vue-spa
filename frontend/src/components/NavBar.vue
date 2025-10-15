@@ -41,8 +41,7 @@ async function handleLogout() {
             router.push(routes.LOGIN);
         }, 100);
     } catch (error) {
-        // ❌ APIエラーハンドリング（Login.vue と同じパターン）
-        handleApiError(error, 'auth.logoutFailed');
+        handleApiError(error);
     }
 }
 

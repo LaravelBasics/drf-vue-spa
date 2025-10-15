@@ -12,7 +12,7 @@ import { ICONS } from '@/constants/icons';
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
-const { handleApiError, showDeleteSuccess } = useApiError();
+const { showSuccess, handleApiError } = useApiError();
 
 const loading = ref(true);
 const deleting = ref(false);
@@ -48,7 +48,7 @@ async function fetchUser() {
         user.value = userResponse.data;
         allUsers.value = usersResponse.data.results || usersResponse.data;
     } catch (error) {
-        handleApiError(error, 'pages.users.detail.error');
+        handleApiError(error);
         router.push(routes.USERS);
     } finally {
         loading.value = false;
@@ -61,7 +61,7 @@ async function deleteUser() {
     deleting.value = true;
     try {
         await usersAPI.delete(userId.value);
-        showDeleteSuccess('pages.users.delete.success', {
+        showSuccess('pages.users.delete.success', {
             username: user.value.username,
         });
         showConfirmDialog.value = false;
