@@ -8,7 +8,6 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.core.cache import cache
 from .serializers import LoginSerializer
-from audit.utils import create_audit_log
 
 
 class CSRFView(APIView):
@@ -75,13 +74,6 @@ class LoginAPIView(APIView):
 
         # ⭐ ブルートフォース対策: ロック状態を確認
         if self._is_locked(employee_id):
-            create_audit_log(
-                action='LOGIN_FAILED',
-                model_name='User',
-                success=False,
-                error_message=f'アカウントロック中: {employee_id}',
-                request=request
-            )
             return Response(
                 {
                     'error_code': 'ACCOUNT_LOCKED',
@@ -99,14 +91,7 @@ class LoginAPIView(APIView):
             # ⭐ ログイン成功: 試行回数をリセット
             if hasattr(user, 'deleted_at') and user.deleted_at:
                 self._increment_attempts(employee_id)
-                create_audit_log(
-                    action='LOGIN_FAILED',
-                    model_name='User',
-                    object_id=user.id,
-                    success=False,
-                    error_message='削除されたアカウント',
-                    request=request
-                )
+
                 return Response(
                     {
                         'error_code': 'ACCOUNT_DELETED',
@@ -117,14 +102,7 @@ class LoginAPIView(APIView):
             
             if not user.is_active:
                 self._increment_attempts(employee_id)
-                create_audit_log(
-                    action='LOGIN_FAILED',
-                    model_name='User',
-                    object_id=user.id,
-                    success=False,
-                    error_message='無効化されたアカウント',
-                    request=request
-                )
+
                 return Response(
                     {
                         'error_code': 'ACCOUNT_INACTIVE',
@@ -137,12 +115,6 @@ class LoginAPIView(APIView):
             self._reset_attempts(employee_id)
             login(request, user)
 
-            create_audit_log(
-                action='LOGIN',
-                model_name='User',
-                object_id=user.id,
-                request=request
-            )
             return Response({
                 'detail': 'logged_in',
                 'user': {
@@ -161,13 +133,7 @@ class LoginAPIView(APIView):
         # ⭐ ロック判定
         if attempts >= self.MAX_LOGIN_ATTEMPTS:
             self._lock_user(employee_id)
-            create_audit_log(
-                action='LOGIN_FAILED',
-                model_name='User',
-                success=False,
-                error_message=f'ブルートフォース攻撃検出（試行回数超過）: {employee_id}',
-                request=request
-            )
+
             return Response(
                 {
                     'error_code': 'ACCOUNT_LOCKED',
@@ -175,14 +141,6 @@ class LoginAPIView(APIView):
                 }, 
                 status=status.HTTP_429_TOO_MANY_REQUESTS
             )
-        
-        create_audit_log(
-            action='LOGIN_FAILED',
-            model_name='User',
-            success=False,
-            error_message=f'認証失敗: {employee_id}',
-            request=request
-        )
 
         return Response(
             {
@@ -199,13 +157,8 @@ class LogoutAPIView(APIView):
     
     def post(self, request):
         try:
-            create_audit_log(
-                action='LOGOUT',
-                model_name='User',
-                object_id=request.user.id,
-                request=request
-            )
             logout(request)
+
             return Response({'detail': 'logged_out'})
         except Exception as e:
             return Response(

@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta
-from audit.utils import create_audit_log, get_model_changes
 from ..exceptions import LastAdminError, UserNotFoundError, CannotDeleteSelfError, CannotUpdateDeletedError
 
 User = get_user_model()
@@ -45,18 +44,6 @@ class UserService:
             password=password or 'defaultpassword123',
             **validated_data
         )
-
-        create_audit_log(
-            action='CREATE',
-            model_name='User',
-            object_id=user.id,
-            changes={
-                'username': {'old': None, 'new': user.username},
-                'employee_id': {'old': None, 'new': user.employee_id},
-                'is_admin': {'old': None, 'new': user.is_admin},
-                'password': {'old': None, 'new': '***'},
-            }
-        )
         
         return user
 
@@ -91,13 +78,6 @@ class UserService:
         
         if update_fields:
             user_instance.save(update_fields=update_fields)
-        
-        create_audit_log(
-            action='UPDATE',
-            model_name='User',
-            object_id=user_instance.id,
-            changes=changes
-        )
 
         return user_instance
 
@@ -119,12 +99,7 @@ class UserService:
         
         user_instance.soft_delete()
 
-        create_audit_log(
-            action='DELETE',
-            model_name='User',
-            object_id=user_instance.id
-        )
-    
+
     @staticmethod
     @transaction.atomic
     def bulk_delete_users(user_ids):

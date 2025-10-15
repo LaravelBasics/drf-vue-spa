@@ -45,7 +45,6 @@ INSTALLED_APPS = [
     # 自作アプリ
     "accounts",  # api/ から accounts/ に変更
     "users",
-    'audit',  # 監査ログアプリを追加
 ]
 
 # 💡 小文字で指定します
@@ -80,7 +79,6 @@ REST_FRAMEWORK = {
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",  # ← 一番上寄りに追加
-    'audit.middleware.RequestIDMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
