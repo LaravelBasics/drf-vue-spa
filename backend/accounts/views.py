@@ -6,6 +6,7 @@ from rest_framework import status
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
+from django.core.cache import cache
 from .serializers import LoginSerializer
 from audit.utils import create_audit_log
 
@@ -20,13 +21,46 @@ class CSRFView(APIView):
 
 
 class LoginAPIView(APIView):
-    """ログインAPI（監査ログ対応）"""
-    """
-    ログインAPI（employee_id認証対応）
-    
-    employee_id と password で認証を行います。
-    """
+    """ログインAPI（ブルートフォース対策 + 監査ログ対応）"""
     permission_classes = [AllowAny]
+    
+    # ⭐ ブルートフォース対策の設定
+    MAX_LOGIN_ATTEMPTS = 10 # 最大試行回数
+    LOCKOUT_DURATION = 60  # 秒（1分）
+    
+    def _get_cache_key(self, employee_id):
+        """キャッシュキーを生成"""
+        return f'login_attempts:{employee_id}'
+    
+    def _get_lockout_key(self, employee_id):
+        """ロック状態のキャッシュキーを生成"""
+        return f'login_locked:{employee_id}'
+    
+    def _increment_attempts(self, employee_id):
+        """ログイン試行回数をインクリメント"""
+        cache_key = self._get_cache_key(employee_id)
+        attempts = cache.get(cache_key, 0)
+        attempts += 1
+        # キャッシュを更新（1時間で自動削除）
+        cache.set(cache_key, attempts, 3600)
+        return attempts
+    
+    def _is_locked(self, employee_id):
+        """ユーザーがロック状態か確認"""
+        lockout_key = self._get_lockout_key(employee_id)
+        return cache.get(lockout_key, False)
+    
+    def _lock_user(self, employee_id):
+        """ユーザーをロック"""
+        lockout_key = self._get_lockout_key(employee_id)
+        cache.set(lockout_key, True, self.LOCKOUT_DURATION)
+    
+    def _reset_attempts(self, employee_id):
+        """ログイン試行回数をリセット"""
+        cache_key = self._get_cache_key(employee_id)
+        lockout_key = self._get_lockout_key(employee_id)
+        cache.delete(cache_key)
+        cache.delete(lockout_key)
     
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -39,18 +73,32 @@ class LoginAPIView(APIView):
         employee_id = serializer.validated_data.get('employee_id')
         password = serializer.validated_data.get('password')
 
-        # ⭐ USERNAME_FIELD が employee_id なので、
-        # authenticate の引数名も username として渡す（Djangoの仕様）
+        # ⭐ ブルートフォース対策: ロック状態を確認
+        if self._is_locked(employee_id):
+            create_audit_log(
+                action='LOGIN_FAILED',
+                model_name='User',
+                success=False,
+                error_message=f'アカウントロック中: {employee_id}',
+                request=request
+            )
+            return Response(
+                {
+                    'error_code': 'ACCOUNT_LOCKED',
+                }, 
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
         user = authenticate(
             request,
-            username=employee_id,  # Djangoの内部では username として扱われる
+            username=employee_id,
             password=password
         )
         
         if user:
-            # 論理削除されているユーザーはログイン不可
+            # ⭐ ログイン成功: 試行回数をリセット
             if hasattr(user, 'deleted_at') and user.deleted_at:
-                # ⭐ ログイン失敗を記録
+                self._increment_attempts(employee_id)
                 create_audit_log(
                     action='LOGIN_FAILED',
                     model_name='User',
@@ -61,15 +109,14 @@ class LoginAPIView(APIView):
                 )
                 return Response(
                     {
-                        'error_code': 'ACCOUNT_DELETED',  # ⭐ エラーコード
-                        'detail': 'このアカウントは削除されています'  # デフォルトメッセージ（フォールバック用）
+                        'error_code': 'ACCOUNT_DELETED',
+                        'detail': 'このアカウントは削除されています'
                     }, 
                     status=status.HTTP_401_UNAUTHORIZED
                 )
             
-            # アクティブでないユーザーはログイン不可
             if not user.is_active:
-                # ⭐ ログイン失敗を記録
+                self._increment_attempts(employee_id)
                 create_audit_log(
                     action='LOGIN_FAILED',
                     model_name='User',
@@ -80,15 +127,16 @@ class LoginAPIView(APIView):
                 )
                 return Response(
                     {
-                        'error_code': 'ACCOUNT_INACTIVE',  # ⭐ エラーコード
+                        'error_code': 'ACCOUNT_INACTIVE',
                         'detail': 'このアカウントは無効化されています'
                     }, 
                     status=status.HTTP_401_UNAUTHORIZED
                 )
             
+            # ⭐ ログイン成功
+            self._reset_attempts(employee_id)
             login(request, user)
 
-            # ⭐ ログイン成功を記録
             create_audit_log(
                 action='LOGIN',
                 model_name='User',
@@ -107,7 +155,27 @@ class LoginAPIView(APIView):
                 }
             })
         
-        # ⭐ ログイン失敗を記録（ユーザー不明）
+        # ⭐ ログイン失敗: 試行回数をインクリメント
+        attempts = self._increment_attempts(employee_id)
+        
+        # ⭐ ロック判定
+        if attempts >= self.MAX_LOGIN_ATTEMPTS:
+            self._lock_user(employee_id)
+            create_audit_log(
+                action='LOGIN_FAILED',
+                model_name='User',
+                success=False,
+                error_message=f'ブルートフォース攻撃検出（試行回数超過）: {employee_id}',
+                request=request
+            )
+            return Response(
+                {
+                    'error_code': 'ACCOUNT_LOCKED',
+                    'detail': f'ログイン試行が{self.MAX_LOGIN_ATTEMPTS}回失敗しました。{self.LOCKOUT_DURATION}秒後に再度お試しください。'
+                }, 
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
         create_audit_log(
             action='LOGIN_FAILED',
             model_name='User',
@@ -118,7 +186,7 @@ class LoginAPIView(APIView):
 
         return Response(
             {
-                'error_code': 'INVALID_CREDENTIALS',  # ⭐ エラーコード
+                'error_code': 'INVALID_CREDENTIALS',
                 'detail': '社員番号またはパスワードが正しくありません'
             }, 
             status=status.HTTP_401_UNAUTHORIZED
@@ -142,7 +210,7 @@ class LogoutAPIView(APIView):
         except Exception as e:
             return Response(
                 {
-                    'error_code': 'LOGOUT_FAILED',  # ⭐ エラーコード
+                    'error_code': 'LOGOUT_FAILED',
                     'detail': 'ログアウトに失敗しました'
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
