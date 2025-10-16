@@ -1,10 +1,10 @@
 # backend/common/mixins.py
 """
-共通で使えるエラーレスポンス機能
+共通で使えるエラーレスポンス機能（確認版）
 
-このファイルの役割:
-- エラーレスポンスの形式を統一する
-- バリデーションエラーのメッセージを取り出す
+変更点:
+- extract_error_message の処理を改善
+- より多くのパターンに対応
 """
 
 from rest_framework import status
@@ -15,93 +15,113 @@ class ErrorResponseMixin:
     """
     エラーレスポンスを統一するミックスイン
     
-    ミックスインとは:
-    - 他のクラスに「機能を追加する」ための部品
-    - このクラスを継承すると error_response() メソッドが使えるようになる
-    
     使い方:
-    class MyView(ErrorResponseMixin, APIView):
-        def get(self, request):
-            return self.error_response('NOT_FOUND', 'ユーザーが見つかりません')
+        class MyView(ErrorResponseMixin, APIView):
+            def get(self, request):
+                return self.error_response(
+                    error_code='NOT_FOUND',
+                    detail='ユーザーが見つかりません',
+                    status_code=404
+                )
     """
     
-    def error_response(self, error_code, detail, status_code=status.HTTP_400_BAD_REQUEST):
+    def error_response(self, error_code=None, detail=None, status_code=status.HTTP_400_BAD_REQUEST):
         """
         統一されたエラーレスポンスを返す
         
-        引数:
-            error_code: エラーの種類を表すコード（例: 'NOT_FOUND', 'VALIDATION_ERROR'）
-                       フロントエンドがこのコードを見て翻訳メッセージを表示する
-            detail: 詳しいエラーメッセージ（日本語でOK）
-            status_code: HTTPステータスコード（デフォルト: 400）
+        Args:
+            error_code: エラーコード（Optional、ビジネスロジックエラー用）
+            detail: 詳細メッセージ（Optional、Django が翻訳済み）
+            status_code: HTTPステータスコード
         
-        戻り値:
-            Response: 以下の形式のJSONレスポンス
-            {
-                "error_code": "NOT_FOUND",
-                "detail": "ユーザーが見つかりません"
-            }
+        Returns:
+            Response: エラーレスポンス
         
         使用例:
-            # ユーザーが見つからない場合
-            return self.error_response('NOT_FOUND', 'ユーザーが見つかりません', 404)
+            # ビジネスロジックエラー（error_code + detail）
+            return self.error_response(
+                error_code='LAST_ADMIN',
+                detail='最後の管理者は削除できません',
+                status_code=400
+            )
             
-            # バリデーションエラーの場合
-            return self.error_response('VALIDATION_ERROR', '社員番号は必須です')
+            # バリデーションエラー（detail のみ）
+            return Response({'detail': 'エラーメッセージ'}, status=400)
         """
-        return Response(
-            {'error_code': error_code, 'detail': detail},
-            status=status_code
-        )
+        response_data = {}
+        
+        if error_code:
+            response_data['error_code'] = error_code
+        
+        if detail:
+            response_data['detail'] = detail
+        
+        return Response(response_data, status=status_code)
     
     @staticmethod
     def extract_error_message(error_detail):
         """
-        DRF（Django REST Framework）のバリデーションエラーから
-        メッセージを取り出す
+        DRF の ValidationError から最初のエラーメッセージを取り出す
         
-        なぜ必要？:
-        DRFのエラーは複雑な形式で返ってくるため、
-        最初のエラーメッセージだけを取り出して表示する
+        Args:
+            error_detail: ValidationError.detail
         
-        引数:
-            error_detail: ValidationError.detail（複雑な形式）
-        
-        戻り値:
+        Returns:
             str: 最初のエラーメッセージ
         
+        対応パターン:
+            1. dict: {'employee_id': ['既に使用されています']}
+            2. list: ['エラー1', 'エラー2']
+            3. str: 'エラーメッセージ'
+            4. ErrorDetail: DRF の ErrorDetail オブジェクト
+        
         例:
-            # パターン1: フィールドごとのエラー（辞書型）
-            {'username': ['必須です'], 'email': ['無効なメールアドレスです']}
-            → '必須です' を返す
-            
-            # パターン2: 複数エラー（リスト型）
-            ['エラー1', 'エラー2']
-            → 'エラー1' を返す
-            
-            # パターン3: 単一エラー（文字列型）
-            'エラーメッセージ'
-            → 'エラーメッセージ' をそのまま返す
+            {'username': ['必須です']} → '必須です'
+            ['エラー1', 'エラー2'] → 'エラー1'
+            'エラーメッセージ' → 'エラーメッセージ'
         """
         
-        # パターン1: フィールド別エラーの場合（dict）
-        # 例: {'username': ['必須です'], 'email': ['無効です']}
+        # パターン1: フィールド別エラー（dict）
         if isinstance(error_detail, dict):
             # 最初のフィールドのエラーを取得
-            first_error = next(iter(error_detail.values()))
+            first_field_error = next(iter(error_detail.values()))
             
-            # エラーがリストの場合、最初のメッセージを取得
-            if isinstance(first_error, list):
-                return str(first_error[0])
+            # そのフィールドのエラーが list の場合
+            if isinstance(first_field_error, list) and len(first_field_error) > 0:
+                return str(first_field_error[0])
             
-            # エラーが文字列の場合、そのまま返す
-            return str(first_error)
+            # そのフィールドのエラーが文字列の場合
+            return str(first_field_error)
         
-        # パターン2: 複数エラーの場合（list）
-        # 例: ['エラー1', 'エラー2']
-        if isinstance(error_detail, list):
+        # パターン2: 複数エラー（list）
+        if isinstance(error_detail, list) and len(error_detail) > 0:
             return str(error_detail[0])
         
-        # パターン3: 単一エラーの場合（str）
-        # 例: 'エラーメッセージ'
+        # パターン3: 単一エラー（str または ErrorDetail）
         return str(error_detail)
+
+
+# ==================== テストケース ====================
+"""
+extract_error_message のテスト:
+
+1. dict (フィールド別エラー)
+   入力: {'employee_id': ['既に使用されています']}
+   出力: '既に使用されています'
+
+2. dict (複数フィールド)
+   入力: {'employee_id': ['エラー1'], 'username': ['エラー2']}
+   出力: 'エラー1' (最初のフィールド)
+
+3. list
+   入力: ['エラー1', 'エラー2']
+   出力: 'エラー1'
+
+4. str
+   入力: 'エラーメッセージ'
+   出力: 'エラーメッセージ'
+
+5. ErrorDetail (DRF)
+   入力: ErrorDetail('必須です', code='required')
+   出力: '必須です'
+"""

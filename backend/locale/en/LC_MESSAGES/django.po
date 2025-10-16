@@ -19,8 +19,16 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
+# ==================== Serializers (バリデーション) ====================
+
 msgid "社員番号は必須です"
 msgstr "Employee ID is required"
+
+msgid "社員番号は既に使用されています"
+msgstr "This Employee ID is already in use"
+
+msgid "ユーザー名は必須です"
+msgstr "Username is required"
 
 msgid "パスワードは必須です"
 msgstr "Password is required"
@@ -28,12 +36,10 @@ msgstr "Password is required"
 msgid "パスワードは8文字以上で入力してください"
 msgstr "Password must be at least 8 characters"
 
-msgid "ユーザー名は必須です"
-msgstr "Username is required"
+msgid "パスワードは128文字以内で入力してください"
+msgstr "Password must be 128 characters or less"
 
-#, python-format
-msgid "社員番号「%(value)s」は既に使用されています"
-msgstr "Employee ID '%(value)s' already exists"
+# ==================== Exceptions (ビジネスロジック) ====================
 
 msgid "管理者は最低1人必要です。最後の管理者を削除することはできません。"
 msgstr "At least one administrator is required. Cannot delete the last administrator."
