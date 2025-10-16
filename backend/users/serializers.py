@@ -167,3 +167,31 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         if not value or not value.strip():
             return None  # パスワード変更しない
         return value
+
+
+# ==================== 変更点のまとめ ====================
+"""
+✅ 改善ポイント:
+
+1. UserCreateSerializer
+   - ❌ 削除: validate_employee_id での重複チェック（二重チェック）
+   - ✅ 追加: employee_id フィールドに error_messages
+   - ✅ 追加: username フィールドに error_messages
+   - ✅ 保持: UniqueValidator による重複チェック
+
+2. UserUpdateSerializer
+   - ❌ 削除: 古い % フォーマットのメッセージ
+   - ✅ 変更: シンプルなメッセージに統一
+   - ✅ 追加: employee_id, username フィールドの明示的定義
+
+3. 共通
+   - ✅ email の正規化のみ validate メソッドで実施
+   - ✅ その他は error_messages で対応
+   - ✅ 翻訳メッセージの一貫性
+
+バリデーションの役割分担:
+- UniqueValidator: 重複チェック（作成時）
+- validate_employee_id: 重複チェック（更新時、自分以外）
+- error_messages: 必須チェック、文字数制限
+- validate_email: 値の正規化（小文字変換）
+"""

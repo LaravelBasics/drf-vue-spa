@@ -1,19 +1,30 @@
 # backend/locale/ja/LC_MESSAGES/django.po
-# 日本語翻訳ファイル
+# 日本語翻訳ファイル（参照用 + 明示的な定義）
 
 msgid ""
 msgstr ""
 "Project-Id-Version: 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-01-16 12:00+0900\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
 "Language: ja\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-# ==================== バリデーションエラー ====================
+# ==================== Serializers (バリデーション) ====================
 
 msgid "社員番号は必須です"
 msgstr "社員番号は必須です"
+
+msgid "社員番号は既に使用されています"
+msgstr "社員番号は既に使用されています"
+
+msgid "ユーザー名は必須です"
+msgstr "ユーザー名は必須です"
 
 msgid "パスワードは必須です"
 msgstr "パスワードは必須です"
@@ -21,14 +32,13 @@ msgstr "パスワードは必須です"
 msgid "パスワードは8文字以上で入力してください"
 msgstr "パスワードは8文字以上で入力してください"
 
-msgid "ユーザー名は必須です"
-msgstr "ユーザー名は必須です"
+msgid "パスワードは128文字以内で入力してください"
+msgstr "パスワードは128文字以内で入力してください"
 
-#, python-format
-msgid "社員番号「%(value)s」は既に使用されています"
-msgstr "社員番号「%(value)s」は既に使用されています"
+msgid "社員番号とパスワードは必須です"
+msgstr "社員番号とパスワードは必須です"
 
-# ==================== ビジネスロジックエラー ====================
+# ==================== Exceptions (ビジネスロジック) ====================
 
 msgid "管理者は最低1人必要です。最後の管理者を削除することはできません。"
 msgstr "管理者は最低1人必要です。最後の管理者を削除することはできません。"
@@ -42,7 +52,7 @@ msgstr "削除済みユーザーは編集できません。"
 msgid "ユーザーが見つかりません。"
 msgstr "ユーザーが見つかりません。"
 
-# ==================== 認証エラー ====================
+# ==================== 認証エラー（accounts/views.py） ====================
 
 msgid "社員番号またはパスワードが正しくありません"
 msgstr "社員番号またはパスワードが正しくありません"
@@ -54,5 +64,16 @@ msgid "このアカウントは無効化されています"
 msgstr "このアカウントは無効化されています"
 
 #, python-format
-msgid "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください。"
-msgstr "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください。"
+msgid "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください"
+msgstr "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください"
+
+msgid "ログアウトに失敗しました"
+msgstr "ログアウトに失敗しました"
+
+# ==================== settings.py（参考） ====================
+
+msgid "日本語"
+msgstr "日本語"
+
+msgid "English"
+msgstr "English"

@@ -1,10 +1,5 @@
 # backend/locale/en/LC_MESSAGES/django.po
 
-# SOME DESCRIPTIVE TITLE.
-# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the PACKAGE package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-#
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
@@ -39,6 +34,9 @@ msgstr "Password must be at least 8 characters"
 msgid "パスワードは128文字以内で入力してください"
 msgstr "Password must be 128 characters or less"
 
+msgid "社員番号とパスワードは必須です"
+msgstr "Employee ID and password are required"
+
 # ==================== Exceptions (ビジネスロジック) ====================
 
 msgid "管理者は最低1人必要です。最後の管理者を削除することはできません。"
@@ -52,3 +50,21 @@ msgstr "Deleted users cannot be edited."
 
 msgid "ユーザーが見つかりません。"
 msgstr "User not found."
+
+# ==================== 認証エラー（accounts/views.py） ====================
+
+msgid "社員番号またはパスワードが正しくありません"
+msgstr "Employee ID or password is incorrect"
+
+msgid "このアカウントは削除されています"
+msgstr "This account has been deleted"
+
+msgid "このアカウントは無効化されています"
+msgstr "This account has been deactivated"
+
+#, python-format
+msgid "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください"
+msgstr "Login failed %(max_attempts)d times. Please try again after %(lockout_duration)d seconds"
+
+msgid "ログアウトに失敗しました"
+msgstr "Logout failed"

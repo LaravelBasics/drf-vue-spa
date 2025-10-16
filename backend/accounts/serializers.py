@@ -1,64 +1,70 @@
 # backend/accounts/serializers.py
 """
-ログイン用のデータ検証（シリアライザー）
+ログイン用のデータ検証（翻訳対応版）
 
-このファイルの役割:
-- フロントエンドから送られてきたデータが正しいかチェックする
-- 「社員番号」と「パスワード」が両方入力されているか確認
+改善ポイント:
+1. エラーメッセージを gettext_lazy で翻訳対応
+2. error_messages を明示的に定義
 """
 
 from rest_framework import serializers
+from django.utils.translation import gettext_lazy as _
 
 
 class LoginSerializer(serializers.Serializer):
-    """
-    ログイン画面で入力されるデータのチェック
+    """ログイン画面で入力されるデータのチェック"""
     
-    フロントエンドから送られてくるデータ:
-    {
-        "employee_id": "EMP001",
-        "password": "password123"
-    }
-    
-    このクラスがやること:
-    1. 社員番号が入力されているか？
-    2. パスワードが入力されているか？
-    3. どちらかが空ならエラーメッセージを返す
-    """
-    
-    # 社員番号のフィールド定義
     employee_id = serializers.CharField(
-        max_length=20,              # 最大20文字
-        required=True,              # 必須項目
+        max_length=20,
+        required=True,
+        error_messages={
+            'required': _('社員番号は必須です'),
+            'blank': _('社員番号は必須です'),
+        },
         help_text='社員番号を入力してください（例: EMP001）'
     )
     
-    # パスワードのフィールド定義
     password = serializers.CharField(
-        write_only=True,            # レスポンスに含めない（セキュリティ対策）
-        required=True,              # 必須項目
-        style={'input_type': 'password'}  # パスワード入力欄として表示
+        write_only=True,
+        required=True,
+        error_messages={
+            'required': _('パスワードは必須です'),
+            'blank': _('パスワードは必須です'),
+        },
+        style={'input_type': 'password'}
     )
     
     def validate(self, attrs):
         """
-        全体のバリデーション（追加チェック）
+        全体のバリデーション
         
-        引数:
-            attrs: 入力されたデータ
-                  例: {'employee_id': 'EMP001', 'password': 'password123'}
-        
-        戻り値:
-            チェックOKなら入力データをそのまま返す
-            NGならエラーを発生させる
+        空白だけの入力を防ぐ
         """
         employee_id = attrs.get('employee_id')
         password = attrs.get('password')
         
-        # 社員番号またはパスワードが空文字列の場合エラー
-        # （空白だけの入力を防ぐ）
+        # 空文字列チェック
         if not employee_id or not password:
-            raise serializers.ValidationError('社員番号とパスワードは必須です')
+            raise serializers.ValidationError(
+                _('社員番号とパスワードは必須です')
+            )
         
-        # チェックOK
         return attrs
+
+
+# ==================== 変更点のまとめ ====================
+"""
+✅ 改善ポイント:
+
+1. gettext_lazy のインポート
+   from django.utils.translation import gettext_lazy as _
+
+2. error_messages を明示的に定義
+   - 'required': _('社員番号は必須です')
+   - 'blank': _('社員番号は必須です')
+
+3. validate メソッドのエラーメッセージも翻訳対応
+   raise serializers.ValidationError(_('社員番号とパスワードは必須です'))
+
+これにより、ログイン画面のすべてのエラーメッセージが多言語対応されます。
+"""
