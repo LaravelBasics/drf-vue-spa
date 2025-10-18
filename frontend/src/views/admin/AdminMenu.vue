@@ -33,6 +33,7 @@ const breadcrumbs = computed(() => [
 // 管理者メニューのカード定義
 const adminMenuItems = computed(() => [
     {
+        id: 'users', // ⭐ ユニークなID
         icon: ICONS.menu.users,
         title: t('pages.users.list.title'),
         to: routes.USERS,

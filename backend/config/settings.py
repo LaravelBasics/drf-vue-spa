@@ -13,6 +13,7 @@ Django プロジェクトの設定ファイル
 
 from pathlib import Path
 from django.utils.translation import gettext_lazy as _
+import os
 
 # ==================== 基本設定 ====================
 
@@ -272,6 +273,10 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+# ==================== ログイン設定 ====================
+LOGIN_MAX_ATTEMPTS = int(os.getenv('LOGIN_MAX_ATTEMPTS', '10'))  # 最大ログイン試行回数
+LOGIN_LOCKOUT_DURATION = int(os.getenv('LOGIN_LOCKOUT_DURATION', '60'))  # ロック時間（秒）
+
 # ==================== 国際化（i18n）設定 ====================
 
 # 対応言語
@@ -287,7 +292,6 @@ LANGUAGE_CODE = 'ja'  # 日本語
 TIME_ZONE = 'Asia/Tokyo'  # 日本時間（JST）
 
 # 国際化を有効化
-USE_I18N = True
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True

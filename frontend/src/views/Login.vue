@@ -58,7 +58,7 @@ async function onSubmit() {
         setTimeout(async () => {
             const redirect = route.query.next || routes.HOME;
             await router.push(redirect);
-        }, 300);
+        }, 150);
     } catch (error) {
         handleApiError(error);
     } finally {

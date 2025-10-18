@@ -5,9 +5,9 @@ defineProps({
     items: {
         type: Array,
         required: true,
+        validator: (items) => items.every((item) => item.id),
         // ⭐ 例: [{ id: 'admin', icon: 'admin_panel_settings', title: '管理', to: '/admin' }]
         // ⭐ id プロパティを追加することで、keyの問題を解決
-        // Material Symbols アイコン名を使用
     },
 });
 </script>
@@ -17,7 +17,7 @@ defineProps({
         <v-row>
             <v-col
                 v-for="item in items"
-                :key="item.id || item.title"
+                :key="item.id"
                 cols="9"
                 sm="4"
                 md="3"

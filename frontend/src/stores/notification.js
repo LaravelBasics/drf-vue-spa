@@ -19,19 +19,23 @@ export const useNotificationStore = defineStore('notification', () => {
         show.value = true;
     }
 
-    function success(msg, duration = 10000) {
+    function success(msg, duration = 5000) {
+        // ⭐ 通常の成功メッセージ5秒
         showNotification(msg, 'success', duration);
     }
 
-    function error(msg, duration = 10000) {
+    function error(msg, duration = 7000) {
+        // ⭐ エラーは長めに7秒
         showNotification(msg, 'error', duration);
     }
 
-    function warning(msg, duration = 10000) {
+    function warning(msg, duration = 5000) {
+        // ⭐ 警告5秒
         showNotification(msg, 'warning', duration);
     }
 
-    function info(msg, duration = 10000) {
+    function info(msg, duration = 5000) {
+        // ⭐ 情報5秒
         showNotification(msg, 'info', duration);
     }
 

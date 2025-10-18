@@ -1,32 +1,17 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { routes } from '@/constants/routes';
 import { BREAKPOINTS } from '@/constants/breakpoints';
 
-const router = useRouter();
 const { t } = useI18n();
 
 const windowWidth = ref(window.innerWidth);
 const windowHeight = ref(window.innerHeight);
 
-// ⭐ 画面サイズ変更を監視
+// ⭐ 表示更新のみ（遷移は App.vue に任せる）
 const handleResize = () => {
     windowWidth.value = window.innerWidth;
     windowHeight.value = window.innerHeight;
-
-    // ⭐ ルーターガードと同じ基準（768px以上）で判定
-    if (windowWidth.value >= BREAKPOINTS.LARGE_SCREEN) {
-        handleGoHome();
-    }
-};
-
-const handleGoHome = () => {
-    // ⭐ ルーターガードと同じ基準で確認してから遷移
-    if (windowWidth.value >= BREAKPOINTS.LARGE_SCREEN) {
-        router.push({ path: routes.HOME, replace: true });
-    }
 };
 
 onMounted(() => {
@@ -69,14 +54,16 @@ onBeforeUnmount(() => {
                 </p>
             </v-card-text>
 
+            <!-- ⭐ オプション: 手動で遷移するボタン -->
             <!-- <v-card-actions class="justify-center pb-4">
                 <v-btn
                     color="primary"
                     variant="elevated"
                     size="large"
-                    @click="handleGoHome"
+                    @click="handleGoToApp"
+                    :disabled="windowWidth < BREAKPOINTS.LARGE_SCREEN"
                 >
-                    {{ t('errors.unsupportedDevice.home') }}
+                    {{ auth.isAuthenticated ? t('errors.unsupportedDevice.home') : t('auth.login') }}
                 </v-btn>
             </v-card-actions> -->
         </v-card>

@@ -17,6 +17,7 @@ from django.utils.decorators import method_decorator
 from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
 from .serializers import LoginSerializer
+from django.conf import settings
 
 
 class CSRFView(APIView):
@@ -33,14 +34,18 @@ class LoginAPIView(APIView):
     """ログインAPI（翻訳対応）"""
     permission_classes = [AllowAny]
     
-    MAX_LOGIN_ATTEMPTS = 10
-    LOCKOUT_DURATION = 60
+    MAX_LOGIN_ATTEMPTS = settings.LOGIN_MAX_ATTEMPTS
+    LOCKOUT_DURATION = settings.LOGIN_LOCKOUT_DURATION
+
+    # キャッシュキーのプレフィックス
+    CACHE_KEY_PREFIX = 'login_attempts'
+    LOCKOUT_KEY_PREFIX = 'login_locked'
     
     def _get_cache_key(self, employee_id):
-        return f'login_attempts:{employee_id}'
+        return f'{self.CACHE_KEY_PREFIX}:{employee_id}'
     
     def _get_lockout_key(self, employee_id):
-        return f'login_locked:{employee_id}'
+        return f'{self.LOCKOUT_KEY_PREFIX}:{employee_id}'
     
     def _increment_attempts(self, employee_id):
         cache_key = self._get_cache_key(employee_id)
@@ -220,10 +225,14 @@ class MeAPIView(APIView):
 
 3. str() でラップする理由
    - gettext_lazy は「遅延翻訳オブジェクト」を返す
-   - JSON レスポンスに含める場合は str() で文字列化が必要
+   - 明示的に文字列化することで意図を明確にする
+   - DRF は自動変換するが、str() で確実性を高める
 
 注意点:
 - % フォーマットは Python 標準の文字列フォーマット
 - Django の翻訳システムと併用可能
-- フォーマット後に翻訳されるのではなく、翻訳後にフォーマットされる
+- 処理順序:
+  1. _('...%(max_attempts)d...') で翻訳文字列を取得
+  2. % {...} でプレースホルダーに値を埋め込む
+  3. str() で明示的に文字列化（DRF は自動変換するが確実性を高める）
 """

@@ -34,7 +34,7 @@ const surfaceColor = computed(
 const elevation = computed(() => COMPONENT_CONFIGS.header?.elevation || 4);
 
 const headerHeight = computed(
-    () => COMPONENT_CONFIGS.header?.height?.desktop || 64,
+    () => COMPONENT_CONFIGS.header.height.desktop || 64,
 );
 
 function getButtonColor(type = 'primary') {

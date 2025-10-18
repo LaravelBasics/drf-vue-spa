@@ -5,7 +5,7 @@
         :page-buttons="headerButtons"
     />
 
-    <MenuCardGrid :items="filteredMenuItems" />
+    <!-- <MenuCardGrid :items="filteredMenuItems" /> -->
 </template>
 
 <script setup>
@@ -43,33 +43,33 @@ const headerButtons = computed(() => [
     },
 ]);
 
-const menuItems = computed(() => [
-    {
-        id: 'admin',
-        icon: ICONS.nav.management,
-        title: t('pages.admin.title'),
-        to: routes.ADMIN,
-        color: 'secondary',
-        requiresAdmin: true,
-    },
-    {
-        id: 'settings',
-        icon: ICONS.nav.settings,
-        title: t('pages.settings.title'),
-        to: routes.SETTINGS,
-        color: COLORS.neutral.medium,
-    },
-]);
+// const menuItems = computed(() => [
+//     {
+//         id: 'admin',
+//         icon: ICONS.nav.management,
+//         title: t('pages.admin.title'),
+//         to: routes.ADMIN,
+//         color: 'secondary',
+//         requiresAdmin: true,
+//     },
+//     {
+//         id: 'settings',
+//         icon: ICONS.nav.settings,
+//         title: t('pages.settings.title'),
+//         to: routes.SETTINGS,
+//         color: COLORS.neutral.medium,
+//     },
+// ]);
 
 // ⭐ 権限に応じてフィルタリング
-const filteredMenuItems = computed(() => {
-    return menuItems.value.filter((item) => {
-        if (item.requiresAdmin) {
-            return isAdmin.value;
-        }
-        return true;
-    });
-});
+// const filteredMenuItems = computed(() => {
+//     return menuItems.value.filter((item) => {
+//         if (item.requiresAdmin) {
+//             return isAdmin.value;
+//         }
+//         return true;
+//     });
+// });
 
 function openOrderSearch() {
     console.log('検索する');

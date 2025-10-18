@@ -136,6 +136,9 @@
             "unknown": "An unexpected error occurred",
             "PERMISSION_DENIED": "You do not have permission to perform this operation",
             "NOT_FOUND": "Resource not found"
+        },
+        "warning": {
+            "initializationFailed": "Application initialization partially failed"
         }
     },
     "pages": {
