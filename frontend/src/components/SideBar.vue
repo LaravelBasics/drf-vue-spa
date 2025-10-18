@@ -70,6 +70,7 @@ function toggleLanguage() {
                 :to="item.to"
                 :value="item.title"
                 link
+                tabindex="0"
                 @click="handleNavItemClick"
                 color="grey-darken-2"
             >
