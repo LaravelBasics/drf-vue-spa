@@ -17,7 +17,6 @@ const auth = useAuthStore();
 const theme = useTheme();
 const { showInfo, handleApiError } = useApiError();
 
-// ⭐ ログアウト中の状態管理
 const loggingOut = ref(false);
 
 const displayName = computed(() => {
@@ -30,18 +29,13 @@ const primaryColor = computed(
         THEME_CONFIG.colors.light.primary,
 );
 
-// ⭐ ログアウト関数（クエリパラメータで通知を伝える）
 async function handleLogout() {
-    // 重複実行防止
     if (loggingOut.value) return;
 
     loggingOut.value = true;
 
     try {
-        // ログアウトAPI呼び出し（redirect=falseで自動リダイレクトを無効化）
         await auth.logout(false);
-
-        // ✅ クエリパラメータ付きでログイン画面へ遷移
         router.push({
             path: routes.LOGIN,
             query: { logout: 'success' },
@@ -95,7 +89,7 @@ function goToHome() {
             </template>
 
             <v-list density="compact" min-width="200">
-                <v-list-item>
+                <v-list-item tabindex="-1">
                     <v-list-item-title class="text-caption">
                         {{ t('form.fields.employeeId') }}:
                         {{ auth.user?.employee_id }}
@@ -105,20 +99,25 @@ function goToHome() {
                 <v-divider />
 
                 <v-list-item
+                    tabindex="0"
                     :prepend-icon="ICONS.nav.settings"
                     :title="t('pages.settings.title')"
                     @click="goToSettings"
+                    @keydown.enter="goToSettings"
+                    @keydown.space.prevent="goToSettings"
                 />
 
                 <v-divider />
 
                 <v-list-item
+                    :tabindex="loggingOut ? -1 : 0"
                     :prepend-icon="ICONS.nav.logout"
                     :title="t('auth.logout')"
                     :disabled="loggingOut"
                     @click="handleLogout"
+                    @keydown.enter="!loggingOut && handleLogout()"
+                    @keydown.space.prevent="!loggingOut && handleLogout()"
                 >
-                    <!-- ⭐ ログアウト中はローディング表示 -->
                     <template v-slot:append v-if="loggingOut">
                         <v-progress-circular
                             indeterminate
@@ -131,3 +130,10 @@ function goToHome() {
         </v-menu>
     </v-app-bar>
 </template>
+
+<style scoped>
+/* エラー時や遅延時のための保険（たった1行！） */
+.user-menu :deep(.v-list-item[disabled]) {
+    cursor: not-allowed;
+}
+</style>
