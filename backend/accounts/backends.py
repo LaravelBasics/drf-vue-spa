@@ -1,77 +1,73 @@
-# backend/accounts/backends.py
 """
 カスタム認証バックエンド
 
 このファイルの役割:
-- 通常の Django は「username」でログインするが、
-  このアプリでは「employee_id（社員番号）」でログインする
-- パスワードが正しいかチェックする
+- デフォルトの「username」ではなく「employee_id（社員番号）」でログイン
+- パスワードの検証を行う
 """
 
 from django.contrib.auth.backends import BaseBackend
 from django.contrib.auth import get_user_model
 
-# Userモデルを取得（settings.py で指定したカスタムユーザー）
+# カスタムユーザーモデルを取得（settings.AUTH_USER_MODEL で指定）
 User = get_user_model()
 
 
 class EmployeeIdBackend(BaseBackend):
     """
-    社員番号（employee_id）でログインするための認証システム
+    社員番号（employee_id）でログインするための認証バックエンド
     
-    やること:
-    1. 社員番号でユーザーを探す
-    2. パスワードが合っているか確認する
-    3. 合っていればログイン成功
+    処理の流れ:
+    1. 社員番号でユーザーを検索
+    2. パスワードが一致するか確認
+    3. 一致すればユーザー情報を返す
     
-    やらないこと:
-    - 削除済み・無効化されたユーザーの判定
-      （それは views.py の LoginAPIView でやる）
+    注意:
+    - 削除済み・無効化されたユーザーの判定は views.py で行う
+    - ここでは認証のみを担当
     """
     
     def authenticate(self, request, username=None, password=None, **kwargs):
         """
-        ログイン認証を行う（社員番号 + パスワード）
+        社員番号とパスワードで認証
         
         引数:
-            request: リクエスト情報（使わないけど必須）
-            username: ログイン時に入力された社員番号
-                     （Django内部では「username」と呼ばれるが、実際は employee_id）
-            password: ログイン時に入力されたパスワード
+            request: HTTPリクエスト（未使用だが必須）
+            username: 社員番号（Django内部では username と呼ばれる）
+            password: パスワード
         
         戻り値:
-            成功時: ユーザー情報
-            失敗時: None
+            User: 認証成功時
+            None: 認証失敗時
         """
         
         # わかりやすいように変数名を変更
         employee_id = username
         
-        # 社員番号かパスワードが空ならログイン失敗
-        if employee_id is None or password is None:
+        # 社員番号またはパスワードが未入力なら失敗
+        if not employee_id or not password:
             return None
         
         try:
-            # ① 社員番号でユーザーを探す
-            # 注意: all_objects を使うことで削除済みユーザーも検索対象にする
-            #      （削除済み判定は LoginAPIView で行うため）
+            # 社員番号でユーザーを検索
+            # all_objects: 削除済みユーザーも含めて検索
+            #（削除済み判定は views.py で行うため）
             user = User.all_objects.get(employee_id=employee_id)
         
         except User.DoesNotExist:
-            # ユーザーが見つからない場合
+            # ユーザーが存在しない場合
             
-            # セキュリティ対策: わざとパスワード処理を実行
-            # 理由: 「ユーザーが存在するか」を処理時間から推測されないようにする
-            #      （存在しないユーザーでも処理時間を同じにする）
+            # セキュリティ対策: タイミング攻撃を防ぐため、
+            # 存在しないユーザーでもパスワード処理を実行
+            # （処理時間から「ユーザーの存在」を推測されないようにする）
             User().set_password(password)
             return None
         
-        # ② パスワードが正しいか確認
+        # パスワードが一致するか確認
         if user.check_password(password):
-            # パスワードが合っていればユーザー情報を返す
             return user
         
-        # パスワードが間違っていたら None を返す
+        # パスワード不一致
         return None
     
     
@@ -79,21 +75,21 @@ class EmployeeIdBackend(BaseBackend):
         """
         セッションからログインユーザーを取得
         
-        このメソッドの役割:
-        - ページ遷移するたびに「このユーザーはログイン済みか？」を確認する
+        役割:
+        - ページ遷移時に「このユーザーはログイン済みか」を確認
         - セッション（Cookie）に保存されたユーザーIDから情報を取得
         
         引数:
             user_id: セッションに保存されているユーザーID
         
         戻り値:
-            ユーザー情報 or None（削除済み・存在しない場合）
+            User: ユーザー情報
+            None: ユーザーが存在しない（削除済み）
         """
         try:
-            # ログイン中のユーザーは削除済みを除外
-            # （削除されたユーザーは自動的にログアウトさせる）
+            # 削除されていないユーザーのみ取得
+            # 削除済みユーザーは自動的にログアウトされる
             return User.objects.get(pk=user_id)
         
         except User.DoesNotExist:
-            # ユーザーが見つからない = 削除されたのでログアウト
             return None

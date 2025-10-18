@@ -92,9 +92,7 @@ if response.status_code == 200:
     # 成功時の処理
     data = response.json()
     
-    # ページネーション対応
-    # results キーがあればそれを使う（ページネーション有効時）
-    # なければ data 全体を使う（ページネーションなし）
+    # ページネーション対応（results キーがあれば使用、なければ data 全体）
     users = data.get('results', data)
     
     print(f"✅ 成功！ユーザー数: {len(users)}")

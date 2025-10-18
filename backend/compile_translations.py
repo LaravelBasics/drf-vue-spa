@@ -96,22 +96,17 @@ if __name__ == '__main__':
 
     # ==================== 使い方 ====================
 """
-方法1: gettext を使う場合（推奨）
+翻訳ファイル（.po）を手動でコンパイルするスクリプト
 
-1. gettext をインストール
-   winget install GnuWin32.GetText
+使い方:
+    python compile_translations.py
 
-2. PowerShell を再起動
-
-3. コンパイル
-   python manage.py compilemessages
-
-
-方法2: polib を使う場合（gettext なし）
-
-1. polib をインストール
-   pip install polib
-
-2. このスクリプトを実行
-   python compile_translations.py
+必要なツール:
+    方法1: gettext（推奨）
+        winget install GnuWin32.GetText
+        python manage.py compilemessages
+    
+    方法2: polib（gettext なし）
+        pip install polib
+        python compile_translations.py
 """

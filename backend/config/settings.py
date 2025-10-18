@@ -291,20 +291,15 @@ LANGUAGE_CODE = 'ja'  # 日本語
 # タイムゾーン
 TIME_ZONE = 'Asia/Tokyo'  # 日本時間（JST）
 
-# 国際化を有効化
-USE_I18N = True
-USE_L10N = True
-USE_TZ = True
+# 国際化・ローカライゼーション・タイムゾーンを有効化
+USE_I18N = True   # 翻訳機能を有効化
+USE_L10N = True   # ローカライズ（日付・数値フォーマット）を有効化
+USE_TZ = True     # タイムゾーンを有効化（UTC で保存し表示時に変換）
 
 # 翻訳ファイルの場所
 LOCALE_PATHS = [
     BASE_DIR / 'locale',
 ]
-
-# タイムゾーンを有効化
-# True = データベースに UTC で保存し、表示時に変換
-USE_TZ = True
-
 
 # ==================== 静的ファイル設定 ====================
 
