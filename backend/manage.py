@@ -1,10 +1,4 @@
-
-
-
-
-
-# ==================== 1. manage.py ====================
-# backend/manage.py
+#!/usr/bin/env python
 """
 Django 管理コマンド実行ファイル
 
@@ -21,44 +15,25 @@ Django 管理コマンド実行ファイル
 - python manage.py test             # テスト実行
 """
 
-#!/usr/bin/env python
 import os
 import sys
 
 
 def main():
-    """
-    Django の管理タスクを実行
+    """Django の管理タスクを実行"""
     
-    処理の流れ:
-    1. DJANGO_SETTINGS_MODULE 環境変数を設定
-    2. Django の管理コマンドをインポート
-    3. コマンドを実行
-    """
-    
-    # Django 設定モジュールを指定
-    # 環境変数がない場合は 'config.settings' をデフォルトに設定
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
     
     try:
-        # Django の管理コマンドをインポート
         from django.core.management import execute_from_command_line
-    
     except ImportError as exc:
-        # Django がインストールされていない場合のエラーメッセージ
         raise ImportError(
-            "Couldn't import Django. Are you sure it's installed and "
-            "available on your PYTHONPATH environment variable? Did you "
-            "forget to activate a virtual environment?"
+            "Django がインストールされていません。仮想環境を有効化してください。"
         ) from exc
     
-    # コマンドライン引数を渡して実行
-    # sys.argv = ['manage.py', 'runserver', '8000']
     execute_from_command_line(sys.argv)
 
 
-# このファイルが直接実行された場合のみ main() を実行
-# import された場合は実行しない
 if __name__ == '__main__':
     main()
 
@@ -85,10 +60,7 @@ python manage.py shell
 >>> User = get_user_model()
 >>> User.objects.all()
 
-5. データベースクリア
-python manage.py flush
-
-6. 静的ファイル収集（本番環境）
+5. 静的ファイル収集（本番環境）
 python manage.py collectstatic
 
 

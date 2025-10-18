@@ -30,19 +30,15 @@ class UserService:
     @staticmethod
     def _check_last_admin(user_id=None, is_admin=None, is_active=None):
         """
-        最後の管理者を削除・無効化しようとしていないかチェック
-        
-        業務ルール:
-        - システムには必ず1人以上の管理者が必要
-        - 最後の1人を削除・無効化してはいけない
-        
-        引数:
-            user_id: チェック対象のユーザーID（このユーザーを除外して数える）
-            is_admin: 管理者権限を外そうとしている場合 False
-            is_active: アカウントを無効化しようとしている場合 False
-        
-        エラー:
-            LastAdminError: 最後の管理者を削除しようとした場合
+        最後の管理者の削除・無効化を防止
+    
+        Args:
+            user_id: 除外するユーザーID
+            is_admin: 管理者権限を外す場合 False
+            is_active: 無効化する場合 False
+    
+        Raises:
+            LastAdminError: 管理者が0人になる場合
         """
         # 現在アクティブな管理者を検索
         query = User.objects.filter(is_admin=True, is_active=True)
