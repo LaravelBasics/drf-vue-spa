@@ -1,0 +1,7 @@
+.gitignore             -  Git管理から除外するファイル（必須）
+.gitattributes         -  改行コード統一（必須）
+eslint.config.js       -  コード品質チェック（推奨）
+
+.prettierrc            -  Vue/JSの整形設定（必須）
+.vscode/settings.json  -  Vue + Python整形対応
+jsconfig.json          -  VSCodeのパス補完・型チェック用

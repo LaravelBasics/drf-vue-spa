@@ -92,6 +92,13 @@ async function fetchUser() {
     }
 }
 
+function handleEnterKey(event) {
+    if (changePassword.value) {
+        return;
+    }
+    submitForm();
+}
+
 async function submitForm() {
     const { valid, errors } = await form.value.validate();
 
@@ -171,8 +178,8 @@ onMounted(() => {
                         <v-card-text class="pa-6">
                             <v-form
                                 ref="form"
-                                @submit.prevent
-                                @keypress.enter.prevent
+                                @submit.prevent="submitForm"
+                                @keypress.enter.prevent="handleEnterKey"
                             >
                                 <v-row>
                                     <v-col cols="12" md="6" class="pb-0">

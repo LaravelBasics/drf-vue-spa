@@ -41,8 +41,6 @@ const primaryColor = computed(
 onMounted(() => {
     setTimeout(() => {
         isVisible.value = true;
-        // ⭐ マウント後に最初のフィールドにフォーカス
-        employeeIdField.value?.focus();
     }, 100);
 
     // ⭐ ログアウト後のクエリパラメータチェック
