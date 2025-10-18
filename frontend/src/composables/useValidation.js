@@ -1,3 +1,5 @@
+// src/composables/useValidation.js - 改善版（重複削除）
+
 import { useI18n } from 'vue-i18n';
 import { createValidationRules } from '@/utils/validation';
 
@@ -10,11 +12,8 @@ export function useValidation() {
         // ログイン用社員番号
         loginEmployeeId() {
             return [
-                rules.required('employeeId'), // 'username' も 'employeeId' に変更
-                rules.custom(
-                    (value) => /^\d{1,10}$/.test(value),
-                    'form.validation.employeeIdFormat',
-                ),
+                rules.required('employeeId'),
+                rules.employeeId(), // ⭐ utils から使用
             ];
         },
 
@@ -39,10 +38,7 @@ export function useValidation() {
         employeeId() {
             return [
                 rules.required('employeeId'),
-                rules.custom(
-                    (value) => /^\d{1,10}$/.test(value),
-                    'form.validation.employeeIdFormat',
-                ),
+                rules.employeeId(), // ⭐ utils から使用
             ];
         },
 
@@ -52,10 +48,7 @@ export function useValidation() {
                 rules.required('password'),
                 rules.minLength('password', 8),
                 rules.maxLength('password', 128),
-                rules.custom(
-                    (value) => /(?=.*[a-zA-Z])(?=.*\d)/.test(value),
-                    'form.validation.passwordStrength',
-                ),
+                rules.passwordStrength(), // ⭐ utils から使用
             ];
         },
 
@@ -82,6 +75,6 @@ export function useValidation() {
     return {
         rules,
         createRules,
-        t, // 翻訳関数も提供
+        t,
     };
 }

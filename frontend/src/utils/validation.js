@@ -1,6 +1,14 @@
-// src/utils/validation.js - 更新版（i18n対応）
+// src/utils/validation.js - 改善版（正規表現を関数化）
 
 import { useI18n } from 'vue-i18n';
+
+// ⭐ 正規表現パターンを定数化
+const PATTERNS = {
+    EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    ALPHA_NUMERIC: /^[a-zA-Z0-9]+$/,
+    EMPLOYEE_ID: /^\d{1,10}$/, // ⭐ 追加
+    PASSWORD_STRENGTH: /(?=.*[a-zA-Z])(?=.*\d)/, // ⭐ 追加
+};
 
 // i18n対応バリデーションルール
 export const createValidationRules = () => {
@@ -49,19 +57,42 @@ export const createValidationRules = () => {
 
         // メールアドレス
         email() {
-            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return (value) => {
                 if (!value) return true;
-                return emailPattern.test(value) || t('form.validation.email');
+                return PATTERNS.EMAIL.test(value) || t('form.validation.email');
             };
         },
 
         // 英数字のみ
         alphaNumeric() {
-            const pattern = /^[a-zA-Z0-9]+$/;
             return (value) => {
                 if (!value) return true;
-                return pattern.test(value) || t('form.validation.alphaNumeric');
+                return (
+                    PATTERNS.ALPHA_NUMERIC.test(value) ||
+                    t('form.validation.alphaNumeric')
+                );
+            };
+        },
+
+        // ⭐ 社員番号（半角数字、10桁以内）
+        employeeId() {
+            return (value) => {
+                if (!value) return true;
+                return (
+                    PATTERNS.EMPLOYEE_ID.test(value) ||
+                    t('form.validation.employeeIdFormat')
+                );
+            };
+        },
+
+        // ⭐ パスワード強度（英字+数字）
+        passwordStrength() {
+            return (value) => {
+                if (!value) return true;
+                return (
+                    PATTERNS.PASSWORD_STRENGTH.test(value) ||
+                    t('form.validation.passwordStrength')
+                );
             };
         },
 
