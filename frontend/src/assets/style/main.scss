@@ -1,7 +1,54 @@
-// Vuetify上書きする
+// frontend/src/assets/style/main.scss
+// Vuetify のデフォルトスタイルを上書き
 
-/* ⭐ グローバルなページ遷移スタイル */
-// frontend\src\App.vue
+// ==================== グローバルフォント設定 ====================
+/* すべての要素にフォントを適用 */
+* {
+    font-family:
+        'Noto Sans JP',
+        /* 日本語フォント（優先） */ 'Roboto',
+        /* 英語フォント（Vuetify標準） */ -apple-system,
+        /* macOS システムフォント */ BlinkMacSystemFont,
+        /* macOS Chrome用 */ 'Segoe UI',
+        /* Windows システムフォント */ 'Helvetica Neue',
+        /* macOS 古いバージョン */ Arial,
+        /* フォールバック */ sans-serif; /* 最終フォールバック */
+}
+
+/* Vuetify コンポーネントにもフォントを適用 */
+.v-application {
+    font-family: inherit !important; /* 上記のフォント設定を継承 */
+}
+
+/* Material Symbols アイコンは除外（専用フォントを維持） */
+.material-symbols-outlined {
+    font-family: 'Material Symbols Outlined' !important;
+}
+
+/* 日本語の letter-spacing 調整（読みやすさ向上） */
+body {
+    letter-spacing: 0.05em; /* 文字間隔を少し広げる */
+}
+
+/* Vuetify ボタンのフォント設定 */
+.v-btn {
+    font-weight: 500; /* 中太字 */
+    letter-spacing: 0.05em; /* 文字間隔 */
+}
+
+/* 見出しのフォント設定 */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-weight: 700; /* 太字 */
+    letter-spacing: 0.03em; /* 文字間隔（ボタンより狭め） */
+}
+
+// ==================== ページ遷移アニメーション ====================
+/* グローバルなページ遷移スタイル */
 /* 通常のページ遷移（ホーム等） */
 .page-transition-enter-active,
 .page-transition-leave-active {
@@ -10,15 +57,15 @@
 
 .page-transition-enter-from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(10px); /* 下から上にフェードイン */
 }
 
 .page-transition-leave-to {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-10px); /* 上に消える */
 }
 
-/* ログインページ専用の遷移 */
+/* ログインページ専用の遷移（スケールアニメーション） */
 .login-page-transition-enter-active,
 .login-page-transition-leave-active {
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -26,35 +73,36 @@
 
 .login-page-transition-enter-from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.95); /* 小さい状態から */
 }
 
 .login-page-transition-leave-to {
     opacity: 0;
-    transform: scale(1.05);
+    transform: scale(1.05); /* 大きくなりながら消える */
 }
 
-/* ⭐ v-mainをflexコンテナにしてフッターを押し下げる */
+// ==================== レイアウト設定 ====================
+/* v-main をフレックスコンテナにしてフッターを押し下げる */
 .v-main {
-    flex: 1 0 auto; /* ⭐ 重要 */
-    min-height: 0; /* ⭐ フレックスアイテムの最小高さをリセット */
-    background-color: #fafafa;
+    flex: 1 0 auto; /* 縮小禁止、伸縮可能 */
+    min-height: 0; /* フレックスアイテムの最小高さリセット */
+    background-color: #fafafa; /* 背景色 */
 }
 
-/* レイアウトシフト防止 */
+/* レイアウトシフト防止（CLS対策） */
 *,
 *::before,
 *::after {
-    box-sizing: border-box;
+    box-sizing: border-box; /* paddingとborderをwidthに含める */
 }
 
 body {
     margin: 0;
     padding: 0;
-    overflow-x: hidden;
+    overflow-x: hidden; /* 横スクロール防止 */
 }
 
-/* Vue Router link遷移も滑らかに */
+/* Vue Router のリンク遷移を滑らかに */
 .router-link-active {
     transition: all 0.2s ease;
 }
