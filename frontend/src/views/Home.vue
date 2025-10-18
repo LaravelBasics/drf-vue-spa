@@ -32,14 +32,16 @@ const breadcrumbs = computed(() => [
 ]);
 
 // ⭐ マウント時に権限エラーチェック
+// 🎯 改善案（オプション）
 onMounted(() => {
-    // クエリパラメータに unauthorized=admin がある場合
+    // ⭐ loading.value がある場合の重複防止
     if (route.query.unauthorized === 'admin') {
-        // 警告通知を表示
         showWarning('notifications.unauthorized.admin');
 
-        // ⭐ URLをクリーンにする（クエリパラメータ削除）
-        router.replace({ path: routes.HOME, query: {} });
+        // ⭐ nextTick で確実に実行
+        nextTick(() => {
+            router.replace({ path: routes.HOME, query: {} });
+        });
     }
 });
 

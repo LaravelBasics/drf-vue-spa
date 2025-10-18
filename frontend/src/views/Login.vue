@@ -24,6 +24,10 @@ const loading = ref(false);
 const isVisible = ref(false);
 const form = ref(null);
 
+// ⭐ フィールド参照（フォーカス用）
+const employeeIdField = ref(null);
+const passwordField = ref(null);
+
 const employeeIdRules = createRules.loginEmployeeId();
 const passwordRules = createRules.loginPassword();
 
@@ -37,17 +41,33 @@ const primaryColor = computed(
 onMounted(() => {
     setTimeout(() => {
         isVisible.value = true;
+        // ⭐ マウント後に最初のフィールドにフォーカス
+        employeeIdField.value?.focus();
     }, 100);
 });
 
 async function onSubmit() {
-    const { valid } = await form.value.validate();
-    if (!valid) return;
+    const { valid, errors } = await form.value.validate();
+
+    if (!valid) {
+        // ⭐ バリデーションエラー時にフォーカス
+        if (errors && errors.length > 0) {
+            const firstErrorField = errors[0]?.id;
+            if (firstErrorField?.includes('employee')) {
+                employeeIdField.value?.focus();
+            } else if (firstErrorField?.includes('password')) {
+                passwordField.value?.focus();
+            }
+        }
+        return;
+    }
+
+    // ⭐ 追加: 重複送信防止
+    if (loading.value) return;
 
     loading.value = true;
 
     try {
-        // ⭐ 修正: try/catch で例外をハンドリング
         await auth.loginSession(employeeId.value, password.value);
 
         // ✅ ログイン成功
@@ -83,6 +103,7 @@ async function onSubmit() {
                     <v-card-text class="py-6 px-6">
                         <v-form @submit.prevent="onSubmit" ref="form">
                             <v-text-field
+                                ref="employeeIdField"
                                 v-model="employeeId"
                                 :label="
                                     t('form.placeholders.employeeId', {
@@ -99,6 +120,7 @@ async function onSubmit() {
                                 persistent-hint
                             />
                             <v-text-field
+                                ref="passwordField"
                                 v-model="password"
                                 :label="
                                     t('form.placeholders.enterPassword', {
