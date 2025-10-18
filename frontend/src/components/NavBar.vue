@@ -1,11 +1,11 @@
 <script setup>
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useTheme } from 'vuetify';
 import { useUiStore } from '@/stores/ui';
 import { useAuthStore } from '@/stores/auth';
-import { useApiError } from '@/composables/useApiError'; // ⭐ 追加
+import { useApiError } from '@/composables/useApiError';
 import { routes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 import { ICON_SIZES, THEME_CONFIG } from '@/constants/theme';
@@ -15,7 +15,10 @@ const { t } = useI18n();
 const ui = useUiStore();
 const auth = useAuthStore();
 const theme = useTheme();
-const { showInfo, handleApiError } = useApiError(); // ⭐ 追加
+const { showInfo, handleApiError } = useApiError();
+
+// ⭐ ログアウト中の状態管理
+const loggingOut = ref(false);
 
 const displayName = computed(() => {
     return auth.user?.username || auth.user?.employee_id || 'ゲスト';
@@ -27,21 +30,26 @@ const primaryColor = computed(
         THEME_CONFIG.colors.light.primary,
 );
 
-// ⭐ ログアウト関数を修正
+// ⭐ ログアウト関数（クエリパラメータで通知を伝える）
 async function handleLogout() {
+    // 重複実行防止
+    if (loggingOut.value) return;
+
+    loggingOut.value = true;
+
     try {
-        // logout(false) で自動リダイレクトを無効化
+        // ログアウトAPI呼び出し（redirect=falseで自動リダイレクトを無効化）
         await auth.logout(false);
 
-        // ✅ ログアウト成功を通知
-        showInfo('auth.logoutSuccess', {}, 3000);
-
-        // 少し遅延させてからログインページへ遷移
-        setTimeout(() => {
-            router.push(routes.LOGIN);
-        }, 100);
+        // ✅ クエリパラメータ付きでログイン画面へ遷移
+        router.push({
+            path: routes.LOGIN,
+            query: { logout: 'success' },
+        });
     } catch (error) {
         handleApiError(error);
+    } finally {
+        loggingOut.value = false;
     }
 }
 
@@ -107,8 +115,18 @@ function goToHome() {
                 <v-list-item
                     :prepend-icon="ICONS.nav.logout"
                     :title="t('auth.logout')"
+                    :disabled="loggingOut"
                     @click="handleLogout"
-                />
+                >
+                    <!-- ⭐ ログアウト中はローディング表示 -->
+                    <template v-slot:append v-if="loggingOut">
+                        <v-progress-circular
+                            indeterminate
+                            size="20"
+                            width="2"
+                        />
+                    </template>
+                </v-list-item>
             </v-list>
         </v-menu>
     </v-app-bar>

@@ -44,6 +44,14 @@ onMounted(() => {
         // ⭐ マウント後に最初のフィールドにフォーカス
         employeeIdField.value?.focus();
     }, 100);
+
+    // ⭐ ログアウト後のクエリパラメータチェック
+    if (route.query.logout === 'success') {
+        // 「ログアウトしました」のメッセージ表示時間3秒
+        showInfo('auth.logoutSuccess', {}, 3000);
+        // URLをクリーンにする
+        router.replace({ path: routes.LOGIN, query: {} });
+    }
 });
 
 async function onSubmit() {
