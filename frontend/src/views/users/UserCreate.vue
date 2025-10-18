@@ -66,6 +66,9 @@ async function submitForm() {
         return;
     }
 
+    // ⭐ 追加: 重複送信防止
+    if (submitting.value) return;
+
     submitting.value = true;
     try {
         await usersAPI.create(formData.value);

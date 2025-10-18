@@ -15,7 +15,8 @@ const { t } = useI18n();
 const { createRules } = useValidation();
 const { showSuccess, handleApiError } = useApiError();
 
-const loading = ref(true);
+// ⭐ 修正: true → false
+const loading = ref(false);
 const submitting = ref(false);
 const form = ref(null);
 
@@ -66,6 +67,9 @@ const passwordConfirmRules = computed(() => {
 const userId = computed(() => route.params.id);
 
 async function fetchUser() {
+    // ⭐ 追加: 重複リクエスト防止
+    if (loading.value) return;
+
     loading.value = true;
     try {
         const response = await usersAPI.get(userId.value);
@@ -105,6 +109,9 @@ async function submitForm() {
         }
         return;
     }
+
+    // ⭐ 追加: 重複送信防止
+    if (submitting.value) return;
 
     submitting.value = true;
     try {
@@ -148,7 +155,19 @@ onMounted(() => {
         <v-container class="pa-4">
             <v-row justify="center">
                 <v-col cols="12" sm="12" md="10">
-                    <v-card elevation="2" v-if="!loading">
+                    <!-- ⭐ 修正: loading 状態を先に表示 -->
+                    <v-card elevation="2" v-if="loading">
+                        <v-card-text class="pa-6 text-center">
+                            <v-progress-circular
+                                indeterminate
+                                color="primary"
+                            />
+                            <p class="mt-4">{{ t('app.loading') }}</p>
+                        </v-card-text>
+                    </v-card>
+
+                    <!-- ⭐ 修正: データ取得後に表示 -->
+                    <v-card elevation="2" v-else>
                         <v-card-text class="pa-6">
                             <v-form
                                 ref="form"
@@ -328,17 +347,6 @@ onMounted(() => {
                                     </v-btn>
                                 </div>
                             </v-form>
-                        </v-card-text>
-                    </v-card>
-
-                    <!-- ローディング表示 -->
-                    <v-card elevation="2" v-else>
-                        <v-card-text class="pa-6 text-center">
-                            <v-progress-circular
-                                indeterminate
-                                color="primary"
-                            />
-                            <p class="mt-4">{{ t('app.loading') }}</p>
                         </v-card-text>
                     </v-card>
                 </v-col>

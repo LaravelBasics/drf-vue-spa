@@ -110,6 +110,7 @@ const endItem = computed(() => {
 
 // データ取得
 async function fetchUsers() {
+    if (loading.value) return; // ← 追加
     loading.value = true;
     try {
         const params = {
@@ -156,13 +157,16 @@ function handleOptionsUpdate(options) {
 }
 
 // ⭐ watch: 検索クエリの変更を監視してデバウンス処理
+// 1. UserList.vue - デバウンス短縮
 watch(searchQuery, () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-        currentPage.value = 1;
-        fetchUsers();
-        updateURLParams();
-    }, 1000);
+        // 重複防止
+        if (!loading.value) {
+            currentPage.value = 1;
+            fetchUsers();
+        }
+    }, 300); // ← 1000 → 300
 });
 
 // ページ変更ハンドラー

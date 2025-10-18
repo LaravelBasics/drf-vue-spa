@@ -13,9 +13,10 @@ const route = useRoute();
 const { t } = useI18n();
 const { handleApiError } = useApiError();
 
-const loading = ref(true);
+const loading = ref(false); // ← true から false に変更
 const user = ref({});
-const allUsers = ref([]);
+// ⭐ adminCountを ref として保存
+const adminCount = ref(0);
 
 const userId = computed(() => route.params.id);
 
@@ -26,23 +27,26 @@ const breadcrumbs = computed(() => [
     { title: t('breadcrumbs.users.detail'), disabled: true },
 ]);
 
+// ⭐ computed で adminCount.value を使う
 const isLastAdmin = computed(() => {
     if (!user.value.is_admin) return false;
-    const adminCount = allUsers.value.filter(
-        (u) => u.is_admin && u.is_active,
-    ).length;
-    return adminCount === 1;
+    return adminCount.value === 1;
 });
 
 async function fetchUser() {
+    // ⭐ 重複リクエスト防止
+    if (loading.value) return;
+
     loading.value = true;
     try {
-        const [userResponse, usersResponse] = await Promise.all([
+        const [userResponse, adminCountResponse] = await Promise.all([
             usersAPI.get(userId.value),
-            usersAPI.list(),
+            usersAPI.adminCount(),
         ]);
+
         user.value = userResponse.data;
-        allUsers.value = usersResponse.data.results || usersResponse.data;
+        // ⭐ adminCount を更新
+        adminCount.value = adminCountResponse.data.count;
     } catch (error) {
         handleApiError(error);
         router.push(routes.USERS);

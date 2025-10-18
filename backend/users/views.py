@@ -282,6 +282,25 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
             'admin_users': stats['admins'],
             'deleted_users': deleted_count,
         })
+    
+    @action(detail=False, methods=['get'], url_path='admin-count')
+    def admin_count(self, request):
+        """
+        アクティブな管理者数を返す
+        
+        GET /api/users/admin-count/
+        
+        レスポンス:
+        {
+            "count": 5,
+            "can_delete": true  # 2人以上なら削除可能
+        }
+        """
+        count = User.objects.filter(is_admin=True, is_active=True).count()
+        return Response({
+            'count': count,
+            'can_delete': count > 1
+        })
 
 
 # ==================== 変更点のまとめ ====================

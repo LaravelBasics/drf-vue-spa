@@ -243,6 +243,10 @@ class User(AbstractBaseUser, PermissionsMixin):
             models.Index(fields=['employee_id']),  # 社員番号で検索
             models.Index(fields=['is_active']),    # アクティブステータスで絞り込み
             models.Index(fields=['deleted_at']),   # 削除済み判定
+
+            # ⭐ 追加
+            models.Index(fields=['is_admin', 'is_active']),  # 管理者検索用
+            models.Index(fields=['-created_at']),            # 並び替え用
         ]
     
     # ==================== 文字列表現 ====================

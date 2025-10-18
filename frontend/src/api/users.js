@@ -24,4 +24,9 @@ export const usersAPI = {
     stats() {
         return api.get('users/stats/');
     },
+
+    // ⭐ 追加
+    adminCount() {
+        return api.get('users/admin-count/');
+    },
 };
