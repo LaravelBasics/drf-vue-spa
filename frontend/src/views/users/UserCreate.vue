@@ -105,14 +105,14 @@ function goBack() {
                                 <v-text-field
                                     ref="usernameField"
                                     v-model="formData.username"
-                                    :label="t('form.fields.username')"
+                                    :label="$t('form.fields.username') + ' *'"
                                     :rules="usernameRules"
                                     variant="outlined"
                                     class="mb-4"
                                     required
                                     :hint="
-                                        t('form.hint.max', {
-                                            max: 20,
+                                        t('form.hint.min', {
+                                            min: 3,
                                         })
                                     "
                                     persistent-hint
@@ -121,7 +121,7 @@ function goBack() {
                                 <v-text-field
                                     ref="employeeIdField"
                                     v-model="formData.employee_id"
-                                    :label="t('form.fields.employeeId')"
+                                    :label="$t('form.fields.employeeId') + ' *'"
                                     :rules="employeeIdRules"
                                     variant="outlined"
                                     type="text"
@@ -135,7 +135,7 @@ function goBack() {
                                 <v-text-field
                                     ref="passwordField"
                                     v-model="formData.password"
-                                    :label="t('form.fields.password')"
+                                    :label="$t('form.fields.password') + ' *'"
                                     :rules="passwordRules"
                                     variant="outlined"
                                     type="password"

@@ -186,13 +186,16 @@ onMounted(() => {
                                         <v-text-field
                                             ref="usernameField"
                                             v-model="formData.username"
-                                            :label="t('form.fields.username')"
+                                            :label="
+                                                $t('form.fields.username') +
+                                                ' *'
+                                            "
                                             :rules="usernameRules"
                                             variant="outlined"
                                             class="mb-2"
                                             required
                                             :hint="
-                                                t('form.hint.max', { max: 20 })
+                                                t('form.hint.min', { min: 3 })
                                             "
                                             persistent-hint
                                         />
@@ -202,7 +205,10 @@ onMounted(() => {
                                         <v-text-field
                                             ref="employeeIdField"
                                             v-model="formData.employee_id"
-                                            :label="t('form.fields.employeeId')"
+                                            :label="
+                                                $t('form.fields.employeeId') +
+                                                ' *'
+                                            "
                                             :rules="employeeIdRules"
                                             variant="outlined"
                                             type="text"
