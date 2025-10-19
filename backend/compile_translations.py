@@ -1,112 +1,70 @@
-# backend/compile_translations.py
 """
-手動で .po ファイルを .mo ファイルにコンパイルするスクリプト
+翻訳ファイル（.po）を .mo にコンパイル
 
-使い方:
-python compile_translations.py
+Usage:
+    python compile_translations.py
+
+Requirements:
+    - gettext (推奨): winget install GnuWin32.GetText
+    - polib (代替): pip install polib
 """
 
-import os
+import subprocess
 from pathlib import Path
 
 
-def compile_po_to_mo(po_file_path):
-    """
-    .po ファイルを .mo ファイルにコンパイル
-    
-    引数:
-        po_file_path: .po ファイルのパス
-    """
-    # .mo ファイルのパスを生成
-    mo_file_path = po_file_path.replace('.po', '.mo')
-    
-    # msgfmt コマンドを実行（gettext がインストールされている場合）
-    try:
-        import subprocess
-        result = subprocess.run(
-            ['msgfmt', '-o', mo_file_path, po_file_path],
-            capture_output=True,
-            text=True
-        )
-        
-        if result.returncode == 0:
-            print(f'✅ コンパイル成功: {mo_file_path}')
-        else:
-            print(f'❌ コンパイル失敗: {result.stderr}')
-            raise Exception('msgfmt が見つかりません')
-    
-    except FileNotFoundError:
-        # gettext がインストールされていない場合
-        print('⚠️  gettext が見つかりません。Python の polib を使用します。')
-        compile_with_polib(po_file_path, mo_file_path)
+def compile_with_msgfmt(po_file, mo_file):
+    """msgfmt を使用してコンパイル"""
+    result = subprocess.run(
+        ["msgfmt", "-o", mo_file, po_file], capture_output=True, text=True
+    )
+
+    if result.returncode == 0:
+        print(f"✅ {mo_file}")
+    else:
+        raise FileNotFoundError("msgfmt not found")
 
 
-def compile_with_polib(po_file_path, mo_file_path):
-    """
-    polib を使って .po を .mo にコンパイル
-    
-    gettext がインストールされていない場合の代替方法
-    """
+def compile_with_polib(po_file, mo_file):
+    """polib を使用してコンパイル（代替手段）"""
     try:
         import polib
+
+        po = polib.pofile(str(po_file))
+        po.save_as_mofile(str(mo_file))
+        print(f"✅ {mo_file} (polib)")
     except ImportError:
-        print('❌ polib がインストールされていません。')
-        print('📦 インストール方法: pip install polib')
-        return
-    
-    # .po ファイルを読み込み
-    po = polib.pofile(po_file_path)
-    
-    # .mo ファイルに保存
-    po.save_as_mofile(mo_file_path)
-    
-    print(f'✅ コンパイル成功（polib使用）: {mo_file_path}')
+        print("❌ polib がインストールされていません: pip install polib")
 
 
 def main():
     """すべての .po ファイルをコンパイル"""
-    
-    # プロジェクトのルートディレクトリ
     BASE_DIR = Path(__file__).resolve().parent
-    LOCALE_DIR = BASE_DIR / 'locale'
-    
+    LOCALE_DIR = BASE_DIR / "locale"
+
     if not LOCALE_DIR.exists():
-        print(f'❌ locale ディレクトリが見つかりません: {LOCALE_DIR}')
+        print(f"❌ locale ディレクトリが見つかりません")
         return
-    
-    # すべての .po ファイルを検索
-    po_files = list(LOCALE_DIR.glob('**/LC_MESSAGES/django.po'))
-    
+
+    po_files = list(LOCALE_DIR.glob("**/LC_MESSAGES/django.po"))
+
     if not po_files:
-        print('⚠️  .po ファイルが見つかりません')
+        print("⚠️ .po ファイルが見つかりません")
         return
-    
-    print(f'📁 {len(po_files)} 個の .po ファイルが見つかりました\n')
-    
-    # 各 .po ファイルをコンパイル
+
+    print(f"📁 {len(po_files)} 個のファイルを処理中...\n")
+
     for po_file in po_files:
-        print(f'🔄 コンパイル中: {po_file}')
-        compile_po_to_mo(str(po_file))
-    
-    print('\n✅ すべての翻訳ファイルのコンパイルが完了しました')
+        mo_file = po_file.with_suffix(".mo")
+
+        try:
+            compile_with_msgfmt(po_file, mo_file)
+        except FileNotFoundError:
+            print("⚠️ gettext が見つかりません。polib を使用します。")
+            compile_with_polib(po_file, mo_file)
+
+    print("\n✅ コンパイル完了")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-    # ==================== 使い方 ====================
-"""
-翻訳ファイル（.po）を手動でコンパイルするスクリプト
-
-使い方:
-    python compile_translations.py
-
-必要なツール:
-    方法1: gettext（推奨）
-        winget install GnuWin32.GetText
-        python manage.py compilemessages
-    
-    方法2: polib（gettext なし）
-        pip install polib
-        python compile_translations.py
-"""

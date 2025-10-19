@@ -1,214 +1,121 @@
-# backend/config/settings.py
 """
-Django プロジェクトの設定ファイル
+Django プロジェクト設定ファイル
 
-このファイルの役割:
-- Django の動作を制御する設定をまとめる
-- データベース、認証、セキュリティなどの設定
-
-注意:
-- 本番環境では SECRET_KEY や DEBUG を環境変数で管理すること
-- このファイルは Git にコミットしても良いが、機密情報は .env で管理
+注意: 本番環境ではSECRET_KEY、DEBUGを環境変数で管理すること
 """
 
 from pathlib import Path
 from django.utils.translation import gettext_lazy as _
 import os
 
-# ==================== 基本設定 ====================
-
-# プロジェクトのルートディレクトリ
-# 例: /home/user/project/backend/
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ==================== セキュリティ ====================
 
-# ==================== セキュリティ設定 ====================
-
-# シークレットキー（暗号化に使用）
-# ⚠️ 本番環境では環境変数で管理すること
 SECRET_KEY = "django-insecure-ycbc+50@xd3u8)6tsw27*q6!uz2l2asg0-$wdgs^j99wokh1w@"
-
-# デバッグモード
-# True: 開発環境（エラーの詳細が表示される）
-# False: 本番環境（エラーの詳細は非表示）
 DEBUG = True
-
-# アクセスを許可するホスト
-# 本番環境では ['example.com', 'www.example.com'] のように指定
 ALLOWED_HOSTS = []
 
-
-SILENCED_SYSTEM_CHECKS = ["auth.W004"]
-# ==================== インストール済みアプリ ====================
+# ==================== アプリケーション ====================
 
 INSTALLED_APPS = [
-    # ==================== Django標準アプリ ====================
-    "django.contrib.admin",  # 管理画面（/admin/）
-    "django.contrib.auth",  # 認証システム
-    "django.contrib.contenttypes",  # コンテンツタイプ（権限管理の基盤）
-    "django.contrib.sessions",  # セッション管理（Cookieでログイン状態を保持）
-    "django.contrib.messages",  # フラッシュメッセージ（一時的な通知）
-    "django.contrib.staticfiles",  # 静的ファイル管理（CSS, JS, 画像）
-    # ==================== サードパーティ ====================
-    "rest_framework",  # REST API フレームワーク
-    "corsheaders",  # CORS対応（フロントエンドとの通信）
-    "django_filters",  # フィルター機能（検索・絞り込み）
-    # ==================== 自作アプリ ====================
-    "accounts",  # 認証専用（ログイン/ログアウト）
-    "users",  # ユーザー管理（CRUD）
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "rest_framework",
+    "corsheaders",
+    "django_filters",
+    "accounts",
+    "users",
 ]
 
+# ==================== 認証 ====================
 
-# ==================== カスタムユーザーモデル ====================
-
-# デフォルトのユーザーモデルを置き換え
-# 'users.User' = users アプリの User モデルを使用
 AUTH_USER_MODEL = "users.User"
 
-
-# ==================== 認証バックエンド ====================
-
-# ログイン認証の方法を指定
 AUTHENTICATION_BACKENDS = [
-    "accounts.backends.EmployeeIdBackend",  # 社員番号でログイン（カスタム）
-    # 'django.contrib.auth.backends.ModelBackend',  # デフォルト（username でログイン）
+    "accounts.backends.EmployeeIdBackend",
 ]
 
-
-# ==================== REST Framework 設定 ====================
+# ==================== REST Framework ====================
 
 REST_FRAMEWORK = {
-    # ==================== 認証方法 ====================
-    # APIを叩いた時に「誰がアクセスしているか」を判定する方法
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        # SessionAuthentication = Cookie（セッション）で認証
-        # ログイン後はブラウザの Cookie に情報が保存される
         "rest_framework.authentication.SessionAuthentication",
     ],
-    # ==================== デフォルト権限 ====================
-    # 認証されていないユーザーのアクセスを制限
     "DEFAULT_PERMISSION_CLASSES": [
-        # IsAuthenticated = ログイン済みユーザーのみアクセスOK
-        # AllowAny に変更すると誰でもアクセスできる
         "rest_framework.permissions.IsAuthenticated",
     ],
-    # ==================== ページネーション ====================
-    # 一覧APIで大量データを分割して返す
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
-    "PAGE_SIZE": 10,  # 1ページあたり10件
-    # ==================== フィルター・検索・並び替え ====================
+    "PAGE_SIZE": 10,
     "DEFAULT_FILTER_BACKENDS": [
-        "django_filters.rest_framework.DjangoFilterBackend",  # フィルター（is_admin=true など）
-        "rest_framework.filters.SearchFilter",  # 検索（キーワード検索）
-        "rest_framework.filters.OrderingFilter",  # 並び替え（作成日順など）
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
     ],
 }
 
-
 # ==================== ミドルウェア ====================
 
-# リクエスト処理の順番（上から順に実行される）
 MIDDLEWARE = [
-    # ==================== CORS（フロントエンドとの通信） ====================
-    # 一番上に配置すること（他のミドルウェアより先に実行）
     "corsheaders.middleware.CorsMiddleware",
-    # ==================== Django標準ミドルウェア ====================
-    "django.middleware.security.SecurityMiddleware",  # セキュリティ対策
-    "django.contrib.sessions.middleware.SessionMiddleware",  # セッション管理
-    "common.middleware.LanguageMiddleware",  # ← カスタムミドルウェア
-    "django.middleware.locale.LocaleMiddleware",  # ← 言語切り替え用（追加）
-    "django.middleware.common.CommonMiddleware",  # 共通処理
-    "django.middleware.csrf.CsrfViewMiddleware",  # CSRF対策
-    "django.contrib.auth.middleware.AuthenticationMiddleware",  # 認証処理
-    "django.contrib.messages.middleware.MessageMiddleware",  # メッセージ処理
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",  # クリックジャッキング対策
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "common.middleware.LanguageMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
+# ==================== キャッシュ ====================
 
-# ==================== キャッシュ設定 ====================
-
-# ブルートフォース攻撃対策のログイン失敗回数を記録
 CACHES = {
     "default": {
-        # LocMemCache = メモリにキャッシュ（開発環境用）
-        # 本番環境では Redis を推奨:
-        # 'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        # 'LOCATION': 'redis://127.0.0.1:6379/1',
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
         "LOCATION": "unique-snowflake",
     }
 }
 
+# ==================== CORS ====================
 
-# ==================== CORS設定（フロントエンドとの通信） ====================
-
-# すべてのオリジンを許可するか
-# False = 特定のURLのみ許可（推奨）
 CORS_ALLOW_ALL_ORIGINS = False
-
-# 許可するフロントエンドのURL
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Vue.js 開発サーバー（Vite）
-    # "http://localhost:3000",  # React 開発サーバー
+    "http://localhost:5173",
 ]
-
-# Cookie を含むリクエストを許可
-# True = セッション認証が使える
 CORS_ALLOW_CREDENTIALS = True
 
+# ==================== セッション ====================
 
-# ==================== セッション設定 ====================
-
-# セッションの有効期限（秒）
-# 86400秒 = 24時間 = 1日
 SESSION_COOKIE_AGE = 86400
-
-# ブラウザを閉じてもセッションを維持
-# False = ブラウザを閉じてもログイン状態を保持
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-
-# アクティビティがあればセッションを延長
-# True = APIを叩くたびにセッションの有効期限がリセットされる
 SESSION_SAVE_EVERY_REQUEST = True
-
-# セッション Cookie をHTTPSのみに制限
-# False = HTTP でも OK（開発環境）
-# True = HTTPS のみ（本番環境）
 SESSION_COOKIE_SECURE = False
 
+# ==================== CSRF ====================
 
-# ==================== CSRF設定（セキュリティ） ====================
-
-# CSRF トークンを信頼するオリジン
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",  # Vue.js 開発サーバー
+    "http://localhost:5173",
 ]
-
-# CSRF Cookie を JavaScript から読み取り可能にする
-# False = JavaScript から読み取れる（フロントエンドが必要）
-# True = JavaScript から読み取れない（より安全）
 CSRF_COOKIE_HTTPONLY = False
-
-# CSRF Cookie をHTTPSのみに制限
-# False = HTTP でも OK（開発環境）
-# True = HTTPS のみ（本番環境）
 CSRF_COOKIE_SECURE = False
 
+# ==================== URL ====================
 
-# ==================== URL設定 ====================
-
-# メインのURL設定ファイル
 ROOT_URLCONF = "config.urls"
 
+# ==================== テンプレート ====================
 
-# ==================== テンプレート設定 ====================
-
-# HTML テンプレートの設定（Django管理画面で使用）
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],  # カスタムテンプレートディレクトリ（必要に応じて追加）
-        "APP_DIRS": True,  # 各アプリの templates/ を自動検索
+        "DIRS": [],
+        "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.debug",
@@ -220,234 +127,60 @@ TEMPLATES = [
     },
 ]
 
+# ==================== WSGI ====================
 
-# ==================== WSGI設定 ====================
-
-# 本番環境で使用する WSGI アプリケーション
 WSGI_APPLICATION = "config.wsgi.application"
 
-
-# ==================== データベース設定 ====================
+# ==================== データベース ====================
 
 DATABASES = {
     "default": {
-        # SQLite（開発環境用）
-        # 本番環境では PostgreSQL や MySQL を推奨:
-        # 'ENGINE': 'django.db.backends.postgresql',
-        # 'NAME': 'your_db_name',
-        # 'USER': 'your_db_user',
-        # 'PASSWORD': 'your_db_password',
-        # 'HOST': 'localhost',
-        # 'PORT': '5432',
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
 
-
 # ==================== パスワード検証 ====================
 
-# パスワードの強度チェック
 AUTH_PASSWORD_VALIDATORS = [
-    # ユーザー名とパスワードが似ていないかチェック
     {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"
     },
-    # 最小文字数チェック（デフォルト: 8文字）
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    # よくあるパスワード（password123 など）をチェック
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    # 数字だけのパスワードを禁止
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-
 # ==================== ログイン設定 ====================
-LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "10"))  # 最大ログイン試行回数
-LOGIN_LOCKOUT_DURATION = int(
-    os.getenv("LOGIN_LOCKOUT_DURATION", "60")
-)  # ロック時間（秒）
 
-# ==================== 国際化（i18n）設定 ====================
+LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "10"))
+LOGIN_LOCKOUT_DURATION = int(os.getenv("LOGIN_LOCKOUT_DURATION", "60"))
 
-# 対応言語
+# ==================== 国際化 ====================
+
 LANGUAGES = [
     ("ja", _("日本語")),
     ("en", _("English")),
 ]
 
-# デフォルト言語
-LANGUAGE_CODE = "ja"  # 日本語
+LANGUAGE_CODE = "ja"
+TIME_ZONE = "Asia/Tokyo"
+USE_I18N = True
+USE_L10N = True
+USE_TZ = True
 
-# タイムゾーン
-TIME_ZONE = "Asia/Tokyo"  # 日本時間（JST）
-
-# 国際化・ローカライゼーション・タイムゾーンを有効化
-USE_I18N = True  # 翻訳機能を有効化
-USE_L10N = True  # ローカライズ（日付・数値フォーマット）を有効化
-USE_TZ = True  # タイムゾーンを有効化（UTC で保存し表示時に変換）
-
-# 翻訳ファイルの場所
 LOCALE_PATHS = [
     BASE_DIR / "locale",
 ]
 
-# ==================== 静的ファイル設定 ====================
+# ==================== 静的ファイル ====================
 
-# 静的ファイル（CSS, JS, 画像）のURL
 STATIC_URL = "static/"
-
-# 本番環境での静的ファイル収集先
-# python manage.py collectstatic で収集
-# STATIC_ROOT = BASE_DIR / 'staticfiles'
-
 
 # ==================== デフォルト設定 ====================
 
-# 主キー（ID）のデフォルトフィールドタイプ
-# BigAutoField = 大きな数字まで扱える自動採番ID
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# ==================== システムチェック ====================
 
-# ==================== システムチェック警告の抑制 ====================
-
-# 意図的に無視する警告のリスト
-SILENCED_SYSTEM_CHECKS = [
-    "auth.W004",  # USERNAME_FIELD が unique でない警告
-]
-
-"""
-⭐ auth.W004 警告を抑制する理由:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-警告内容:
-  'User.employee_id' is named as the 'USERNAME_FIELD', but it is not unique.
-  → 「ログインIDが一意じゃないよ」という警告
-
-
-なぜ抑制するのか:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. 論理削除を実装するため
-   - 削除済みユーザーの社員番号を保持する必要がある
-   - employee_id を変更せずに deleted_at で削除を表現
-   - 同じ社員番号を再利用可能にする
-
-2. unique=False が必須
-   - フィールドに unique=True をつけると削除済みでも重複エラー
-   - 条件付きユニーク制約（Meta.constraints）を使用
-   - deleted_at が NULL の時だけ一意性を保証
-
-
-安全性の保証:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✅ データベースレベル（最強）
-   models.UniqueConstraint(
-       fields=['employee_id'],
-       condition=Q(deleted_at__isnull=True),
-       name='unique_active_employee_id'
-   )
-   → アクティブユーザー間では確実に一意
-
-✅ アプリケーションレベル
-   UniqueValidator（serializers.py）
-   → 作成・更新時に重複をチェック
-   → エラーがあれば 400 Bad Request を返す
-
-✅ ビジネスロジックレベル
-   UserService（services/user_service.py）
-   → 復元時に重複チェック
-   → 適切なエラーメッセージを返す
-
-
-実際の動作:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1. ユーザーA（社員番号 1000）を作成
-   id=1, employee_id='1000', deleted_at=NULL
-   
-2. ユーザーAを論理削除
-   id=1, employee_id='1000', deleted_at='2025-10-19 10:00:00'
-   → 条件付き制約から外れる
-   
-3. 新しいユーザーB（社員番号 1000）を作成
-   id=2, employee_id='1000', deleted_at=NULL
-   → 作成成功！（削除済みは制約の対象外）
-
-4. アクティブユーザーを検索
-   User.objects.filter(employee_id='1000')
-   → ユーザーB のみ（削除済み除外）
-
-5. 履歴を含めて検索
-   User.all_objects.filter(employee_id='1000')
-   → ユーザーA（削除済み）とユーザーB（アクティブ）の2件
-
-
-他の警告は残る:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-auth.W005: MIDDLEWARE の設定不足
-auth.W006: SESSION_COOKIE_SECURE が False
-auth.E003: PASSWORD_HASHERS が空
-などなど...
-
-→ セキュリティ関連の警告は表示される
-→ 問題があれば検知できる
-
-
-確認コマンド:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-$ python manage.py check
-
-期待される結果:
-  System check identified no issues (1 silenced).
-  
-→ 「1 silenced」は正常
-→ auth.W004 を意図的に抑制している証拠
-"""
-
-# ==================== 本番環境での追加設定例 ====================
-"""
-本番環境では以下の設定を追加すること:
-
-import os
-
-# 環境変数から読み込み
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
-DEBUG = False
-ALLOWED_HOSTS = ['example.com', 'www.example.com']
-
-# データベースをPostgreSQLに変更
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': '5432',
-    }
-}
-
-# キャッシュをRedisに変更
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
-    }
-}
-
-# セキュリティ強化
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-SECURE_SSL_REDIRECT = True
-SECURE_HSTS_SECONDS = 31536000
-"""
+SILENCED_SYSTEM_CHECKS = ["auth.W004"]

@@ -5,3 +5,35 @@ eslint.config.js       -  コード品質チェック（推奨）
 .prettierrc            -  Vue/JSの整形設定（必須）
 .vscode/settings.json  -  Vue + Python整形対応
 jsconfig.json          -  VSCodeのパス補完・型チェック用
+
+
+******************************************************************
+# 意図的に無視する警告のリスト
+SILENCED_SYSTEM_CHECKS = [
+    "auth.W004",  # USERNAME_FIELD が unique でない警告
+]
+
+この↑警告ってログイン認証をusername（中身はemployee_id）でやった  →
+デフォルトでDjangoはログイン認証に使うusernameをユニークで期待する →
+モデルがfalseだった →
+Django君「ここtrueじゃないよ？どういうこと?！( ﾟДﾟ)」てきな状況
+
+
+🎯 正確にはこういう状況
+python# models.py
+class User(AbstractBaseUser, PermissionsMixin):
+    employee_id = models.CharField(
+        max_length=50,
+        unique=False,  # ← これが原因！
+    )
+    
+    USERNAME_FIELD = "employee_id"  # ← ログインIDとして指定
+```
+
+Django君の内部チェック：
+```
+Django: 「USERNAME_FIELD は employee_id か...」
+       「じゃあ employee_id に unique=True が必要だな！」
+       「え？ unique=False になってる...」
+       「( ﾟДﾟ)どういうことだってばよ！」
+       「警告出しとこ... W004!!」
