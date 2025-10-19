@@ -93,8 +93,8 @@ class LoginAPIView(ErrorResponseMixin, APIView):
             if not user.is_active:
                 self._increment_attempts(employee_id)
                 return self.error_response(
-                    error_code="ACCOUNT_INACTIVE",
-                    detail=str(_("このアカウントは無効化されています")),
+                    error_code="INVALID_CREDENTIALS",
+                    detail=str(_("社員番号またはパスワードが正しくありません")),
                     status_code=status.HTTP_401_UNAUTHORIZED,
                 )
 
