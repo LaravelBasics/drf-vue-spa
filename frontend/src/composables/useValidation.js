@@ -14,6 +14,7 @@ export function useValidation() {
             return [
                 rules.required('employeeId'),
                 rules.employeeId(), // ⭐ utils から使用
+                rules.maxLength('employeeId', 50), // ⭐ 追加
             ];
         },
 
@@ -21,7 +22,7 @@ export function useValidation() {
         loginPassword() {
             return [
                 rules.required('password'),
-                rules.maxLength('password', 13),
+                rules.maxLength('password', 128),
             ];
         },
 
@@ -30,7 +31,7 @@ export function useValidation() {
             return [
                 rules.required('username'),
                 rules.minLength('username', 3),
-                rules.maxLength('username', 20),
+                rules.maxLength('username', 50),
             ];
         },
 
@@ -39,6 +40,7 @@ export function useValidation() {
             return [
                 rules.required('employeeId'),
                 rules.employeeId(), // ⭐ utils から使用
+                rules.maxLength('employeeId', 50), // ⭐ 追加
             ];
         },
 
@@ -48,7 +50,7 @@ export function useValidation() {
                 rules.required('password'),
                 rules.minLength('password', 8),
                 rules.maxLength('password', 128),
-                rules.passwordStrength(), // ⭐ utils から使用
+                rules.passwordStrength(), // 英字+数字チェック
             ];
         },
 
@@ -67,7 +69,7 @@ export function useValidation() {
             return [
                 rules.required('email'),
                 rules.email(),
-                rules.maxLength('email', 100),
+                rules.maxLength('email', 255),
             ];
         },
     };
