@@ -56,12 +56,6 @@ msgstr "User not found."
 msgid "社員番号またはパスワードが正しくありません"
 msgstr "Employee ID or password is incorrect"
 
-msgid "このアカウントは削除されています"
-msgstr "This account has been deleted"
-
-msgid "このアカウントは無効化されています"
-msgstr "This account has been deactivated"
-
 #, python-format
 msgid "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください"
 msgstr "Login failed %(max_attempts)d times. Please try again after %(lockout_duration)d seconds"

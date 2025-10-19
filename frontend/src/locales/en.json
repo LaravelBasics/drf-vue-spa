@@ -210,8 +210,6 @@
     "backend": {
         "errors": {
             "INVALID_CREDENTIALS": "Employee ID or password is incorrect",
-            "ACCOUNT_DELETED": "This account has been deleted",
-            "ACCOUNT_INACTIVE": "This account is inactive",
             "ACCOUNT_LOCKED": "Login attempts failed 10 times. Please try again in 1 minute",
             "LOGOUT_FAILED": "Logout failed",
             "SESSION_EXPIRED": "Your session has expired. Please log in again",

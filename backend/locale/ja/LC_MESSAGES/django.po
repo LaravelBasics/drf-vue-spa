@@ -57,12 +57,6 @@ msgstr "ユーザーが見つかりません。"
 msgid "社員番号またはパスワードが正しくありません"
 msgstr "社員番号またはパスワードが正しくありません"
 
-msgid "このアカウントは削除されています"
-msgstr "このアカウントは削除されています"
-
-msgid "このアカウントは無効化されています"
-msgstr "このアカウントは無効化されています"
-
 #, python-format
 msgid "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください"
 msgstr "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください"

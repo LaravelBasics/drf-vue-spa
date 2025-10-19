@@ -210,8 +210,6 @@
     "backend": {
         "errors": {
             "INVALID_CREDENTIALS": "社員番号またはパスワードが正しくありません",
-            "ACCOUNT_DELETED": "このアカウントは削除されています",
-            "ACCOUNT_INACTIVE": "このアカウントは無効化されています",
             "ACCOUNT_LOCKED": "ログイン試行が10回失敗しました。1分後に再度お試しください",
             "LOGOUT_FAILED": "ログアウトに失敗しました",
             "SESSION_EXPIRED": "セッションの有効期限が切れました。再度ログインしてください",
