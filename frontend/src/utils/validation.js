@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n';
 const PATTERNS = {
     EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     ALPHA_NUMERIC: /^[a-zA-Z0-9]+$/,
-    EMPLOYEE_ID: /^\d{1,10}$/, // ⭐ 追加
+    EMPLOYEE_ID: /^\d{1,50}$/, // ⭐ 追加
     PASSWORD_STRENGTH: /(?=.*[a-zA-Z])(?=.*\d)/, // ⭐ 追加
 };
 
@@ -74,7 +74,7 @@ export const createValidationRules = () => {
             };
         },
 
-        // ⭐ 社員番号（半角数字、10桁以内）
+        // ⭐ 社員番号（半角数字、○桁以内）
         employeeId() {
             return (value) => {
                 if (!value) return true;

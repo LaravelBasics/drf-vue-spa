@@ -50,7 +50,7 @@
             "minLength": "{field}は{min}文字以上",
             "email": "メールアドレスの形式",
             "alphaNumeric": "英数字のみ",
-            "employeeIdFormat": "半角数字、10桁以内",
+            "employeeIdFormat": "半角数字、50桁以内",
             "passwordStrength": "英字、数字を含む、8文字以上",
             "newPasswordConfirmation": "確認のため再度入力してください",
             "passwordMismatch": "パスワードが一致しません"
@@ -62,7 +62,7 @@
             "minLength": "{field}は{min}文字以上で入力してください",
             "email": "正しいメールアドレスの形式で入力してください",
             "alphaNumeric": "英数字のみで入力してください",
-            "employeeIdFormat": "半角数字、10桁以内で入力してください",
+            "employeeIdFormat": "半角数字、50桁以内で入力してください",
             "passwordStrength": "英字、数字を含む、8文字以上で入力してください",
             "passwordMismatch": "パスワードが一致しません"
         }

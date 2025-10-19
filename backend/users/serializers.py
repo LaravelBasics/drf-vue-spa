@@ -7,6 +7,7 @@
 2. 不要な validate_employee_id メソッドを削除
 3. DRFの標準機能のみで実装
 4. シンプルで保守しやすいコード
+5. 社員番号の桁数を50に拡張（論理削除対応）⭐
 """
 
 from django.utils.translation import gettext_lazy as _
@@ -66,10 +67,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     employee_id = serializers.CharField(
         required=True,
+        max_length=50,  # ⭐ 20→50に拡張（models.py と合わせる）
         validators=[EMPLOYEE_ID_UNIQUE_VALIDATOR],
         error_messages={
             "required": _("社員番号は必須です"),
             "blank": _("社員番号は必須です"),
+            "max_length": _("社員番号は50文字以内で入力してください"),  # ⭐ 追加
         },
     )
 
@@ -92,7 +95,13 @@ class UserCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate_employee_id(self, value):
-        """値の正規化のみ（空白削除）"""
+        """
+        値の正規化のみ（空白削除）
+
+        ⭐ 重複チェックは UniqueValidator が自動で行う
+        - 作成時: 全体で重複チェック
+        - 更新時: 自分以外で重複チェック（UniqueValidator が自動判定）
+        """
         return value.strip() if value else value
 
     def validate_email(self, value):
@@ -118,10 +127,12 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
     employee_id = serializers.CharField(
         required=True,
+        max_length=50,  # ⭐ 20→50に拡張（models.py と合わせる）
         validators=[EMPLOYEE_ID_UNIQUE_VALIDATOR],  # ⭐ 作成時と同じ！
         error_messages={
             "required": _("社員番号は必須です"),
             "blank": _("社員番号は必須です"),
+            "max_length": _("社員番号は50文字以内で入力してください"),  # ⭐ 追加
         },
     )
 
@@ -145,7 +156,13 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def validate_employee_id(self, value):
-        """値の正規化のみ（空白削除）"""
+        """
+        値の正規化のみ（空白削除）
+
+        ⭐ UniqueValidator が自動で以下を判定:
+        - 作成時: queryset 全体で重複チェック
+        - 更新時: 自分（instance）以外で重複チェック
+        """
         return value.strip() if value else value
 
     def validate_email(self, value):
@@ -183,11 +200,21 @@ class UserUpdateSerializer(serializers.ModelSerializer):
    ✅ DRFの標準機能のみ使用
    ✅ カスタムバリデーター不要
 
+5. ⭐ 社員番号の桁数拡張
+   ✅ max_length=20 → max_length=50
+   ✅ models.py の変更に合わせる
+   ✅ 論理削除で番号をそのまま保持するため
+   ✅ 将来の拡張にも対応
+
+
 バリデーションの流れ:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 1. employee_id フィールドの検証
-   - required チェック（error_messages）
-   - UniqueValidator で重複チェック（自動で作成/更新を判定）
-   - validate_employee_id で空白削除
+   ① max_length チェック（50文字以内）
+   ② required チェック（error_messages）
+   ③ UniqueValidator で重複チェック（自動で作成/更新を判定）
+   ④ validate_employee_id で空白削除
 
 2. 更新時の動作
    - serializer.instance が存在
@@ -197,4 +224,41 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 3. 作成時の動作
    - serializer.instance が None
    - UniqueValidator が全体をチェック
+
+
+論理削除との連携:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. 削除時
+   - employee_id はそのまま保持
+   - deleted_at に日時を設定
+   - 条件付きユニーク制約から外れる
+
+2. 再利用時
+   - 同じ employee_id で新規作成可能
+   - UniqueValidator は User.objects（削除済み除外）を検索
+   - 削除済みは検索対象外なので重複エラーにならない
+
+3. 履歴追跡
+   - User.all_objects.filter(employee_id="1000")
+   - 削除済みも含めて検索可能
+   - 監査・履歴確認に使用
+
+
+使用例:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# 作成
+serializer = UserCreateSerializer(data={
+    'employee_id': '1000',  # 最大50文字
+    'username': '山田太郎',
+    'password': 'password123',
+    'is_admin': False
+})
+
+# 更新
+serializer = UserUpdateSerializer(user_instance, data={
+    'employee_id': '1001',  # 最大50文字
+    'username': '山田次郎',
+}, partial=True)
 """

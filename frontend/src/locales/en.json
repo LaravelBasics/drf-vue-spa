@@ -58,7 +58,7 @@
             "minLength": "{field} must be at least {min} characters",
             "email": "Valid email format",
             "alphaNumeric": "Alphanumeric only",
-            "employeeIdFormat": "Half-width numbers, up to 10 digits",
+            "employeeIdFormat": "Half-width numbers, up to 50 digits",
             "passwordStrength": "Must contain letters and numbers, at least 8 characters",
             "newPasswordConfirmation": "Please enter again for confirmation",
             "passwordMismatch": "Passwords do not match"
@@ -70,7 +70,7 @@
             "minLength": "{field} must be at least {min} characters",
             "email": "Please enter a valid email address",
             "alphaNumeric": "Please enter alphanumeric characters only",
-            "employeeIdFormat": "Please enter half-width numbers, up to 10 digits",
+            "employeeIdFormat": "Please enter half-width numbers, up to 50 digits",
             "passwordStrength": "Must contain letters and numbers, at least 8 characters",
             "passwordMismatch": "Passwords do not match"
         }
