@@ -15,26 +15,56 @@ class UserService:
     """ユーザー管理サービス"""
 
     @staticmethod
-    def _check_last_admin(user_id=None, is_admin=None, is_active=None):
+    def _get_active_admin_count(exclude_user_id=None):
         """
-        最後の管理者チェック
+        アクティブな管理者数を取得
+
+        Args:
+            exclude_user_id: カウントから除外するユーザーID
+
+        Returns:
+            int: 管理者数
+        """
+        query = User.objects.filter(is_admin=True, is_active=True)
+
+        if exclude_user_id:
+            query = query.exclude(id=exclude_user_id)
+
+        return query.count()
+
+    @staticmethod
+    def _check_last_admin_for_delete(user_id):
+        """
+        削除時の最後の管理者チェック
 
         Raises:
             LastAdminError: 管理者が0人になる場合
         """
-        query = User.objects.filter(is_admin=True, is_active=True)
+        if UserService._get_active_admin_count(exclude_user_id=user_id) == 0:
+            raise LastAdminError(action="削除")
 
-        if user_id:
-            query = query.exclude(id=user_id)
+    @staticmethod
+    def _check_last_admin_for_update(user_id, new_is_admin, new_is_active):
+        """
+        更新時の最後の管理者チェック
 
-        if not query.exists():
-            action = "削除"
-            if is_admin is False:
-                action = "管理者権限から外す"
-            elif is_active is False:
-                action = "無効化"
+        Args:
+            user_id: 更新対象ユーザーID
+            new_is_admin: 更新後の管理者フラグ
+            new_is_active: 更新後のアクティブフラグ
 
-            raise LastAdminError(action=action)
+        Raises:
+            LastAdminError: 管理者が0人になる場合
+        """
+        # 管理者権限を剥奪する場合
+        if new_is_admin is False:
+            if UserService._get_active_admin_count(exclude_user_id=user_id) == 0:
+                raise LastAdminError(action="管理者権限から外す")
+
+        # 無効化する場合
+        if new_is_active is False:
+            if UserService._get_active_admin_count(exclude_user_id=user_id) == 0:
+                raise LastAdminError(action="無効化")
 
     @staticmethod
     @transaction.atomic
@@ -73,8 +103,10 @@ class UserService:
             new_is_admin = validated_data.get("is_admin", user_instance.is_admin)
             new_is_active = validated_data.get("is_active", user_instance.is_active)
 
-            UserService._check_last_admin(
-                user_id=user_instance.id, is_admin=new_is_admin, is_active=new_is_active
+            UserService._check_last_admin_for_update(
+                user_id=user_instance.id,
+                new_is_admin=new_is_admin,
+                new_is_active=new_is_active,
             )
 
         password = validated_data.pop("password", None)
@@ -89,6 +121,7 @@ class UserService:
             update_fields.append("password")
 
         if update_fields:
+            update_fields.append("updated_at")
             user_instance.save(update_fields=update_fields)
 
         return user_instance
@@ -98,9 +131,6 @@ class UserService:
         """
         ユーザー削除（論理削除）
 
-        Note:
-            soft_delete()が単一のsave()呼び出しのため@transaction.atomic不要
-
         Args:
             user_instance: 削除対象ユーザー
             request_user_id: 削除実行ユーザーID
@@ -109,7 +139,7 @@ class UserService:
             raise CannotDeleteSelfError()
 
         if user_instance.is_admin:
-            UserService._check_last_admin(user_id=user_instance.id)
+            UserService._check_last_admin_for_delete(user_id=user_instance.id)
 
         user_instance.soft_delete()
 

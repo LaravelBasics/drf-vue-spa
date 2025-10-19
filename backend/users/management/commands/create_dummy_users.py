@@ -75,13 +75,18 @@ class Command(BaseCommand):
         count = options["count"]
         default_password = options["password"]
 
+        # パスワードは1回だけハッシュ化（全ユーザー共通）
         hashed_password = make_password(default_password)
 
         # 既存の最大社員番号を取得
         max_id = User.all_objects.aggregate(max_id=Max("employee_id"))["max_id"]
         start_id = int(max_id) + 1 if max_id and max_id.isdigit() else 10000
 
+        # 管理者が存在するか確認
         has_admin = User.objects.filter(is_admin=True, is_active=True).exists()
+
+        # 基準時刻を1回だけ取得
+        base_time = timezone.now()
 
         users_to_create = []
 
@@ -93,7 +98,8 @@ class Command(BaseCommand):
                 f"{random.choice(self.LAST_NAMES)}{random.choice(self.FIRST_NAMES)}"
             )
 
-            created_at = timezone.now() - timedelta(
+            # 基準時刻から相対的に計算
+            created_at = base_time - timedelta(
                 days=random.randint(0, 30),
                 hours=random.randint(0, 23),
                 minutes=random.randint(0, 59),

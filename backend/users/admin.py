@@ -4,13 +4,94 @@ Django管理画面カスタマイズ
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import ReadOnlyPasswordHashField
+from django import forms
 
 User = get_user_model()
+
+
+class UserCreationForm(forms.ModelForm):
+    """管理画面でのユーザー作成フォーム"""
+
+    password1 = forms.CharField(
+        label="パスワード",
+        widget=forms.PasswordInput,
+        help_text="8文字以上で入力してください",
+    )
+    password2 = forms.CharField(
+        label="パスワード（確認）",
+        widget=forms.PasswordInput,
+        help_text="確認のため、もう一度入力してください",
+    )
+
+    class Meta:
+        model = User
+        fields = (
+            "employee_id",
+            "username",
+            "email",
+            "is_admin",
+            "is_staff",
+            "is_active",
+        )
+
+    def clean_password2(self):
+        """パスワード一致確認"""
+        password1 = self.cleaned_data.get("password1")
+        password2 = self.cleaned_data.get("password2")
+
+        if password1 and password2 and password1 != password2:
+            raise forms.ValidationError("パスワードが一致しません")
+
+        if password1 and len(password1) < 8:
+            raise forms.ValidationError("パスワードは8文字以上で入力してください")
+
+        return password2
+
+    def save(self, commit=True):
+        """パスワードをハッシュ化して保存"""
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data["password1"])
+
+        if commit:
+            user.save()
+
+        return user
+
+
+class UserChangeForm(forms.ModelForm):
+    """管理画面でのユーザー編集フォーム"""
+
+    password = ReadOnlyPasswordHashField(
+        label="パスワード",
+        help_text=(
+            "パスワードは暗号化されて保存されます。"
+            '<a href="../password/">このフォーム</a>から変更できます。'
+        ),
+    )
+
+    class Meta:
+        model = User
+        fields = (
+            "employee_id",
+            "username",
+            "email",
+            "password",
+            "is_active",
+            "is_admin",
+            "is_staff",
+            "is_superuser",
+            "groups",
+            "user_permissions",
+        )
 
 
 @admin.register(User)
 class CustomUserAdmin(admin.ModelAdmin):
     """ユーザー管理画面"""
+
+    form = UserChangeForm
+    add_form = UserCreationForm
 
     list_display = [
         "employee_id",
@@ -100,16 +181,10 @@ class CustomUserAdmin(admin.ModelAdmin):
         """削除済みも含めて表示"""
         return User.all_objects.all()
 
-    def save_model(self, request, obj, form, change):
-        """パスワードをハッシュ化して保存"""
-        if not change:
-            # 新規作成時
-            if "password1" in form.cleaned_data:
-                obj.set_password(form.cleaned_data["password1"])
-        elif change and "password" in form.cleaned_data:
-            # 更新時（パスワードが入力されている場合のみ）
-            password = form.cleaned_data["password"]
-            if password:
-                obj.set_password(password)
-
-        super().save_model(request, obj, form, change)
+    def get_form(self, request, obj=None, **kwargs):
+        """新規作成時と編集時でフォームを切り替え"""
+        if obj is None:
+            kwargs["form"] = self.add_form
+        else:
+            kwargs["form"] = self.form
+        return super().get_form(request, obj, **kwargs)

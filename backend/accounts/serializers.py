@@ -4,16 +4,13 @@
 
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class LoginSerializer(serializers.Serializer):
-    """
-    ログイン入力データのバリデーション
-
-    Fields:
-        employee_id: 社員番号（最大50文字）
-        password: パスワード
-    """
+    """ログイン入力データのバリデーション"""
 
     employee_id = serializers.CharField(
         max_length=50,
@@ -22,7 +19,6 @@ class LoginSerializer(serializers.Serializer):
             "required": _("社員番号は必須です"),
             "blank": _("社員番号は必須です"),
         },
-        help_text="社員番号を入力してください（例: EMP001）",
     )
 
     password = serializers.CharField(
@@ -44,3 +40,22 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError(_("社員番号とパスワードは必須です"))
 
         return attrs
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """ユーザー情報シリアライザー（ログイン・認証用）"""
+
+    display_name = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "employee_id",
+            "username",
+            "email",
+            "display_name",
+            "is_admin",
+            "is_active",
+        ]
+        read_only_fields = fields

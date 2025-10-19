@@ -10,13 +10,13 @@ import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# ==================== セキュリティ ====================
+# === セキュリティ ===
 
 SECRET_KEY = "django-insecure-ycbc+50@xd3u8)6tsw27*q6!uz2l2asg0-$wdgs^j99wokh1w@"
 DEBUG = True
 ALLOWED_HOSTS = []
 
-# ==================== アプリケーション ====================
+# === アプリケーション ===
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -32,7 +32,7 @@ INSTALLED_APPS = [
     "users",
 ]
 
-# ==================== 認証 ====================
+# === 認証 ===
 
 AUTH_USER_MODEL = "users.User"
 
@@ -40,7 +40,7 @@ AUTHENTICATION_BACKENDS = [
     "accounts.backends.EmployeeIdBackend",
 ]
 
-# ==================== REST Framework ====================
+# === REST Framework ===
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -58,7 +58,7 @@ REST_FRAMEWORK = {
     ],
 }
 
-# ==================== ミドルウェア ====================
+# === ミドルウェア ===
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -73,7 +73,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# ==================== キャッシュ ====================
+# === キャッシュ ===
 
 CACHES = {
     "default": {
@@ -82,7 +82,7 @@ CACHES = {
     }
 }
 
-# ==================== CORS ====================
+# === CORS ===
 
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
@@ -90,14 +90,14 @@ CORS_ALLOWED_ORIGINS = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
-# ==================== セッション ====================
+# === セッション ===
 
 SESSION_COOKIE_AGE = 86400
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_COOKIE_SECURE = False
 
-# ==================== CSRF ====================
+# === CSRF ===
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
@@ -105,11 +105,11 @@ CSRF_TRUSTED_ORIGINS = [
 CSRF_COOKIE_HTTPONLY = False
 CSRF_COOKIE_SECURE = False
 
-# ==================== URL ====================
+# === URL設定 ===
 
 ROOT_URLCONF = "config.urls"
 
-# ==================== テンプレート ====================
+# === テンプレート ===
 
 TEMPLATES = [
     {
@@ -127,11 +127,11 @@ TEMPLATES = [
     },
 ]
 
-# ==================== WSGI ====================
+# === WSGI ===
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# ==================== データベース ====================
+# === データベース ===
 
 DATABASES = {
     "default": {
@@ -140,7 +140,7 @@ DATABASES = {
     }
 }
 
-# ==================== パスワード検証 ====================
+# === パスワード検証 ===
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -151,12 +151,12 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# ==================== ログイン設定 ====================
+# === ログイン設定 ===
 
 LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "10"))
 LOGIN_LOCKOUT_DURATION = int(os.getenv("LOGIN_LOCKOUT_DURATION", "60"))
 
-# ==================== 国際化 ====================
+# === 国際化 ===
 
 LANGUAGES = [
     ("ja", _("日本語")),
@@ -173,14 +173,16 @@ LOCALE_PATHS = [
     BASE_DIR / "locale",
 ]
 
-# ==================== 静的ファイル ====================
+# === 静的ファイル ===
 
 STATIC_URL = "static/"
 
-# ==================== デフォルト設定 ====================
+# === デフォルト設定 ===
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ==================== システムチェック ====================
+# === システムチェック ===
 
+# カスタムユーザーモデルで is_superuser フィールドがない警告を抑制
+# (ビジネス要件に従い is_admin を使用しているため)
 SILENCED_SYSTEM_CHECKS = ["auth.W004"]

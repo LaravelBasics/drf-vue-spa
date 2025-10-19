@@ -65,16 +65,9 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
             return self.validation_error_response(e)
 
     def retrieve(self, request, *args, **kwargs):
-        """ユーザー詳細"""
-        try:
-            instance = self.get_object()
-            return Response(UserSerializer(instance).data)
-        except User.DoesNotExist:
-            return self.error_response(
-                error_code="NOT_FOUND",
-                detail="ユーザーが見つかりません",
-                status_code=status.HTTP_404_NOT_FOUND,
-            )
+        """ユーザー詳細（DRFが自動で404を返すためtry-except不要）"""
+        instance = self.get_object()
+        return Response(UserSerializer(instance).data)
 
     def update(self, request, *args, **kwargs):
         """ユーザー更新"""
@@ -89,7 +82,7 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if hasattr(instance, "deleted_at") and instance.deleted_at:
+        if instance.deleted_at:
             return self.error_response(
                 error_code="CANNOT_UPDATE_DELETED",
                 detail="削除済みユーザーは編集できません",

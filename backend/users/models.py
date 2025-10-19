@@ -70,7 +70,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     employee_id = models.CharField(
         "社員番号",
         max_length=50,
-        unique=False,  # 条件付きユニーク制約を使用
+        unique=False,
         db_index=True,
     )
 
@@ -102,7 +102,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = "ユーザー"
         ordering = ["-created_at"]
 
-        # 条件付きユニーク制約（論理削除対応）
         constraints = [
             models.UniqueConstraint(
                 fields=["employee_id"],
@@ -124,16 +123,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"{self.employee_id} ({self.username or '名前未設定'}){status}"
 
     def soft_delete(self):
-        """論理削除"""
+        """論理削除（1回のSQLで完結）"""
         self.deleted_at = timezone.now()
         self.is_active = False
-        self.save()
+        self.save(update_fields=["deleted_at", "is_active"])
 
     def restore(self):
-        """復元"""
+        """復元（1回のSQLで完結）"""
         self.deleted_at = None
         self.is_active = True
-        self.save()
+        self.save(update_fields=["deleted_at", "is_active"])
 
     @property
     def display_name(self):

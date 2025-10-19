@@ -1,12 +1,9 @@
 """
 共通エラーレスポンスミックスイン
-
-統一されたエラーレスポンス形式を提供。
 """
 
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
 
 
 class ErrorResponseMixin:
@@ -74,21 +71,20 @@ class ErrorResponseMixin:
 
         Returns:
             str: 最初のエラーメッセージ
-
-        対応パターン:
-            dict: {'employee_id': ['既に使用されています']}
-            list: ['エラー1', 'エラー2']
-            str:  'エラーメッセージ'
         """
+        # 文字列の場合
+        if isinstance(error_detail, str):
+            return str(error_detail)
+
+        # リストの場合
+        if isinstance(error_detail, list):
+            return str(error_detail[0]) if error_detail else ""
+
+        # 辞書の場合（フィールドエラー）
         if isinstance(error_detail, dict):
-            first_field_error = next(iter(error_detail.values()))
-
-            if isinstance(first_field_error, list) and first_field_error:
-                return str(first_field_error[0])
-
-            return str(first_field_error)
-
-        if isinstance(error_detail, list) and error_detail:
-            return str(error_detail[0])
+            first_value = next(iter(error_detail.values()), None)
+            if isinstance(first_value, list) and first_value:
+                return str(first_value[0])
+            return str(first_value) if first_value else ""
 
         return str(error_detail)

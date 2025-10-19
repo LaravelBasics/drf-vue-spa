@@ -147,3 +147,23 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     def validate_password(self, value):
         """パスワード検証（空白のみは変更なし）"""
         return value.strip() if value and value.strip() else None
+
+
+class BulkActionSerializer(serializers.Serializer):
+    """一括操作用シリアライザー（削除・復元共通）"""
+
+    ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        min_length=1,
+        max_length=100,
+        error_messages={
+            "required": _("IDを指定してください"),
+            "empty": _("IDを指定してください"),
+            "min_length": _("最低1件のIDを指定してください"),
+            "max_length": _("一度に操作できるのは100件までです"),
+        },
+    )
+
+    def validate_ids(self, value):
+        """重複IDの除去"""
+        return list(set(value))
