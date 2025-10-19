@@ -166,7 +166,7 @@ watch(searchQuery, () => {
             currentPage.value = 1;
             fetchUsers();
         }
-    }, 300); // ← 1000 → 300
+    }, 300); //  300は0.3秒
 });
 
 // ページ変更ハンドラー

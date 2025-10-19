@@ -61,7 +61,7 @@
         }
     },
     "buttons": {
-        "search": "検索",
+        "search": "サンプルボタン",
         "create": "登録",
         "update": "編集",
         "delete": "削除",

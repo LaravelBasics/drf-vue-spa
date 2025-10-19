@@ -26,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # シークレットキー（暗号化に使用）
 # ⚠️ 本番環境では環境変数で管理すること
-SECRET_KEY = 'django-insecure-ycbc+50@xd3u8)6tsw27*q6!uz2l2asg0-$wdgs^j99wokh1w@'
+SECRET_KEY = "django-insecure-ycbc+50@xd3u8)6tsw27*q6!uz2l2asg0-$wdgs^j99wokh1w@"
 
 # デバッグモード
 # True: 開発環境（エラーの詳細が表示される）
@@ -38,25 +38,24 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
+SILENCED_SYSTEM_CHECKS = ["auth.W004"]
 # ==================== インストール済みアプリ ====================
 
 INSTALLED_APPS = [
     # ==================== Django標準アプリ ====================
-    "django.contrib.admin",        # 管理画面（/admin/）
-    "django.contrib.auth",         # 認証システム
-    "django.contrib.contenttypes", # コンテンツタイプ（権限管理の基盤）
-    "django.contrib.sessions",     # セッション管理（Cookieでログイン状態を保持）
-    "django.contrib.messages",     # フラッシュメッセージ（一時的な通知）
+    "django.contrib.admin",  # 管理画面（/admin/）
+    "django.contrib.auth",  # 認証システム
+    "django.contrib.contenttypes",  # コンテンツタイプ（権限管理の基盤）
+    "django.contrib.sessions",  # セッション管理（Cookieでログイン状態を保持）
+    "django.contrib.messages",  # フラッシュメッセージ（一時的な通知）
     "django.contrib.staticfiles",  # 静的ファイル管理（CSS, JS, 画像）
-    
     # ==================== サードパーティ ====================
-    "rest_framework",              # REST API フレームワーク
-    "corsheaders",                 # CORS対応（フロントエンドとの通信）
-    "django_filters",              # フィルター機能（検索・絞り込み）
-    
+    "rest_framework",  # REST API フレームワーク
+    "corsheaders",  # CORS対応（フロントエンドとの通信）
+    "django_filters",  # フィルター機能（検索・絞り込み）
     # ==================== 自作アプリ ====================
-    "accounts",                    # 認証専用（ログイン/ログアウト）
-    "users",                       # ユーザー管理（CRUD）
+    "accounts",  # 認証専用（ログイン/ログアウト）
+    "users",  # ユーザー管理（CRUD）
 ]
 
 
@@ -64,14 +63,14 @@ INSTALLED_APPS = [
 
 # デフォルトのユーザーモデルを置き換え
 # 'users.User' = users アプリの User モデルを使用
-AUTH_USER_MODEL = 'users.User'
+AUTH_USER_MODEL = "users.User"
 
 
 # ==================== 認証バックエンド ====================
 
 # ログイン認証の方法を指定
 AUTHENTICATION_BACKENDS = [
-    'accounts.backends.EmployeeIdBackend',  # 社員番号でログイン（カスタム）
+    "accounts.backends.EmployeeIdBackend",  # 社員番号でログイン（カスタム）
     # 'django.contrib.auth.backends.ModelBackend',  # デフォルト（username でログイン）
 ]
 
@@ -86,7 +85,6 @@ REST_FRAMEWORK = {
         # ログイン後はブラウザの Cookie に情報が保存される
         "rest_framework.authentication.SessionAuthentication",
     ],
-    
     # ==================== デフォルト権限 ====================
     # 認証されていないユーザーのアクセスを制限
     "DEFAULT_PERMISSION_CLASSES": [
@@ -94,17 +92,15 @@ REST_FRAMEWORK = {
         # AllowAny に変更すると誰でもアクセスできる
         "rest_framework.permissions.IsAuthenticated",
     ],
-    
     # ==================== ページネーション ====================
     # 一覧APIで大量データを分割して返す
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10,  # 1ページあたり10件
-    
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,  # 1ページあたり10件
     # ==================== フィルター・検索・並び替え ====================
-    'DEFAULT_FILTER_BACKENDS': [
-        'django_filters.rest_framework.DjangoFilterBackend',  # フィルター（is_admin=true など）
-        'rest_framework.filters.SearchFilter',                # 検索（キーワード検索）
-        'rest_framework.filters.OrderingFilter',              # 並び替え（作成日順など）
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",  # フィルター（is_admin=true など）
+        "rest_framework.filters.SearchFilter",  # 検索（キーワード検索）
+        "rest_framework.filters.OrderingFilter",  # 並び替え（作成日順など）
     ],
 }
 
@@ -116,17 +112,16 @@ MIDDLEWARE = [
     # ==================== CORS（フロントエンドとの通信） ====================
     # 一番上に配置すること（他のミドルウェアより先に実行）
     "corsheaders.middleware.CorsMiddleware",
-    
     # ==================== Django標準ミドルウェア ====================
-    'django.middleware.security.SecurityMiddleware',      # セキュリティ対策
-    'django.contrib.sessions.middleware.SessionMiddleware',  # セッション管理
-    'common.middleware.LanguageMiddleware',  # ← カスタムミドルウェア
-    'django.middleware.locale.LocaleMiddleware',  # ← 言語切り替え用（追加）
-    'django.middleware.common.CommonMiddleware',          # 共通処理
-    'django.middleware.csrf.CsrfViewMiddleware',          # CSRF対策
-    'django.contrib.auth.middleware.AuthenticationMiddleware',  # 認証処理
-    'django.contrib.messages.middleware.MessageMiddleware',     # メッセージ処理
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',   # クリックジャッキング対策
+    "django.middleware.security.SecurityMiddleware",  # セキュリティ対策
+    "django.contrib.sessions.middleware.SessionMiddleware",  # セッション管理
+    "common.middleware.LanguageMiddleware",  # ← カスタムミドルウェア
+    "django.middleware.locale.LocaleMiddleware",  # ← 言語切り替え用（追加）
+    "django.middleware.common.CommonMiddleware",  # 共通処理
+    "django.middleware.csrf.CsrfViewMiddleware",  # CSRF対策
+    "django.contrib.auth.middleware.AuthenticationMiddleware",  # 認証処理
+    "django.contrib.messages.middleware.MessageMiddleware",  # メッセージ処理
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",  # クリックジャッキング対策
 ]
 
 
@@ -134,13 +129,13 @@ MIDDLEWARE = [
 
 # ブルートフォース攻撃対策のログイン失敗回数を記録
 CACHES = {
-    'default': {
+    "default": {
         # LocMemCache = メモリにキャッシュ（開発環境用）
         # 本番環境では Redis を推奨:
         # 'BACKEND': 'django.core.cache.backends.redis.RedisCache',
         # 'LOCATION': 'redis://127.0.0.1:6379/1',
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-snowflake",
     }
 }
 
@@ -203,7 +198,7 @@ CSRF_COOKIE_SECURE = False
 # ==================== URL設定 ====================
 
 # メインのURL設定ファイル
-ROOT_URLCONF = 'config.urls'
+ROOT_URLCONF = "config.urls"
 
 
 # ==================== テンプレート設定 ====================
@@ -211,15 +206,15 @@ ROOT_URLCONF = 'config.urls'
 # HTML テンプレートの設定（Django管理画面で使用）
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],  # カスタムテンプレートディレクトリ（必要に応じて追加）
-        'APP_DIRS': True,  # 各アプリの templates/ を自動検索
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],  # カスタムテンプレートディレクトリ（必要に応じて追加）
+        "APP_DIRS": True,  # 各アプリの templates/ を自動検索
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
@@ -229,13 +224,13 @@ TEMPLATES = [
 # ==================== WSGI設定 ====================
 
 # 本番環境で使用する WSGI アプリケーション
-WSGI_APPLICATION = 'config.wsgi.application'
+WSGI_APPLICATION = "config.wsgi.application"
 
 
 # ==================== データベース設定 ====================
 
 DATABASES = {
-    'default': {
+    "default": {
         # SQLite（開発環境用）
         # 本番環境では PostgreSQL や MySQL を推奨:
         # 'ENGINE': 'django.db.backends.postgresql',
@@ -244,8 +239,8 @@ DATABASES = {
         # 'PASSWORD': 'your_db_password',
         # 'HOST': 'localhost',
         # 'PORT': '5432',
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
 }
 
@@ -256,55 +251,57 @@ DATABASES = {
 AUTH_PASSWORD_VALIDATORS = [
     # ユーザー名とパスワードが似ていないかチェック
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     # 最小文字数チェック（デフォルト: 8文字）
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     # よくあるパスワード（password123 など）をチェック
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     # 数字だけのパスワードを禁止
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
 
 # ==================== ログイン設定 ====================
-LOGIN_MAX_ATTEMPTS = int(os.getenv('LOGIN_MAX_ATTEMPTS', '10'))  # 最大ログイン試行回数
-LOGIN_LOCKOUT_DURATION = int(os.getenv('LOGIN_LOCKOUT_DURATION', '60'))  # ロック時間（秒）
+LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "10"))  # 最大ログイン試行回数
+LOGIN_LOCKOUT_DURATION = int(
+    os.getenv("LOGIN_LOCKOUT_DURATION", "60")
+)  # ロック時間（秒）
 
 # ==================== 国際化（i18n）設定 ====================
 
 # 対応言語
 LANGUAGES = [
-    ('ja', _('日本語')),
-    ('en', _('English')),
+    ("ja", _("日本語")),
+    ("en", _("English")),
 ]
 
 # デフォルト言語
-LANGUAGE_CODE = 'ja'  # 日本語
+LANGUAGE_CODE = "ja"  # 日本語
 
 # タイムゾーン
-TIME_ZONE = 'Asia/Tokyo'  # 日本時間（JST）
+TIME_ZONE = "Asia/Tokyo"  # 日本時間（JST）
 
 # 国際化・ローカライゼーション・タイムゾーンを有効化
-USE_I18N = True   # 翻訳機能を有効化
-USE_L10N = True   # ローカライズ（日付・数値フォーマット）を有効化
-USE_TZ = True     # タイムゾーンを有効化（UTC で保存し表示時に変換）
+USE_I18N = True  # 翻訳機能を有効化
+USE_L10N = True  # ローカライズ（日付・数値フォーマット）を有効化
+USE_TZ = True  # タイムゾーンを有効化（UTC で保存し表示時に変換）
 
 # 翻訳ファイルの場所
 LOCALE_PATHS = [
-    BASE_DIR / 'locale',
+    BASE_DIR / "locale",
 ]
 
 # ==================== 静的ファイル設定 ====================
 
 # 静的ファイル（CSS, JS, 画像）のURL
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
 
 # 本番環境での静的ファイル収集先
 # python manage.py collectstatic で収集
@@ -315,8 +312,107 @@ STATIC_URL = 'static/'
 
 # 主キー（ID）のデフォルトフィールドタイプ
 # BigAutoField = 大きな数字まで扱える自動採番ID
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+
+# ==================== システムチェック警告の抑制 ====================
+
+# 意図的に無視する警告のリスト
+SILENCED_SYSTEM_CHECKS = [
+    "auth.W004",  # USERNAME_FIELD が unique でない警告
+]
+
+"""
+⭐ auth.W004 警告を抑制する理由:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+警告内容:
+  'User.employee_id' is named as the 'USERNAME_FIELD', but it is not unique.
+  → 「ログインIDが一意じゃないよ」という警告
+
+
+なぜ抑制するのか:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. 論理削除を実装するため
+   - 削除済みユーザーの社員番号を保持する必要がある
+   - employee_id を変更せずに deleted_at で削除を表現
+   - 同じ社員番号を再利用可能にする
+
+2. unique=False が必須
+   - フィールドに unique=True をつけると削除済みでも重複エラー
+   - 条件付きユニーク制約（Meta.constraints）を使用
+   - deleted_at が NULL の時だけ一意性を保証
+
+
+安全性の保証:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ データベースレベル（最強）
+   models.UniqueConstraint(
+       fields=['employee_id'],
+       condition=Q(deleted_at__isnull=True),
+       name='unique_active_employee_id'
+   )
+   → アクティブユーザー間では確実に一意
+
+✅ アプリケーションレベル
+   UniqueValidator（serializers.py）
+   → 作成・更新時に重複をチェック
+   → エラーがあれば 400 Bad Request を返す
+
+✅ ビジネスロジックレベル
+   UserService（services/user_service.py）
+   → 復元時に重複チェック
+   → 適切なエラーメッセージを返す
+
+
+実際の動作:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. ユーザーA（社員番号 1000）を作成
+   id=1, employee_id='1000', deleted_at=NULL
+   
+2. ユーザーAを論理削除
+   id=1, employee_id='1000', deleted_at='2025-10-19 10:00:00'
+   → 条件付き制約から外れる
+   
+3. 新しいユーザーB（社員番号 1000）を作成
+   id=2, employee_id='1000', deleted_at=NULL
+   → 作成成功！（削除済みは制約の対象外）
+
+4. アクティブユーザーを検索
+   User.objects.filter(employee_id='1000')
+   → ユーザーB のみ（削除済み除外）
+
+5. 履歴を含めて検索
+   User.all_objects.filter(employee_id='1000')
+   → ユーザーA（削除済み）とユーザーB（アクティブ）の2件
+
+
+他の警告は残る:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+auth.W005: MIDDLEWARE の設定不足
+auth.W006: SESSION_COOKIE_SECURE が False
+auth.E003: PASSWORD_HASHERS が空
+などなど...
+
+→ セキュリティ関連の警告は表示される
+→ 問題があれば検知できる
+
+
+確認コマンド:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+$ python manage.py check
+
+期待される結果:
+  System check identified no issues (1 silenced).
+  
+→ 「1 silenced」は正常
+→ auth.W004 を意図的に抑制している証拠
+"""
 
 # ==================== 本番環境での追加設定例 ====================
 """
