@@ -1,202 +1,392 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { useTheme } from 'vuetify';
-import { useAuthStore } from '@/stores/auth';
-import { useValidation } from '@/composables/useValidation';
-import { useApiError } from '@/composables/useApiError';
+import Header from '@/components/Header.vue';
+import { usersAPI } from '@/api/users';
 import { routes } from '@/constants/routes';
-import { ICONS } from '@/constants/icons';
-import { THEME_CONFIG } from '@/constants/theme';
+import { ICONS } from '@/constants/icons.js';
+import { useDisplay } from 'vuetify';
 
-const auth = useAuthStore();
+const { mdAndUp } = useDisplay();
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
-const theme = useTheme();
-const { createRules } = useValidation();
-const { showInfo, handleApiError } = useApiError();
-
-const employeeId = ref('');
-const password = ref('');
+const users = ref([]);
 const loading = ref(false);
-const isVisible = ref(false);
-const form = ref(null);
+const searchQuery = ref('');
+const totalItems = ref(0);
 
-// ⭐ フィールド参照（フォーカス用）
-const employeeIdField = ref(null);
-const passwordField = ref(null);
+// ⭐ デバウンス用タイマー
+let searchTimer = null;
 
-const employeeIdRules = createRules.loginEmployeeId();
-const passwordRules = createRules.loginPassword();
+const headerButtons = computed(() => [
+    {
+        name: t('buttons.csv'),
+        action: exportCSV,
+        icon: ICONS.buttons.csv,
+        type: 'success',
+    },
+]);
 
-// テーマカラー
-const primaryColor = computed(
-    () =>
-        theme.global.current.value?.colors?.primary ||
-        THEME_CONFIG.colors.light.primary,
-);
+const breadcrumbs = computed(() => [
+    {
+        title: t('breadcrumbs.home'),
+        to: routes.HOME,
+        disabled: false,
+    },
+    {
+        title: t('breadcrumbs.admin'),
+        to: routes.ADMIN,
+        disabled: false,
+    },
+    {
+        title: t('breadcrumbs.users.list'),
+        disabled: true,
+    },
+]);
 
-onMounted(() => {
-    setTimeout(() => {
-        isVisible.value = true;
-    }, 100);
+const headers = computed(() => {
+    const baseHeaders = [
+        { title: t('form.fields.id'), key: 'id', sortable: true },
+        { title: t('form.fields.username'), key: 'username', sortable: false },
+        {
+            title: t('form.fields.employeeId'),
+            key: 'employee_id',
+            sortable: true,
+        },
+        { title: t('form.fields.isAdmin'), key: 'is_admin', sortable: true },
+    ];
 
-    // ⭐ ログアウト後のクエリパラメータチェック
-    if (route.query.logout === 'success') {
-        // 「ログアウトしました」のメッセージ表示時間3秒
-        showInfo('auth.logoutSuccess', {}, 3000);
-        // URLをクリーンにする
-        router.replace({ path: routes.LOGIN, query: {} });
+    if (mdAndUp.value) {
+        baseHeaders.push({
+            title: t('form.fields.createdAt'),
+            key: 'created_at',
+            sortable: true,
+        });
     }
+
+    return baseHeaders;
 });
 
-async function onSubmit() {
-    const { valid, errors } = await form.value.validate();
+const noDataText = computed(() => t('dataTable.noData'));
+const loadingText = computed(() => t('dataTable.loading'));
 
-    if (!valid) {
-        // ⭐ バリデーションエラー時にフォーカス
-        if (errors && errors.length > 0) {
-            const firstErrorField = errors[0]?.id;
-            if (firstErrorField?.includes('employee')) {
-                employeeIdField.value?.focus();
-            } else if (firstErrorField?.includes('password')) {
-                passwordField.value?.focus();
-            }
-        }
-        return;
-    }
+// ⭐ v-data-table-server 用の状態管理
+const page = ref(1);
+const itemsPerPage = ref(10);
+const sortBy = ref([]);
 
-    // ⭐ 追加: 重複送信防止
+const itemCountText = computed(() => {
+    return t('dataTable.itemCount', {
+        start: startItem.value,
+        end: endItem.value,
+        total: totalItems.value,
+    });
+});
+
+const hoverTooltipText = computed(() => {
+    const text = t('tooltips.viewDetails');
+    return `"${text}"`;
+});
+
+const totalPages = computed(() =>
+    Math.ceil(totalItems.value / itemsPerPage.value),
+);
+
+const startItem = computed(() => {
+    if (totalItems.value === 0) return 0;
+    return (page.value - 1) * itemsPerPage.value + 1;
+});
+
+const endItem = computed(() => {
+    return Math.min(page.value * itemsPerPage.value, totalItems.value);
+});
+
+// ⭐ データ取得関数
+async function fetchUsers() {
     if (loading.value) return;
 
     loading.value = true;
-
     try {
-        await auth.loginSession(employeeId.value, password.value);
+        const params = {
+            page: page.value,
+            page_size: itemsPerPage.value,
+        };
 
-        // ✅ ログイン成功
-        showInfo('auth.loginSuccess', {}, 3000);
+        if (searchQuery.value?.trim()) {
+            params.search = searchQuery.value.trim();
+        }
 
-        // ⭐ フェードアウトしてから遷移
-        isVisible.value = false;
-        setTimeout(async () => {
-            const redirect = route.query.next || routes.HOME;
-            await router.push(redirect);
-        }, 150);
+        if (sortBy.value.length > 0) {
+            const sort = sortBy.value[0];
+            const orderPrefix = sort.order === 'desc' ? '-' : '';
+            params.ordering = `${orderPrefix}${sort.key}`;
+        }
+
+        const response = await usersAPI.list(params);
+
+        if (response.data.results) {
+            users.value = response.data.results;
+            totalItems.value = response.data.count;
+        } else {
+            users.value = response.data;
+            totalItems.value = response.data.length;
+        }
+
+        updateURLParams();
     } catch (error) {
-        handleApiError(error);
+        console.error('ユーザー一覧取得エラー:', error);
     } finally {
         loading.value = false;
     }
 }
+
+// ⭐ v-data-table-server の options 変更時
+function handleOptionsUpdate(options) {
+    page.value = options.page;
+    itemsPerPage.value = options.itemsPerPage;
+    sortBy.value = options.sortBy || [];
+
+    fetchUsers();
+}
+
+// ⭐ 検索クエリの変更を監視（デバウンス付き）
+watch(searchQuery, () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+        if (!loading.value) {
+            // ⭐ ページを1にリセット
+            page.value = 1;
+            fetchUsers();
+        }
+    }, 300);
+});
+
+// URL パラメータ更新
+function updateURLParams() {
+    const query = {};
+
+    if (searchQuery.value?.trim()) {
+        query.search = searchQuery.value.trim();
+    }
+
+    if (page.value > 1) {
+        query.page = page.value;
+    }
+
+    if (itemsPerPage.value !== 10) {
+        query.per_page = itemsPerPage.value;
+    }
+
+    if (sortBy.value.length > 0) {
+        const sort = sortBy.value[0];
+        query.sort = sort.key;
+        query.order = sort.order;
+    }
+
+    router.replace({ query });
+}
+
+// URL パラメータから初期化
+function initFromURLParams() {
+    const query = route.query;
+
+    if (query.search) {
+        searchQuery.value = query.search;
+    }
+
+    if (query.page) {
+        page.value = parseInt(query.page);
+    }
+
+    if (query.per_page) {
+        itemsPerPage.value = parseInt(query.per_page);
+    }
+
+    if (query.sort && query.order) {
+        sortBy.value = [
+            {
+                key: query.sort,
+                order: query.order,
+            },
+        ];
+    }
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    });
+}
+
+function goToCreate() {
+    router.push(routes.USER_CREATE);
+}
+
+function handleRowClick(event, { item }) {
+    router.push(routes.USER_DETAIL.replace(':id', item.id));
+}
+
+function exportCSV() {
+    console.log('Export CSV');
+}
+
+onMounted(() => {
+    initFromURLParams();
+    fetchUsers();
+});
+
+// ⭐ クリーンアップ（メモリリーク対策）
+onBeforeUnmount(() => {
+    if (searchTimer) {
+        clearTimeout(searchTimer);
+        searchTimer = null;
+    }
+});
 </script>
 
 <template>
-    <div class="login-page">
-        <transition name="login-fade" appear>
-            <div v-show="isVisible" class="login-center">
-                <v-card rounded="lg" :elevation="12" class="login-card">
-                    <v-toolbar :color="primaryColor" dark flat>
-                        <div class="d-flex w-100 justify-center align-center">
-                            <span class="text-h5 font-weight-bold text-white">
-                                {{ t('auth.loginTitle') }}
-                            </span>
-                        </div>
-                    </v-toolbar>
+    <div>
+        <Header
+            :app-title="t('pages.users.list.title')"
+            :page-buttons="headerButtons"
+            :breadcrumbs="breadcrumbs"
+        />
 
-                    <v-card-text class="py-6 px-6">
-                        <v-form @submit.prevent="onSubmit" ref="form">
-                            <v-text-field
-                                ref="employeeIdField"
-                                v-model="employeeId"
-                                :label="
-                                    t('form.placeholders.employeeId', {
-                                        field: t('form.fields.employeeId'),
-                                    })
-                                "
-                                :prepend-inner-icon="ICONS.form.user"
-                                variant="outlined"
-                                class="mt-1 mb-2"
-                                type="text"
-                                inputmode="numeric"
-                                :rules="employeeIdRules"
-                                :hint="t('form.hint.testEmployeeId')"
-                                persistent-hint
+        <v-container fluid class="pa-4">
+            <v-row class="mb-1 align-center">
+                <v-col cols="12" sm="5" md="3">
+                    <v-text-field
+                        v-model="searchQuery"
+                        :label="t('pages.users.list.searchPlaceholder')"
+                        :prepend-inner-icon="ICONS.buttons.search"
+                        variant="outlined"
+                        density="compact"
+                        hide-details
+                    >
+                        <template v-slot:append-inner>
+                            <v-progress-circular
+                                v-if="loading"
+                                indeterminate
+                                size="20"
+                                width="2"
+                                color="primary"
                             />
-                            <v-text-field
-                                ref="passwordField"
-                                v-model="password"
-                                :label="
-                                    t('form.placeholders.enterPassword', {
-                                        field: t('form.fields.password'),
-                                    })
-                                "
-                                type="password"
-                                :prepend-inner-icon="ICONS.form.password"
-                                variant="outlined"
-                                class="mb-3"
-                                :rules="passwordRules"
-                                :hint="t('form.hint.testPassword')"
-                                persistent-hint
+                            <v-icon
+                                v-else-if="searchQuery"
+                                icon="close"
+                                size="small"
+                                class="cursor-pointer"
+                                @click="searchQuery = ''"
                             />
+                        </template>
+                    </v-text-field>
+                </v-col>
 
-                            <v-btn
-                                type="submit"
-                                :loading="loading"
-                                :color="primaryColor"
-                                block
-                                size="large"
-                                rounded
-                                class="text-none"
-                            >
-                                {{ t('auth.login') }}
-                            </v-btn>
-                        </v-form>
-                    </v-card-text>
-                </v-card>
-            </div>
-        </transition>
+                <v-col cols="12" sm="4" md="3">
+                    <div class="text-body-2 text-grey-darken-1">
+                        {{ itemCountText }}
+                    </div>
+                </v-col>
+
+                <v-spacer />
+
+                <v-col cols="12" sm="3" md="3" class="d-flex justify-end">
+                    <v-btn
+                        variant="outlined"
+                        color="primary"
+                        size="default"
+                        :prepend-icon="ICONS.buttons.arrowForward"
+                        @click="goToCreate"
+                    >
+                        {{ t('pages.users.list.createButton') }}
+                    </v-btn>
+                </v-col>
+            </v-row>
+
+            <v-data-table-server
+                :headers="headers"
+                :items="users"
+                :items-length="totalItems"
+                :loading="loading"
+                :no-data-text="noDataText"
+                :loading-text="loadingText"
+                v-model:page="page"
+                v-model:items-per-page="itemsPerPage"
+                v-model:sort-by="sortBy"
+                class="elevation-2 clickable-table"
+                density="compact"
+                hover
+                @update:options="handleOptionsUpdate"
+                @click:row="handleRowClick"
+            >
+                <template v-slot:item.id="{ item }">
+                    <RouterLink
+                        :to="routes.USER_DETAIL.replace(':id', item.id)"
+                        class="font-weight-medium text-decoration-none text-primary"
+                        @click.stop
+                    >
+                        {{ item.id }}
+                    </RouterLink>
+                </template>
+
+                <template v-slot:item.is_admin="{ item }">
+                    <v-icon
+                        :color="item.is_admin ? 'success' : 'grey'"
+                        :size="item.is_admin ? 'default' : 'small'"
+                    >
+                        {{
+                            item.is_admin
+                                ? ICONS.status.check
+                                : ICONS.status.minus
+                        }}
+                    </v-icon>
+                </template>
+
+                <template v-slot:item.created_at="{ item }">
+                    {{ formatDate(item.created_at) }}
+                </template>
+            </v-data-table-server>
+        </v-container>
     </div>
 </template>
 
 <style scoped>
-.login-page {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: 1000;
+:deep(.clickable-table tbody tr) {
+    cursor: pointer;
+    position: relative;
 }
 
-.login-center {
+:deep(.clickable-table tbody tr:hover::after) {
+    content: v-bind(hoverTooltipText);
     position: absolute;
-    top: 45%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 100%;
-    max-width: 425px;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: rgb(var(--v-theme-primary));
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    animation: fadeIn 0.3s ease-in;
 }
 
-.login-card {
-    background-color: rgba(255, 255, 255, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
 
-.login-fade-enter-active,
-.login-fade-leave-active {
-    transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
-
-.login-fade-enter-from {
-    opacity: 0;
-    transform: translate(-50%, -50%) translateY(20px) scale(0.9);
-}
-
-.login-fade-leave-to {
-    opacity: 0;
-    transform: translate(-50%, -50%) translateY(-20px) scale(1.1);
+    to {
+        opacity: 1;
+    }
 }
 </style>

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useValidation } from '@/composables/useValidation';
@@ -16,11 +16,7 @@ const { showSuccess, handleApiError } = useApiError();
 
 const submitting = ref(false);
 const form = ref(null);
-
-// ⭐ 各フィールドの ref を作成
 const usernameField = ref(null);
-const employeeIdField = ref(null);
-const passwordField = ref(null);
 
 const formData = ref({
     username: '',
@@ -40,34 +36,27 @@ const usernameRules = createRules.username();
 const employeeIdRules = createRules.employeeId();
 const passwordRules = createRules.newPassword();
 
-// ⭐ マウント時に最初のフィールドにフォーカス
-onMounted(() => {
-    setTimeout(() => {
-        usernameField.value?.focus();
-    }, 100);
+// ⭐ Vue 3 公式推奨: nextTick を使用
+onMounted(async () => {
+    await nextTick();
+    usernameField.value?.focus();
 });
 
 async function submitForm() {
-    const { valid, errors } = await form.value.validate();
+    // ⭐ 重複送信防止（最優先）
+    if (submitting.value) return;
+
+    const { valid } = await form.value.validate();
 
     if (!valid) {
-        // ⭐ バリデーションエラー時、最初のエラーフィールドにフォーカス
-        if (errors && errors.length > 0) {
-            const firstErrorField = errors[0]?.id;
-
-            if (firstErrorField?.includes('username')) {
-                usernameField.value?.focus();
-            } else if (firstErrorField?.includes('employee')) {
-                employeeIdField.value?.focus();
-            } else if (firstErrorField?.includes('password')) {
-                passwordField.value?.focus();
-            }
+        // ⭐ バリデーションエラー時のフォーカス処理
+        await nextTick();
+        const firstErrorInput = document.querySelector('.v-input--error input');
+        if (firstErrorInput) {
+            firstErrorInput.focus();
         }
         return;
     }
-
-    // ⭐ 追加: 重複送信防止
-    if (submitting.value) return;
 
     submitting.value = true;
     try {
@@ -101,7 +90,6 @@ function goBack() {
                     <v-card elevation="2">
                         <v-card-text class="pa-6">
                             <v-form ref="form" @submit.prevent="submitForm">
-                                <!-- ⭐ ref を追加 -->
                                 <v-text-field
                                     ref="usernameField"
                                     v-model="formData.username"
@@ -110,16 +98,11 @@ function goBack() {
                                     variant="outlined"
                                     class="mb-4"
                                     required
-                                    :hint="
-                                        t('form.hint.min', {
-                                            min: 3,
-                                        })
-                                    "
+                                    :hint="t('form.hint.min', { min: 3 })"
                                     persistent-hint
                                 />
 
                                 <v-text-field
-                                    ref="employeeIdField"
                                     v-model="formData.employee_id"
                                     :label="$t('form.fields.employeeId') + ' *'"
                                     :rules="employeeIdRules"
@@ -133,7 +116,6 @@ function goBack() {
                                 />
 
                                 <v-text-field
-                                    ref="passwordField"
                                     v-model="formData.password"
                                     :label="$t('form.fields.password') + ' *'"
                                     :rules="passwordRules"

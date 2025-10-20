@@ -1,4 +1,4 @@
-// Desktop\template\frontend\src\stores\ui.js
+// src/stores/ui.js - 修正版
 
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
@@ -23,15 +23,9 @@ export const useUiStore = defineStore('ui', () => {
         return isDesktop.value ? 'permanent' : 'temporary';
     });
 
-    // ⭐ 画面サイズが変わったときの自動調整
+    // ⭐ 画面サイズが変わったときの自動調整（簡潔化）
     watch(mdAndUp, (newValue) => {
-        if (newValue) {
-            // PCサイズになったら自動的に開く
-            drawer.value = true;
-        } else {
-            // モバイルサイズになったら閉じる
-            drawer.value = false;
-        }
+        drawer.value = newValue;
     });
 
     // ⭐ サイドバーの切り替え（完全開閉）

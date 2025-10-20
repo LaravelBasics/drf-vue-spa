@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import Header from '@/components/Header.vue';
@@ -12,12 +12,13 @@ const { mdAndUp } = useDisplay();
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
+
 const users = ref([]);
 const loading = ref(false);
 const searchQuery = ref('');
+const totalItems = ref(0);
 const currentPage = ref(1);
 const itemsPerPage = ref(10);
-const totalItems = ref(0);
 const sortBy = ref([]);
 
 // ⭐ デバウンス用タイマー
@@ -32,7 +33,6 @@ const headerButtons = computed(() => [
     },
 ]);
 
-// パンくずリスト
 const breadcrumbs = computed(() => [
     {
         title: t('breadcrumbs.home'),
@@ -50,7 +50,6 @@ const breadcrumbs = computed(() => [
     },
 ]);
 
-// テーブルヘッダー（ソート可能）
 const headers = computed(() => {
     const baseHeaders = [
         { title: t('form.fields.id'), key: 'id', sortable: true },
@@ -63,7 +62,6 @@ const headers = computed(() => {
         { title: t('form.fields.isAdmin'), key: 'is_admin', sortable: true },
     ];
 
-    // ⭐ タブレット以上の場合のみ追加
     if (mdAndUp.value) {
         baseHeaders.push({
             title: t('form.fields.createdAt'),
@@ -75,61 +73,75 @@ const headers = computed(() => {
     return baseHeaders;
 });
 
-// ⭐ 修正後：t()に置き換え
 const noDataText = computed(() => t('dataTable.noData'));
 const loadingText = computed(() => t('dataTable.loading'));
 
 const itemCountText = computed(() => {
+    if (totalItems.value === 0) {
+        return t('dataTable.itemCount', {
+            start: 0,
+            end: 0,
+            total: 0,
+        });
+    }
+
+    const start = (currentPage.value - 1) * itemsPerPage.value + 1;
+    const end = Math.min(
+        currentPage.value * itemsPerPage.value,
+        totalItems.value,
+    );
+
     return t('dataTable.itemCount', {
-        start: startItem.value,
-        end: endItem.value,
+        start,
+        end,
         total: totalItems.value,
     });
 });
 
-// ⭐ ホバー時のツールチップテキスト（言語対応）
 const hoverTooltipText = computed(() => {
     const text = t('tooltips.viewDetails');
     return `"${text}"`;
 });
 
-// ページ数計算
-const totalPages = computed(() =>
-    Math.ceil(totalItems.value / itemsPerPage.value),
-);
-
-// 表示範囲計算
-const startItem = computed(() => {
-    if (totalItems.value === 0) return 0;
-    return (currentPage.value - 1) * itemsPerPage.value + 1;
+// ⭐ 外部ページネーション用
+const totalPages = computed(() => {
+    const pages = Math.ceil(totalItems.value / itemsPerPage.value);
+    console.log('📄 Total Pages:', {
+        totalItems: totalItems.value,
+        itemsPerPage: itemsPerPage.value,
+        pages,
+    });
+    return pages;
 });
 
-const endItem = computed(() => {
-    return Math.min(currentPage.value * itemsPerPage.value, totalItems.value);
-});
+// ⭐ データ取得関数
+async function loadItems({ page, itemsPerPage, sortBy }) {
+    console.log('📊 loadItems called:', { page, itemsPerPage, sortBy });
 
-// データ取得
-async function fetchUsers() {
-    if (loading.value) return; // ← 追加
+    if (loading.value) {
+        console.log('⏳ Already loading, skipping...');
+        return;
+    }
+
     loading.value = true;
+
     try {
         const params = {
-            page: currentPage.value,
-            page_size: itemsPerPage.value,
+            page,
+            page_size: itemsPerPage,
         };
 
-        // 検索クエリ
-        if (searchQuery.value && searchQuery.value.trim()) {
+        if (searchQuery.value?.trim()) {
             params.search = searchQuery.value.trim();
         }
 
-        // ソート条件
-        if (sortBy.value.length > 0) {
-            const sort = sortBy.value[0];
+        if (sortBy && sortBy.length > 0) {
+            const sort = sortBy[0];
             const orderPrefix = sort.order === 'desc' ? '-' : '';
             params.ordering = `${orderPrefix}${sort.key}`;
         }
 
+        console.log('🔄 Fetching with params:', params);
         const response = await usersAPI.list(params);
 
         if (response.data.results) {
@@ -139,61 +151,55 @@ async function fetchUsers() {
             users.value = response.data;
             totalItems.value = response.data.length;
         }
+
+        console.log('✅ Data loaded:', {
+            usersCount: users.value.length,
+            totalItems: totalItems.value,
+        });
+
+        updateURLParams({ page, itemsPerPage, sortBy });
     } catch (error) {
-        console.error('ユーザー一覧取得エラー:', error);
+        console.error('❌ ユーザー一覧取得エラー:', error);
     } finally {
         loading.value = false;
     }
 }
 
-// v-data-table-serverのoptionsハンドラー
-function handleOptionsUpdate(options) {
-    currentPage.value = options.page;
-    itemsPerPage.value = options.itemsPerPage;
-    sortBy.value = options.sortBy;
+// ⭐ 検索クエリの変更を監視（デバウンス付き）
+watch(searchQuery, (newValue, oldValue) => {
+    console.log('🔍 Search query changed:', { from: oldValue, to: newValue });
 
-    fetchUsers();
-    updateURLParams();
-}
-
-// ⭐ watch: 検索クエリの変更を監視してデバウンス処理
-// 1. UserList.vue - デバウンス短縮
-watch(searchQuery, () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-        // 重複防止
-        if (!loading.value) {
-            currentPage.value = 1;
-            fetchUsers();
-        }
-    }, 300); //  300は0.3秒
+        console.log('🔍 Executing search...');
+        // ⭐ ページを1にリセットして再検索
+        currentPage.value = 1;
+        loadItems({
+            page: 1,
+            itemsPerPage: itemsPerPage.value,
+            sortBy: sortBy.value,
+        });
+    }, 300);
 });
 
-// ページ変更ハンドラー
-function handlePageChange(page) {
-    currentPage.value = page;
-    fetchUsers();
-    updateURLParams();
-}
-
 // URL パラメータ更新
-function updateURLParams() {
+function updateURLParams({ page, itemsPerPage, sortBy }) {
     const query = {};
 
-    if (searchQuery.value && searchQuery.value.trim()) {
+    if (searchQuery.value?.trim()) {
         query.search = searchQuery.value.trim();
     }
 
-    if (currentPage.value > 1) {
-        query.page = currentPage.value;
+    if (page > 1) {
+        query.page = page;
     }
 
-    if (itemsPerPage.value !== 10) {
-        query.per_page = itemsPerPage.value;
+    if (itemsPerPage !== 10) {
+        query.per_page = itemsPerPage;
     }
 
-    if (sortBy.value.length > 0) {
-        const sort = sortBy.value[0];
+    if (sortBy && sortBy.length > 0) {
+        const sort = sortBy[0];
         query.sort = sort.key;
         query.order = sort.order;
     }
@@ -227,7 +233,6 @@ function initFromURLParams() {
     }
 }
 
-// 日付フォーマット
 function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString('ja-JP', {
@@ -237,12 +242,10 @@ function formatDate(dateString) {
     });
 }
 
-// 新規作成画面へ遷移
 function goToCreate() {
     router.push(routes.USER_CREATE);
 }
 
-// 行クリックで詳細画面へ遷移
 function handleRowClick(event, { item }) {
     router.push(routes.USER_DETAIL.replace(':id', item.id));
 }
@@ -252,8 +255,24 @@ function exportCSV() {
 }
 
 onMounted(() => {
+    console.log('🚀 UserList mounted');
     initFromURLParams();
-    fetchUsers();
+
+    // ⭐ 初回データ取得
+    loadItems({
+        page: currentPage.value,
+        itemsPerPage: itemsPerPage.value,
+        sortBy: sortBy.value,
+    });
+});
+
+// ⭐ クリーンアップ（メモリリーク対策）
+onBeforeUnmount(() => {
+    console.log('👋 UserList unmounting');
+    if (searchTimer) {
+        clearTimeout(searchTimer);
+        searchTimer = null;
+    }
 });
 </script>
 
@@ -316,7 +335,6 @@ onMounted(() => {
                 </v-col>
             </v-row>
 
-            <!-- ⭐ no-data-text と loading-text を追加 -->
             <v-data-table-server
                 :headers="headers"
                 :items="users"
@@ -324,14 +342,15 @@ onMounted(() => {
                 :loading="loading"
                 :no-data-text="noDataText"
                 :loading-text="loadingText"
-                v-model:items-per-page="itemsPerPage"
+                :items-per-page-options="[10, 25, 50, 100]"
                 v-model:page="currentPage"
+                v-model:items-per-page="itemsPerPage"
                 v-model:sort-by="sortBy"
                 class="elevation-2 clickable-table"
                 density="compact"
                 hover
                 hide-default-footer
-                @update:options="handleOptionsUpdate"
+                @update:options="loadItems"
                 @click:row="handleRowClick"
             >
                 <template v-slot:item.id="{ item }">
@@ -362,13 +381,13 @@ onMounted(() => {
                 </template>
             </v-data-table-server>
 
+            <!-- ⭐ 外部ページネーション（元のデザイン） -->
             <div class="d-flex justify-center mt-4">
                 <v-pagination
                     v-model="currentPage"
                     :length="totalPages"
                     :total-visible="5"
                     density="compact"
-                    @update:model-value="handlePageChange"
                 />
             </div>
         </v-container>
@@ -381,7 +400,6 @@ onMounted(() => {
     position: relative;
 }
 
-/* ⭐ CSSカスタムプロパティでツールチップテキストを動的に変更 */
 :deep(.clickable-table tbody tr:hover::after) {
     content: v-bind(hoverTooltipText);
     position: absolute;

@@ -1,9 +1,3 @@
-<template>
-    <Header :app-title="t('pages.home.title')" :breadcrumbs="breadcrumbs" />
-
-    <MenuCardGrid :items="filteredMenuItems" />
-</template>
-
 <script setup>
 import { computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -22,7 +16,6 @@ const route = useRoute();
 const { showWarning } = useApiError();
 const { isAdmin } = usePermissions();
 
-// パンくずリスト
 const breadcrumbs = computed(() => [
     {
         title: t('breadcrumbs.home'),
@@ -31,26 +24,20 @@ const breadcrumbs = computed(() => [
     },
 ]);
 
-// ⭐ マウント時に権限エラーチェック
-// 🎯 改善案（オプション）
+// ⭐ マウント時に権限エラーチェック（nextTick 不要）
 onMounted(() => {
-    // ⭐ loading.value がある場合の重複防止
     if (route.query.unauthorized === 'admin') {
         showWarning('notifications.unauthorized.admin');
-
-        // ⭐ nextTick で確実に実行
-        nextTick(() => {
-            router.replace({ path: routes.HOME, query: {} });
-        });
+        // ⭐ nextTick 不要（router.replace は非同期だが await 不要）
+        router.replace({ path: routes.HOME, query: {} });
     }
 });
 
-// ⭐ 修正: menuItems を computed にして、t() が locale 変更時に再評価されるようにする
 const menuItems = computed(() => [
     {
         id: 'admin',
         icon: ICONS.nav.management,
-        title: t('pages.admin.title'), // ⭐ locale変更時に再評価される
+        title: t('pages.admin.title'),
         to: routes.ADMIN,
         color: 'secondary',
         requiresAdmin: true,
@@ -58,13 +45,12 @@ const menuItems = computed(() => [
     {
         id: 'settings',
         icon: ICONS.nav.settings,
-        title: t('pages.settings.title'), // ⭐ locale変更時に再評価される
+        title: t('pages.settings.title'),
         to: routes.SETTINGS,
         color: COLORS.neutral.medium,
     },
 ]);
 
-// ⭐ 権限に応じてフィルタリング
 const filteredMenuItems = computed(() => {
     return menuItems.value.filter((item) => {
         if (item.requiresAdmin) {
@@ -74,3 +60,9 @@ const filteredMenuItems = computed(() => {
     });
 });
 </script>
+
+<template>
+    <Header :app-title="t('pages.home.title')" :breadcrumbs="breadcrumbs" />
+
+    <MenuCardGrid :items="filteredMenuItems" />
+</template>

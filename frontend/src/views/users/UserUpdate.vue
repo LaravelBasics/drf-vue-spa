@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useValidation } from '@/composables/useValidation';
@@ -15,15 +15,9 @@ const { t } = useI18n();
 const { createRules } = useValidation();
 const { showSuccess, handleApiError } = useApiError();
 
-// ⭐ 修正: true → false
 const loading = ref(false);
 const submitting = ref(false);
 const form = ref(null);
-
-// ⭐ フィールド参照
-const usernameField = ref(null);
-const employeeIdField = ref(null);
-const passwordField = ref(null);
 
 const changePassword = ref(false);
 const showPassword = ref(false);
@@ -67,7 +61,6 @@ const passwordConfirmRules = computed(() => {
 const userId = computed(() => route.params.id);
 
 async function fetchUser() {
-    // ⭐ 追加: 重複リクエスト防止
     if (loading.value) return;
 
     loading.value = true;
@@ -80,10 +73,6 @@ async function fetchUser() {
             is_active: response.data.is_active,
             password: '',
         };
-        // ⭐ 読み込み後にフォーカス
-        setTimeout(() => {
-            usernameField.value?.focus();
-        }, 100);
     } catch (error) {
         handleApiError(error, 'pages.users.detail.error');
         router.push(routes.USERS);
@@ -92,33 +81,21 @@ async function fetchUser() {
     }
 }
 
-function handleEnterKey(event) {
-    if (changePassword.value) {
-        return;
-    }
-    submitForm();
-}
-
 async function submitForm() {
-    const { valid, errors } = await form.value.validate();
+    // ⭐ 重複送信防止（最優先）
+    if (submitting.value) return;
+
+    const { valid } = await form.value.validate();
 
     if (!valid) {
-        // ⭐ バリデーションエラー時にフォーカス
-        if (errors && errors.length > 0) {
-            const firstErrorField = errors[0]?.id;
-            if (firstErrorField?.includes('username')) {
-                usernameField.value?.focus();
-            } else if (firstErrorField?.includes('employee')) {
-                employeeIdField.value?.focus();
-            } else if (firstErrorField?.includes('password')) {
-                passwordField.value?.focus();
-            }
+        // ⭐ バリデーションエラー時のフォーカス処理（修正版）
+        await nextTick();
+        const firstErrorInput = document.querySelector('.v-input--error input');
+        if (firstErrorInput) {
+            firstErrorInput.focus();
         }
         return;
     }
-
-    // ⭐ 追加: 重複送信防止
-    if (submitting.value) return;
 
     submitting.value = true;
     try {
@@ -162,7 +139,6 @@ onMounted(() => {
         <v-container class="pa-4">
             <v-row justify="center">
                 <v-col cols="12" sm="12" md="10">
-                    <!-- ⭐ 修正: loading 状態を先に表示 -->
                     <v-card elevation="2" v-if="loading">
                         <v-card-text class="pa-6 text-center">
                             <v-progress-circular
@@ -173,18 +149,12 @@ onMounted(() => {
                         </v-card-text>
                     </v-card>
 
-                    <!-- ⭐ 修正: データ取得後に表示 -->
                     <v-card elevation="2" v-else>
                         <v-card-text class="pa-6">
-                            <v-form
-                                ref="form"
-                                @submit.prevent="submitForm"
-                                @keypress.enter.prevent="handleEnterKey"
-                            >
+                            <v-form ref="form" @submit.prevent="submitForm">
                                 <v-row>
                                     <v-col cols="12" md="6" class="pb-0">
                                         <v-text-field
-                                            ref="usernameField"
                                             v-model="formData.username"
                                             :label="
                                                 $t('form.fields.username') +
@@ -203,7 +173,6 @@ onMounted(() => {
 
                                     <v-col cols="12" md="6" class="pb-0">
                                         <v-text-field
-                                            ref="employeeIdField"
                                             v-model="formData.employee_id"
                                             :label="
                                                 $t('form.fields.employeeId') +
@@ -238,7 +207,6 @@ onMounted(() => {
                                             <v-expand-transition>
                                                 <div v-if="changePassword">
                                                     <v-text-field
-                                                        ref="passwordField"
                                                         v-model="
                                                             formData.password
                                                         "
@@ -337,7 +305,6 @@ onMounted(() => {
                                 <div class="d-flex gap-2">
                                     <v-btn
                                         type="submit"
-                                        @click="submitForm"
                                         color="primary"
                                         size="large"
                                         variant="outlined"

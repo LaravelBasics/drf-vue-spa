@@ -1,20 +1,30 @@
 <script setup>
-import { ref, onMounted, nextTick, computed, onBeforeUnmount } from 'vue'; // ⭐ onBeforeUnmount 追加
+import {
+    ref,
+    onMounted,
+    nextTick,
+    computed,
+    onBeforeUnmount,
+    watch,
+} from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { useRoute, useRouter } from 'vue-router'; // ⭐ useRouter 追加
+import { useRoute, useRouter } from 'vue-router';
 import NavBar from '@/components/NavBar.vue';
 import SideBar from '@/components/SideBar.vue';
 import Footer from '@/components/Footer.vue';
 import Notification from '@/components/Notification.vue';
 import { routes } from '@/constants/routes';
-import { BREAKPOINTS } from '@/constants/breakpoints'; // ⭐ 追加
+import { BREAKPOINTS } from '@/constants/breakpoints';
 
 const auth = useAuthStore();
 const route = useRoute();
-const router = useRouter(); // ⭐ 追加
+const router = useRouter();
 const appReady = ref(false);
 
-// ⭐ 計算プロパティで現在のルートが非対応デバイス画面かどうかを判定
+// ⭐ リサイズ監視用
+const windowWidth = ref(window.innerWidth);
+let resizeTimer = null;
+
 const isUnsupportedRoute = computed(() => {
     return route.path === routes.UNSUPPORTED_DEVICE;
 });
@@ -29,37 +39,44 @@ const waitForFontsAndIcons = () => {
     });
 };
 
-// ⭐ グローバルな画面サイズ監視（追加）
-const handleGlobalResize = () => {
-    const windowWidth = window.innerWidth;
+// ⭐ デバウンス付きリサイズハンドラー
+function handleResize() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+        windowWidth.value = window.innerWidth;
+    }, 200);
+}
 
-    console.log('📱 Global Resize:', {
-        width: windowWidth,
+// ⭐ watch で画面サイズの変化を監視
+watch(windowWidth, (newWidth) => {
+    const isLarge = newWidth >= BREAKPOINTS.LARGE_SCREEN;
+
+    console.log('📱 Window Width Changed:', {
+        width: newWidth,
         threshold: BREAKPOINTS.LARGE_SCREEN,
+        isLarge,
         currentRoute: route.path,
         requiresLargeScreen: route.meta?.requiresLargeScreen,
     });
 
-    // ⭐ パターン1: 大画面必須のページで画面が小さくなった
+    // パターン1: 大画面必須のページで画面が小さくなった
     if (
         route.meta?.requiresLargeScreen &&
-        windowWidth < BREAKPOINTS.LARGE_SCREEN
+        !isLarge &&
+        route.path !== routes.UNSUPPORTED_DEVICE
     ) {
         console.warn('📱 画面が小さくなりました - UNSUPPORTED_DEVICE へ遷移');
         router.push({ path: routes.UNSUPPORTED_DEVICE, replace: true });
         return;
     }
 
-    // ⭐ パターン2: UNSUPPORTED_DEVICE で画面が大きくなった
-    if (
-        route.path === routes.UNSUPPORTED_DEVICE &&
-        windowWidth >= BREAKPOINTS.LARGE_SCREEN
-    ) {
+    // パターン2: UNSUPPORTED_DEVICE で画面が大きくなった
+    if (route.path === routes.UNSUPPORTED_DEVICE && isLarge) {
         console.log('✅ 画面が大きくなりました - 適切なページへ遷移');
         const targetRoute = auth.isAuthenticated ? routes.HOME : routes.LOGIN;
         router.push({ path: targetRoute, replace: true });
     }
-};
+});
 
 onMounted(async () => {
     try {
@@ -76,20 +93,24 @@ onMounted(async () => {
         console.log('✅ UI準備完了 - 表示開始');
         appReady.value = true;
 
-        // ⭐ グローバルな resize 監視を開始
-        window.addEventListener('resize', handleGlobalResize);
+        // ⭐ リサイズイベントリスナー登録
+        window.addEventListener('resize', handleResize);
 
-        // ⭐ 初回チェック
-        handleGlobalResize();
+        // ⭐ 初回チェック（マウント時に一度だけ実行）
+        windowWidth.value = window.innerWidth;
     } catch (error) {
         console.error('❌ UI準備エラー:', error);
         appReady.value = true;
     }
 });
 
-// ⭐ クリーンアップ（追加）
+// ⭐ クリーンアップ
 onBeforeUnmount(() => {
-    window.removeEventListener('resize', handleGlobalResize);
+    window.removeEventListener('resize', handleResize);
+    if (resizeTimer) {
+        clearTimeout(resizeTimer);
+        resizeTimer = null;
+    }
 });
 </script>
 

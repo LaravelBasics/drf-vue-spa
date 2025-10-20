@@ -15,7 +15,7 @@ const { t } = useI18n();
 const ui = useUiStore();
 const auth = useAuthStore();
 const theme = useTheme();
-const { showInfo, handleApiError } = useApiError();
+const { handleApiError } = useApiError();
 
 const loggingOut = ref(false);
 
@@ -78,7 +78,8 @@ function goToHome() {
 
         <v-spacer />
 
-        <v-menu offset-y location="bottom end">
+        <!-- ⭐ offset-y を削除（Vuetify 3 では不要） -->
+        <v-menu location="bottom end">
             <template v-slot:activator="{ props }">
                 <v-chip v-bind="props" :color="primaryColor" class="me-2">
                     <v-icon :size="ICON_SIZES.sm" class="me-2">
@@ -109,14 +110,15 @@ function goToHome() {
 
                 <v-divider />
 
+                <!-- ⭐ disabled があれば自動的にイベントが無効化されるため、条件チェック不要 -->
                 <v-list-item
                     :tabindex="loggingOut ? -1 : 0"
                     :prepend-icon="ICONS.nav.logout"
                     :title="t('auth.logout')"
                     :disabled="loggingOut"
                     @click="handleLogout"
-                    @keydown.enter="!loggingOut && handleLogout()"
-                    @keydown.space.prevent="!loggingOut && handleLogout()"
+                    @keydown.enter="handleLogout"
+                    @keydown.space.prevent="handleLogout"
                 >
                     <template v-slot:append v-if="loggingOut">
                         <v-progress-circular
@@ -132,7 +134,6 @@ function goToHome() {
 </template>
 
 <style scoped>
-/* エラー時や遅延時のための保険（たった1行！） */
 .user-menu :deep(.v-list-item[disabled]) {
     cursor: not-allowed;
 }
