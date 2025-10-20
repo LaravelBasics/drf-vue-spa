@@ -24,15 +24,25 @@ class UserServiceException(Exception):
 class LastAdminError(UserServiceException):
     """最後の管理者削除エラー"""
 
-    def __init__(self, action="削除"):
+    def __init__(self, action="delete"):
+        # アクションごとに翻訳可能なメッセージを定義
+        messages = {
+            "delete": _(
+                "管理者は最低1人必要です。最後の管理者を削除することはできません。"
+            ),
+            "demote": _(
+                "管理者は最低1人必要です。最後の管理者から管理者権限を外すことはできません。"
+            ),
+            "deactivate": _(
+                "管理者は最低1人必要です。最後の管理者を無効化することはできません。"
+            ),
+        }
+
+        message = messages.get(action, messages["delete"])
+
         super().__init__(
             error_code="LAST_ADMIN",
-            detail=str(
-                _(
-                    "管理者は最低1人必要です。最後の管理者を%(action)sすることはできません。"
-                )
-                % {"action": action}
-            ),
+            detail=str(message),
             status_code=400,
         )
 

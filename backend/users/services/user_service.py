@@ -41,7 +41,7 @@ class UserService:
             LastAdminError: 管理者が0人になる場合
         """
         if UserService._get_active_admin_count(exclude_user_id=user_id) == 0:
-            raise LastAdminError(action="削除")
+            raise LastAdminError(action="delete")
 
     @staticmethod
     def _check_last_admin_for_update(user_id, new_is_admin, new_is_active):
@@ -56,15 +56,14 @@ class UserService:
         Raises:
             LastAdminError: 管理者が0人になる場合
         """
-        # 管理者権限を剥奪する場合
-        if new_is_admin is False:
-            if UserService._get_active_admin_count(exclude_user_id=user_id) == 0:
-                raise LastAdminError(action="管理者権限から外す")
+        if UserService._get_active_admin_count(exclude_user_id=user_id) == 0:
+            # 管理者権限を剥奪する場合
+            if new_is_admin is False:
+                raise LastAdminError(action="demote")
 
-        # 無効化する場合
-        if new_is_active is False:
-            if UserService._get_active_admin_count(exclude_user_id=user_id) == 0:
-                raise LastAdminError(action="無効化")
+            # 無効化する場合
+            if new_is_active is False:
+                raise LastAdminError(action="deactivate")
 
     @staticmethod
     @transaction.atomic
@@ -169,7 +168,7 @@ class UserService:
             )
 
             if not remaining_admins:
-                raise LastAdminError(action="削除")
+                raise LastAdminError(action="delete")
 
         updated_count = User.objects.filter(id__in=user_ids).update(
             deleted_at=timezone.now(), is_active=False

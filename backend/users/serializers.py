@@ -36,7 +36,19 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created_at", "updated_at"]
 
 
-class UserCreateSerializer(serializers.ModelSerializer):
+class BaseUserSerializer(serializers.ModelSerializer):
+    """共通バリデーション用ベースシリアライザー"""
+
+    def validate_employee_id(self, value):
+        """社員番号の正規化（空白削除）"""
+        return value.strip() if value else value
+
+    def validate_email(self, value):
+        """メールアドレス正規化（小文字変換）"""
+        return value.strip().lower() if value else None
+
+
+class UserCreateSerializer(BaseUserSerializer):
     """ユーザー作成用"""
 
     password = serializers.CharField(
@@ -81,16 +93,8 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "is_admin",
         ]
 
-    def validate_employee_id(self, value):
-        """値の正規化（空白削除）"""
-        return value.strip() if value else value
 
-    def validate_email(self, value):
-        """メールアドレス正規化（小文字変換）"""
-        return value.strip().lower() if value else None
-
-
-class UserUpdateSerializer(serializers.ModelSerializer):
+class UserUpdateSerializer(BaseUserSerializer):
     """ユーザー更新用"""
 
     password = serializers.CharField(
@@ -135,14 +139,6 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "is_admin",
             "is_active",
         ]
-
-    def validate_employee_id(self, value):
-        """値の正規化（空白削除）"""
-        return value.strip() if value else value
-
-    def validate_email(self, value):
-        """メールアドレス正規化（小文字変換）"""
-        return value.strip().lower() if value else None
 
     def validate_password(self, value):
         """パスワード検証（空白のみは変更なし）"""

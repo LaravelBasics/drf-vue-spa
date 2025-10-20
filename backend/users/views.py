@@ -12,7 +12,12 @@ from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Q
 
-from .serializers import UserSerializer, UserCreateSerializer, UserUpdateSerializer
+from .serializers import (
+    UserSerializer,
+    UserCreateSerializer,
+    UserUpdateSerializer,
+    BulkActionSerializer,
+)
 from .services.user_service import UserService
 from .exceptions import UserServiceException
 from .permissions import IsAdminUser
@@ -51,6 +56,8 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
             return UserCreateSerializer
         elif self.action in ["update", "partial_update"]:
             return UserUpdateSerializer
+        elif self.action in ["bulk_delete", "bulk_restore"]:
+            return BulkActionSerializer
         return UserSerializer
 
     def create(self, request, *args, **kwargs):
@@ -65,22 +72,14 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
             return self.validation_error_response(e)
 
     def retrieve(self, request, *args, **kwargs):
-        """ユーザー詳細（DRFが自動で404を返すためtry-except不要）"""
+        """ユーザー詳細"""
         instance = self.get_object()
         return Response(UserSerializer(instance).data)
 
     def update(self, request, *args, **kwargs):
         """ユーザー更新"""
         partial = kwargs.pop("partial", False)
-
-        try:
-            instance = self.get_object()
-        except User.DoesNotExist:
-            return self.error_response(
-                error_code="NOT_FOUND",
-                detail="ユーザーが見つかりません",
-                status_code=status.HTTP_404_NOT_FOUND,
-            )
+        instance = self.get_object()
 
         if instance.deleted_at:
             return self.error_response(
@@ -102,14 +101,7 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         """ユーザー削除（論理削除）"""
-        try:
-            instance = self.get_object()
-        except User.DoesNotExist:
-            return self.error_response(
-                error_code="NOT_FOUND",
-                detail="ユーザーが見つかりません",
-                status_code=status.HTTP_404_NOT_FOUND,
-            )
+        instance = self.get_object()
 
         try:
             UserService.delete_user(instance, request_user_id=request.user.id)
@@ -120,23 +112,12 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
     @action(detail=False, methods=["post"], url_path="bulk-delete")
     def bulk_delete(self, request):
         """一括削除"""
-        user_ids = request.data.get("ids", [])
-
-        if not user_ids:
-            return self.error_response(
-                error_code="VALIDATION_ERROR",
-                detail="削除対象のIDを指定してください",
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not isinstance(user_ids, list):
-            return self.error_response(
-                error_code="VALIDATION_ERROR",
-                detail="ids は配列で指定してください",
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
+        serializer = self.get_serializer(data=request.data)
 
         try:
+            serializer.is_valid(raise_exception=True)
+            user_ids = serializer.validated_data["ids"]
+
             deleted_count = UserService.bulk_delete_users(user_ids)
             return Response(
                 {
@@ -144,6 +125,8 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
                     "deleted_count": deleted_count,
                 }
             )
+        except ValidationError as e:
+            return self.validation_error_response(e)
         except UserServiceException as e:
             return self.error_response(e.error_code, e.detail, e.status_code)
 
@@ -161,23 +144,12 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
     @action(detail=False, methods=["post"], url_path="bulk-restore")
     def bulk_restore(self, request):
         """一括復元"""
-        user_ids = request.data.get("ids", [])
-
-        if not user_ids:
-            return self.error_response(
-                error_code="VALIDATION_ERROR",
-                detail="復元対象のIDを指定してください",
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if not isinstance(user_ids, list):
-            return self.error_response(
-                error_code="VALIDATION_ERROR",
-                detail="ids は配列で指定してください",
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
+        serializer = self.get_serializer(data=request.data)
 
         try:
+            serializer.is_valid(raise_exception=True)
+            user_ids = serializer.validated_data["ids"]
+
             restored_count = UserService.bulk_restore_users(user_ids)
             return Response(
                 {
@@ -185,6 +157,8 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
                     "restored_count": restored_count,
                 }
             )
+        except ValidationError as e:
+            return self.validation_error_response(e)
         except UserServiceException as e:
             return self.error_response(e.error_code, e.detail, e.status_code)
 

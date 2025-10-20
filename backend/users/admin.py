@@ -180,11 +180,3 @@ class CustomUserAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         """削除済みも含めて表示"""
         return User.all_objects.all()
-
-    def get_form(self, request, obj=None, **kwargs):
-        """新規作成時と編集時でフォームを切り替え"""
-        if obj is None:
-            kwargs["form"] = self.add_form
-        else:
-            kwargs["form"] = self.form
-        return super().get_form(request, obj, **kwargs)

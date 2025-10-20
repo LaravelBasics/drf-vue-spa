@@ -1,0 +1,369 @@
+# ユーザー管理システム
+
+Django REST Framework + Vue.js 3 + Vuetify 3 で構築された、論理削除対応のユーザー管理システムです。
+
+## 🎯 主な機能
+
+- ✅ **社員番号ログイン認証**（パスワード認証）
+- ✅ **論理削除対応**（削除済み社員番号の再利用可能）
+- ✅ **ブルートフォース攻撃対策**（10回失敗でロック）
+- ✅ **多言語対応**（日本語・英語）
+- ✅ **管理者権限管理**（最低1人の管理者を保証）
+- ✅ **CRUD操作 + 一括操作**（削除・復元）
+
+---
+
+## 📦 技術スタック
+
+### **バックエンド**
+- Python 3.11+
+- Django 4.2+
+- Django REST Framework 3.14+
+- SQLite（開発環境）
+
+### **フロントエンド**
+- Vue.js 3.4+
+- Vuetify 3.5+
+- Pinia（状態管理）
+- Vue Router
+- Axios
+
+---
+
+## 🚀 セットアップ
+
+### **1. 前提条件**
+
+```bash
+# 必要なツール
+Python 3.11+
+Node.js 18+
+npm または yarn
+```
+
+### **2. バックエンドのセットアップ**
+
+```bash
+# リポジトリをクローン
+git clone <repository-url>
+cd backend
+
+# 仮想環境を作成
+python -m venv venv
+
+# 仮想環境を有効化
+# Windows
+venv\Scripts\activate
+
+# macOS/Linux
+source venv/bin/activate
+
+# 依存関係をインストール
+pip install -r requirements.txt
+
+# 翻訳ファイルをコンパイル
+python compile_translations.py
+
+# データベースをマイグレート
+python manage.py migrate
+
+# （オプション）ダミーデータを作成
+python manage.py create_dummy_users --count=50
+
+# サーバー起動
+python manage.py runserver
+```
+
+**デフォルト管理者アカウント:**
+- 社員番号: `9999`
+- パスワード: `test1234`
+
+### **3. フロントエンドのセットアップ**
+
+```bash
+cd frontend
+
+# 依存関係をインストール
+npm install
+
+# 開発サーバー起動
+npm run dev
+```
+
+**アクセス URL:**
+- フロントエンド: `http://localhost:5173`
+- バックエンド API: `http://localhost:8000`
+- Django Admin: `http://localhost:8000/admin`
+
+---
+
+## 📁 プロジェクト構成
+
+```
+project/
+├── backend/                 # Django バックエンド
+│   ├── accounts/           # 認証関連
+│   │   ├── backends.py     # 社員番号認証バックエンド
+│   │   ├── serializers.py  # ログインシリアライザー
+│   │   └── views.py        # ログイン/ログアウト API
+│   ├── users/              # ユーザー管理
+│   │   ├── models.py       # ユーザーモデル（論理削除対応）
+│   │   ├── serializers.py  # CRUD シリアライザー
+│   │   ├── views.py        # CRUD API
+│   │   ├── services/       # ビジネスロジック
+│   │   │   └── user_service.py
+│   │   ├── exceptions.py   # カスタム例外
+│   │   └── permissions.py  # 権限クラス
+│   ├── common/             # 共通処理
+│   │   ├── middleware.py   # 言語切り替え
+│   │   └── mixins.py       # エラーレスポンス統一
+│   ├── config/             # Django設定
+│   │   └── settings.py
+│   └── locale/             # 翻訳ファイル
+│       ├── ja/
+│       └── en/
+│
+└── frontend/               # Vue.js フロントエンド
+    ├── src/
+    │   ├── components/     # 再利用可能コンポーネント
+    │   ├── views/          # ページコンポーネント
+    │   ├── stores/         # Pinia ストア
+    │   ├── composables/    # 共通ロジック
+    │   ├── router/         # ルーティング
+    │   └── locales/        # 翻訳ファイル
+    └── package.json
+```
+
+---
+
+## 🔐 セキュリティ機能
+
+### **1. ブルートフォース攻撃対策**
+- ログイン失敗10回でアカウントロック（60秒）
+- キャッシュベースの試行回数管理
+
+### **2. 認証エラーの曖昧化**
+```python
+# 削除済みユーザー → "社員番号またはパスワードが正しくありません"
+# 無効化ユーザー   → "社員番号またはパスワードが正しくありません"
+# 存在しないユーザー → "社員番号またはパスワードが正しくありません"
+```
+→ アカウントの存在を推測できない（OWASP推奨）
+
+### **3. タイミング攻撃対策**
+```python
+if not user:
+    User().set_password(password)  # ダミー処理で時間を統一
+    return None
+```
+
+### **4. 最後の管理者保護**
+- 管理者を0人にする操作を自動ブロック
+- 削除・無効化・権限剥奪を防止
+
+---
+
+## 🌍 多言語対応
+
+### **サポート言語**
+- 🇯🇵 日本語（デフォルト）
+- 🇬🇧 英語
+
+### **翻訳の仕組み**
+
+**バックエンド:**
+```python
+from django.utils.translation import gettext_lazy as _
+
+error_message = _("社員番号は必須です")
+# 日本語: "社員番号は必須です"
+# 英語: "Employee ID is required"
+```
+
+**フロントエンド:**
+```javascript
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
+
+const message = t('auth.loginSuccess')
+// 日本語: "ログインしました"
+// 英語: "Login successful"
+```
+
+### **翻訳ファイルの編集**
+
+```bash
+# バックエンド
+backend/locale/ja/LC_MESSAGES/django.po  # 日本語
+backend/locale/en/LC_MESSAGES/django.po  # 英語
+
+# コンパイル
+python compile_translations.py
+
+# フロントエンド
+frontend/src/locales/ja.json  # 日本語
+frontend/src/locales/en.json  # 英語
+```
+
+---
+
+## 🗑️ 論理削除の仕組み
+
+### **通常の削除との違い**
+
+| 項目      | 物理削除       | 論理削除 |
+|----------|----------------|--------------------------|
+| データ    | DBから完全削除  | `deleted_at` に日時を記録 |
+| 復元      | ❌ 不可能     | ✅ 可能                  |
+| 社員番号  | ❌ 再利用不可  | ✅ 再利用可能            |
+| 監査証跡  | ❌ 残らない    | ✅ 削除日時が残る        |
+
+### **実装の特徴**
+
+```python
+# モデル定義
+class User(AbstractBaseUser):
+    deleted_at = models.DateTimeField(null=True, blank=True)
+    
+    # 条件付きユニーク制約
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee_id"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_active_employee_id",
+            )
+        ]
+
+# カスタムマネージャー（削除済みを自動除外）
+class CustomUserManager(BaseUserManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
+
+# 使い方
+User.objects.all()          # 削除済み除外
+User.all_objects.all()      # 削除済み含む
+```
+
+### **社員番号の再利用例**
+
+```python
+# 1. ユーザー作成
+user = User.objects.create(employee_id="EMP001", username="太郎")
+
+# 2. 論理削除
+user.soft_delete()  # deleted_at に現在日時、is_active=False
+
+# 3. 同じ社員番号で新規作成（可能！）
+new_user = User.objects.create(employee_id="EMP001", username="次郎")
+# → 条件付きユニーク制約により、deleted_at が NULL のレコードのみチェック
+
+# 4. 復元
+user.restore()  # deleted_at=None、is_active=True
+```
+
+---
+
+## 🧪 テスト
+
+### **バックエンドテスト**
+
+```bash
+cd backend
+
+# 全テスト実行
+python manage.py test
+
+# 特定のアプリのみ
+python manage.py test users
+
+# カバレッジ確認
+coverage run --source='.' manage.py test
+coverage report
+```
+
+### **フロントエンドテスト**
+
+```bash
+cd frontend
+
+# ユニットテスト
+npm run test:unit
+
+# E2Eテスト
+npm run test:e2e
+```
+
+---
+
+## 🛠️ 開発コマンド
+
+### **便利なコマンド**
+
+```bash
+# ダミーユーザー作成
+python manage.py create_dummy_users --count=100 --password=test1234
+
+# 削除後90日経過したユーザーを物理削除
+python manage.py cleanup_deleted_users --days=90
+
+# Dry run（削除対象を確認のみ）
+python manage.py cleanup_deleted_users --days=90 --dry-run
+
+# データベースリセット
+python manage.py flush
+
+# スーパーユーザー作成
+python manage.py createsuperuser
+```
+
+---
+
+## 📖 詳細ドキュメント
+
+- [システム設計書](./ARCHITECTURE.md) - アーキテクチャの詳細
+- [開発ガイド](./DEVELOPMENT_GUIDE.md) - 実装ガイド
+- [API仕様書](./API_DOCUMENTATION.md) - エンドポイント一覧
+
+---
+
+## 🐛 トラブルシューティング
+
+### **ログインできない**
+
+```bash
+# 1. 管理者アカウントが存在するか確認
+python manage.py shell
+>>> from django.contrib.auth import get_user_model
+>>> User = get_user_model()
+>>> User.objects.filter(is_admin=True, is_active=True).exists()
+
+# 2. アカウントがロックされていないか確認（キャッシュクリア）
+python manage.py shell
+>>> from django.core.cache import cache
+>>> cache.clear()
+
+# 3. パスワードをリセット
+python manage.py changepassword 9999
+```
+
+### **翻訳が反映されない**
+
+```bash
+# 翻訳ファイルを再コンパイル
+python compile_translations.py
+
+# サーバー再起動
+python manage.py runserver
+```
+
+### **CORS エラー**
+
+```python
+# settings.py を確認
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # フロントエンドのURL
+]
+```
+
+---
