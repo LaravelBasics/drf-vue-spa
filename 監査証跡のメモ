@@ -3,6 +3,563 @@
 vscode用リアルタイム監視コマンド：
 Get-Content -Path backend/logs/audit.log -Wait -Encoding UTF8
 
+===========================================================================================================
+
+# 監査ログシステム 完全ガイド
+
+## 📋 目次
+
+1. [概要](#概要)
+2. [機能](#機能)
+3. [セットアップ](#セットアップ)
+4. [使い方](#使い方)
+5. [カスタマイズ](#カスタマイズ)
+6. [ログ形式](#ログ形式)
+7. [トラブルシューティング](#トラブルシューティング)
+8. [FAQ](#faq)
+
+---
+
+## 概要
+
+このシステムは、Djangoアプリケーションのすべてのモデル操作を自動的に記録します。
+
+### 記録される操作
+- ✅ モデルの作成（CREATE）
+- ✅ モデルの更新（UPDATE）
+- ✅ モデルの削除（DELETE）
+- ✅ ログイン成功・失敗
+- ✅ ログアウト
+
+### 特徴
+- 🔒 機密情報の自動マスキング
+- 🔍 リクエストIDによる追跡
+- 📊 JSON形式の構造化ログ
+- ⚙️ 柔軟な除外設定
+- 🚀 自動監視（設定不要）
+
+---
+
+## 機能
+
+### 1. 自動モデル監視
+
+すべてのモデルの変更が自動的に記録されます。追加の設定は不要です。
+
+```python
+# コード上は普通に操作するだけ
+user = User.objects.create(username="test")
+user.email = "test@example.com"
+user.save()
+user.delete()
+```
+
+→ これだけで3つのログが記録されます（CREATE, UPDATE, DELETE）
+
+### 2. 機密情報のマスキング
+
+パスワードやトークンなどの機密情報は自動的に `***` でマスクされます。
+
+```json
+{
+  "changes": "{\"password\": {\"old\": \"***\", \"new\": \"***\"}}"
+}
+```
+
+### 3. リクエストID追跡
+
+各リクエストに一意のIDを付与し、関連するすべてのログを追跡できます。
+
+```json
+{"request_id": "550e8400-e29b-41d4-a716-446655440000", ...}
+{"request_id": "550e8400-e29b-41d4-a716-446655440000", ...}
+```
+
+### 4. ログイン・ログアウト記録
+
+認証関連の操作も自動記録されます。
+
+```json
+// ログイン成功
+{"level": "INFO", "action": "LOGIN", "user": "9999", ...}
+
+// ログイン失敗
+{"level": "WARNING", "action": "LOGIN_FAILED", "user": "anonymous", ...}
+
+// ログアウト
+{"level": "INFO", "action": "LOGOUT", "user": "9999", ...}
+```
+
+---
+
+## セットアップ
+
+### 必要なファイル
+
+```
+backend/
+├── common/
+│   ├── signals.py          # シグナル定義
+│   ├── middleware.py       # ミドルウェア
+│   ├── context.py          # リクエストコンテキスト管理
+│   └── formatters.py       # ログフォーマッター
+├── users/
+│   └── apps.py             # シグナル登録
+└── logs/
+    └── audit.log           # ログ出力先
+```
+
+### 1. アプリに登録
+
+監視したいアプリの `apps.py` に以下を追加：
+
+```python
+# backend/users/apps.py
+
+from django.apps import AppConfig
+
+class UsersConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "users"
+    
+    def ready(self):
+        """アプリ起動時にシグナルを登録"""
+        from common.signals import register_audit_signals
+        register_audit_signals()
+```
+
+### 2. ミドルウェア設定
+
+`settings.py` のミドルウェアに追加：
+
+```python
+# backend/config/settings.py
+
+MIDDLEWARE = [
+    # ... 他のミドルウェア
+    'common.middleware.AuditMiddleware',  # ⭐ 追加
+]
+```
+
+### 3. ロギング設定
+
+`settings.py` にロギング設定を追加：
+
+```python
+# backend/config/settings.py
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'audit': {
+            '()': 'common.formatters.AuditJSONFormatter',
+        },
+    },
+    'handlers': {
+        'audit_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'audit.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
+            'backupCount': 10,
+            'formatter': 'audit',
+        },
+    },
+    'loggers': {
+        'audit': {
+            'handlers': ['audit_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+```
+
+### 4. ログディレクトリ作成
+
+```bash
+mkdir backend/logs
+```
+
+### 5. サーバー再起動
+
+```bash
+python manage.py runserver
+```
+
+---
+
+## 使い方
+
+### 基本操作
+
+特別な操作は不要です。通常通りモデルを操作するだけで自動記録されます。
+
+```python
+# ユーザー作成
+user = User.objects.create(
+    username="test",
+    email="test@example.com"
+)
+
+# ユーザー更新
+user.email = "new@example.com"
+user.save()
+
+# ユーザー削除
+user.delete()
+```
+
+### ログの確認
+
+```bash
+# リアルタイム監視
+tail -f backend/logs/audit.log
+
+# 最新10件表示
+tail -n 10 backend/logs/audit.log
+
+# 特定ユーザーの操作を検索
+grep '"user": "9999"' backend/logs/audit.log
+
+# ログイン失敗を検索
+grep 'LOGIN_FAILED' backend/logs/audit.log
+
+# 特定リクエストIDを追跡
+grep '550e8400-e29b-41d4-a716-446655440000' backend/logs/audit.log
+```
+
+---
+
+## カスタマイズ
+
+### 1. モデルを監視から除外
+
+頻繁に更新されるキャッシュテーブルなど、監視不要なモデルを除外できます。
+
+```python
+# backend/common/signals.py
+
+EXCLUDE_MODELS = [
+    "contenttypes.contenttype",
+    "sessions.session",
+    "admin.logentry",
+    # ↓ ここに追加
+    "myapp.cachedata",           # キャッシュデータ
+    "myapp.temporarytoken",      # 一時トークン
+    "analytics.pageview",        # アクセスログ（記録多すぎ）
+]
+```
+
+**フォーマット**: `"アプリ名.モデル名"` （全て小文字）
+
+### 2. 機密フィールドを追加
+
+マスクしたいフィールドを追加できます。
+
+```python
+# backend/common/signals.py
+
+SENSITIVE_FIELDS = [
+    "password",
+    "token",
+    "secret_key",
+    "api_key",
+    # ↓ ここに追加
+    "credit_card",               # クレジットカード番号
+    "ssn",                       # 社会保障番号
+    "bank_account",              # 銀行口座
+    "private_key",               # 秘密鍵
+    "access_token",              # アクセストークン
+]
+```
+
+これらのフィールドが変更されると、ログには `***` と記録されます。
+
+### 3. 新しいアプリを監視対象に追加
+
+新しく作成したアプリも簡単に監視できます。
+
+```python
+# backend/orders/apps.py（新規作成したアプリ）
+
+from django.apps import AppConfig
+
+class OrdersConfig(AppConfig):
+    name = "orders"
+    
+    def ready(self):
+        from common.signals import register_audit_signals
+        register_audit_signals()  # ⭐ これだけ追加
+```
+
+→ `Order`, `OrderItem` などのモデルが自動監視されます
+
+---
+
+## ログ形式
+
+### JSON構造
+
+```json
+{
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-10-22 21:20:17",
+  "level": "INFO",
+  "user": "9999",
+  "action": "UPDATE",
+  "model": "User",
+  "object_id": 1,
+  "ip": "127.0.0.1",
+  "changes": "{\"email\": {\"old\": \"old@example.com\", \"new\": \"new@example.com\"}}",
+  "message": "user UPDATE: 1"
+}
+```
+
+### フィールド説明
+
+| フィールド | 説明 | 例 |
+|-----------|------|-----|
+| `request_id` | リクエスト固有ID | `550e8400-e29b-...` |
+| `timestamp` | タイムスタンプ | `2025-10-22 21:20:17` |
+| `level` | ログレベル | `INFO`, `WARNING` |
+| `user` | 実行ユーザー | `9999`, `anonymous`, `system` |
+| `action` | 操作種別 | `CREATE`, `UPDATE`, `DELETE`, `LOGIN` |
+| `model` | モデル名 | `User`, `Auth` |
+| `object_id` | オブジェクトID | `1`, `null` |
+| `ip` | IPアドレス | `127.0.0.1` |
+| `changes` | 変更内容（JSON） | `{...}` |
+| `message` | メッセージ | `user UPDATE: 1` |
+
+### アクション種別
+
+| アクション | 説明 | レベル |
+|-----------|------|--------|
+| `CREATE` | 新規作成 | INFO |
+| `UPDATE` | 更新 | INFO |
+| `DELETE` | 削除 | INFO |
+| `LOGIN` | ログイン成功 | INFO |
+| `LOGIN_FAILED` | ログイン失敗 | WARNING |
+| `LOGOUT` | ログアウト | INFO |
+
+---
+
+## トラブルシューティング
+
+### ❌ ログが出力されない
+
+**原因1**: ログディレクトリが存在しない
+```bash
+mkdir backend/logs
+```
+
+**原因2**: `ready()` が呼ばれていない
+```python
+# apps.py を確認
+def ready(self):
+    from common.signals import register_audit_signals
+    register_audit_signals()
+```
+
+**原因3**: モデルが除外リストに入っている
+```python
+# signals.py の EXCLUDE_MODELS を確認
+```
+
+### ❌ ログが重複している
+
+**原因**: ミドルウェアで API 操作を記録している
+
+**解決策**: `middleware.py` の以下の部分を削除
+```python
+# この部分を削除
+elif request.method in ["POST", "PUT", "PATCH", "DELETE"]:
+    if request.path.startswith("/api/users/"):
+        ...
+```
+
+### ❌ `request_id` が `N/A` になる
+
+**原因**: ミドルウェアが登録されていない
+
+**解決策**: `settings.py` に追加
+```python
+MIDDLEWARE = [
+    'common.middleware.AuditMiddleware',
+]
+```
+
+### ❌ パスワードが平文で記録される
+
+**原因**: `SENSITIVE_FIELDS` に登録されていない
+
+**解決策**: `signals.py` に追加
+```python
+SENSITIVE_FIELDS = ["password", ...]
+```
+
+---
+
+## FAQ
+
+### Q1: 特定のフィールドだけ監視できますか？
+
+A: できません。モデル単位での監視になります。ただし、`SENSITIVE_FIELDS` でマスクは可能です。
+
+### Q2: 非同期処理に対応していますか？
+
+A: 現在の実装はスレッドローカルストレージを使用しているため、非同期ビューでは動作しない可能性があります。非同期対応が必要な場合は `contextvars` への移行が必要です。
+
+### Q3: ログのローテーション設定は？
+
+A: `settings.py` の `RotatingFileHandler` で設定できます。
+```python
+'maxBytes': 10 * 1024 * 1024,  # 10MB
+'backupCount': 10,             # 10世代保持
+```
+
+### Q4: パフォーマンスへの影響は？
+
+A: シグナルは同期的に実行されるため、大量のモデル操作がある場合はパフォーマンスに影響する可能性があります。頻繁に更新されるモデルは `EXCLUDE_MODELS` で除外することを推奨します。
+
+### Q5: ログの保存期間は？
+
+A: `RotatingFileHandler` により古いログは自動削除されます。長期保存が必要な場合は、別途アーカイブ処理を実装してください。
+
+### Q6: システムユーザーによる操作も記録されますか？
+
+A: はい。リクエストコンテキスト外（管理コマンドなど）の操作は `user: "system"` として記録されます。
+
+### Q7: 複数アプリで同じシグナルを登録しても問題ありませんか？
+
+A: はい。`dispatch_uid` により重複登録は防止されています。複数の `apps.py` で `register_audit_signals()` を呼んでも問題ありません。
+
+### Q8: Apacheの `X-Request-ID` を使用できますか？
+
+A: はい。Apacheから `X-Request-ID` ヘッダーが送信されていれば、自動的に使用されます。存在しない場合はDjangoで UUID を生成します。
+
+---
+
+## アーキテクチャ
+
+### コンポーネント構成
+
+```
+┌─────────────────────────────────────────────────┐
+│                  リクエスト                      │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────────────┐
+│            AuditMiddleware                       │
+│  - リクエストID生成/取得                         │
+│  - コンテキスト保存                             │
+│  - ログイン/ログアウト記録                       │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────────────┐
+│              ビュー処理                          │
+│         （モデル操作実行）                       │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────────────┐
+│            Djangoシグナル                        │
+│  - pre_save: 更新前の値を保存                   │
+│  - post_save: CREATE/UPDATE を記録              │
+│  - post_delete: DELETE を記録                   │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────────────┐
+│          AuditJSONFormatter                      │
+│        （JSON形式に整形）                        │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────────────┐
+│            logs/audit.log                        │
+└─────────────────────────────────────────────────┘
+```
+
+### データフロー
+
+1. **リクエスト受信**
+   - ミドルウェアがリクエストIDを生成/取得
+   - スレッドローカルにリクエストを保存
+
+2. **モデル操作**
+   - ビューでモデルを操作（save/delete）
+   - シグナルが自動発火
+
+3. **シグナル処理**
+   - pre_save: 更新前の値を `_old_instance` に保存
+   - post_save/post_delete: 変更内容を抽出
+   - スレッドローカルからリクエスト情報を取得
+
+4. **ログ出力**
+   - 機密フィールドをマスク
+   - JSON形式に整形
+   - ファイルに出力
+
+---
+
+## ベストプラクティス
+
+### ✅ やるべきこと
+
+- 定期的にログをバックアップする
+- 機密情報は必ず `SENSITIVE_FIELDS` に登録する
+- 頻繁に更新されるモデルは除外する
+- ログの保存期間をチーム内で決める
+
+### ❌ やってはいけないこと
+
+- ログファイルをバージョン管理に含めない
+- 本番環境で `DEBUG=True` にしない
+- ログの手動編集（改ざん検知が困難）
+- 機密情報を平文でログに残す
+
+---
+
+## サポート
+
+問題が発生した場合:
+1. このドキュメントの「トラブルシューティング」を確認
+2. ログファイルの内容を確認
+3. チーム内で相談
+
+---
+
+## 変更履歴
+
+| バージョン | 日付 | 変更内容 |
+|-----------|------|---------|
+| 1.0.0 | 2025-10-22 | 初版リリース |
+
+---
+
+**作成日**: 2025年10月23日  
+**最終更新**: 2025年10月23日
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+============================================================================================================
+
 DRF＋Vuejsでファイルに監査証跡のログを出力したいって時はミドルウェア＋シグナル＋settingsにlog系追加？したら、既存の環境壊さずにいけるんかな？(´・ω・｀)
 
 
