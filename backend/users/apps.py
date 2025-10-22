@@ -13,4 +13,6 @@ class UsersConfig(AppConfig):
 
     def ready(self):
         """アプリ起動時にシグナルを登録"""
-        import common.signals  # シグナル登録
+        from common.signals import register_audit_signals
+
+        register_audit_signals()  # ⭐ 全モデルに適用

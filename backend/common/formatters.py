@@ -12,6 +12,7 @@ class AuditJSONFormatter(logging.Formatter):
 
     出力形式:
     {
+        "request_id": "550e8400-e29b-41d4-a716-446655440000",
         "timestamp": "2025-01-20 15:30:45",
         "level": "INFO",
         "user": "9999",
@@ -27,6 +28,7 @@ class AuditJSONFormatter(logging.Formatter):
     def format(self, record):
         """ログレコードをJSON形式に変換"""
         log_data = {
+            "request_id": getattr(record, "request_id", "N/A"),  # ⭐ 追加
             "timestamp": self.formatTime(record, datefmt="%Y-%m-%d %H:%M:%S"),
             "level": record.levelname,
             "user": getattr(record, "user", "unknown"),

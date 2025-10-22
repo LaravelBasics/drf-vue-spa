@@ -4,6 +4,7 @@
 
 import logging
 import json
+import uuid
 from django.utils.translation import activate
 from django.utils.deprecation import MiddlewareMixin
 from common.context import set_current_request, get_client_ip
@@ -75,10 +76,18 @@ class AuditMiddleware(MiddlewareMixin):
     API監査ミドルウェア
 
     ログイン・ログアウト・API操作を監査ログに記録
+    リクエストIDを管理（X-Request-ID or UUID生成）
     """
 
     def process_request(self, request):
         """リクエスト前処理"""
+        # リクエストIDを取得 or 生成
+        request_id = request.META.get("HTTP_X_REQUEST_ID")
+        if not request_id:
+            request_id = str(uuid.uuid4())  # ⭐ UUID生成
+
+        request._request_id = request_id
+
         # リクエストをスレッドローカルに保存（シグナルで使用）
         set_current_request(request)
 
@@ -86,38 +95,60 @@ class AuditMiddleware(MiddlewareMixin):
         request._audit_data = {
             "method": request.method,
             "path": request.path,
+            "request_id": request_id,
         }
 
         return None
 
     def process_response(self, request, response):
         """レスポンス後処理"""
+        # レスポンスヘッダーにリクエストIDを追加
+        if hasattr(request, "_request_id"):
+            response["X-Request-ID"] = request._request_id
+
         # ユーザー情報取得
         user_info = "anonymous"
         if hasattr(request, "user") and request.user.is_authenticated:
             user_info = request.user.employee_id
 
         ip = get_client_ip(request)
+        request_id = getattr(request, "_request_id", "N/A")
 
-        # ログイン成功
-        if request.path == "/api/auth/login/" and response.status_code == 200:
-            audit_logger.info(
-                "ユーザーがログインしました",
-                extra={
-                    "user": user_info,
-                    "action": "LOGIN",
-                    "model": "Auth",
-                    "object_id": None,
-                    "ip": ip,
-                    "changes": "{}",
-                },
-            )
+        # ログイン（成功・失敗）
+        if request.path == "/api/auth/login/":
+            if response.status_code == 200:
+                audit_logger.info(
+                    "ユーザーがログインしました",
+                    extra={
+                        "request_id": request_id,
+                        "user": user_info,
+                        "action": "LOGIN",
+                        "model": "Auth",
+                        "object_id": None,
+                        "ip": ip,
+                        "changes": "{}",
+                    },
+                )
+            else:
+                audit_logger.warning(
+                    f"ログイン失敗（status: {response.status_code}）",
+                    extra={
+                        "request_id": request_id,
+                        "user": user_info,
+                        "action": "LOGIN_FAILED",
+                        "model": "Auth",
+                        "object_id": None,
+                        "ip": ip,
+                        "changes": json.dumps({"status_code": response.status_code}),
+                    },
+                )
 
         # ログアウト
         elif request.path == "/api/auth/logout/" and response.status_code == 200:
             audit_logger.info(
                 "ユーザーがログアウトしました",
                 extra={
+                    "request_id": request_id,
                     "user": user_info,
                     "action": "LOGOUT",
                     "model": "Auth",
@@ -141,6 +172,7 @@ class AuditMiddleware(MiddlewareMixin):
                 audit_logger.info(
                     f"{request.method} {request.path}",
                     extra={
+                        "request_id": request_id,
                         "user": user_info,
                         "action": action_map[request.method],
                         "model": "User",
