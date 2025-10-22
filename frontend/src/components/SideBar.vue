@@ -1,15 +1,15 @@
 <script setup>
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useLocaleStore } from '@/stores/locale'; // ⭐ 追加
+import { useLocaleStore } from '@/stores/locale';
 import { useUiStore } from '@/stores/ui';
 import { usePermissions } from '@/composables/usePermissions';
 import { routes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 import { ICON_SIZES } from '@/constants/theme';
 
-const { t } = useI18n(); // ⭐ locale を削除
-const localeStore = useLocaleStore(); // ⭐ 追加
+const { t } = useI18n();
+const localeStore = useLocaleStore();
 const ui = useUiStore();
 const { isAdmin } = usePermissions();
 
@@ -37,7 +37,6 @@ const filteredNavItems = computed(() => {
     });
 });
 
-// ⭐ localeStore.locale を参照するように変更
 const languageDisplayText = computed(() => {
     return localeStore.locale === 'ja' ? '日本語' : 'English';
 });
@@ -48,7 +47,6 @@ const handleNavItemClick = () => {
     }
 };
 
-// ⭐ localeStore.setLocale を使うように変更
 function toggleLanguage() {
     const newLocale = localeStore.locale === 'ja' ? 'en' : 'ja';
     localeStore.setLocale(newLocale);
@@ -56,12 +54,11 @@ function toggleLanguage() {
 </script>
 
 <template>
+    <!-- ⭐ Vuetify 3.9: app プロパティ削除（自動レイアウト） -->
     <v-navigation-drawer
         v-model="ui.drawer"
         :rail="ui.isDesktop && ui.rail"
-        :permanent="ui.isDesktop"
         :temporary="!ui.isDesktop"
-        app
     >
         <v-list nav>
             <v-list-item

@@ -44,7 +44,7 @@ function handleResize() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
         windowWidth.value = window.innerWidth;
-    }, 200);
+    }, 250);
 }
 
 // ⭐ watch で画面サイズの変化を監視
@@ -85,7 +85,6 @@ onMounted(async () => {
         await Promise.all([
             auth.initialized ? Promise.resolve() : auth.initialize(),
             waitForFontsAndIcons(),
-            new Promise((resolve) => setTimeout(resolve, 50)),
         ]);
 
         await nextTick();

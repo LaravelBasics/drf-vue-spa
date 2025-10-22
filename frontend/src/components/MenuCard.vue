@@ -1,31 +1,25 @@
 <script setup>
 const props = defineProps({
-    // ⭐ Material Symbols アイコン名（admin_panel_settings など）
     icon: {
         type: String,
         required: true,
     },
-    // カードのタイトル（2〜4文字）
     title: {
         type: String,
         required: true,
     },
-    // ルーティング用（vue-router）
     to: {
         type: [String, Object],
         default: null,
     },
-    // 外部リンク用
     href: {
         type: String,
         default: null,
     },
-    // アイコンの色
     color: {
         type: String,
         default: 'primary',
     },
-    // アイコンサイズ
     iconSize: {
         type: [String, Number],
         default: 64,
@@ -35,7 +29,6 @@ const props = defineProps({
 const emit = defineEmits(['click']);
 
 const handleClick = (event) => {
-    // toやhrefが設定されていない場合のみemit
     if (!props.to && !props.href) {
         emit('click', event);
     }
@@ -49,7 +42,10 @@ const handleClick = (event) => {
         class="menu-card"
         elevation="2"
         hover
+        tabindex="0"
         @click="handleClick"
+        @keydown.enter.prevent="handleClick"
+        @keydown.space.prevent.stop="handleClick"
     >
         <v-card-text
             class="d-flex flex-column align-center justify-center pa-6"
@@ -78,5 +74,11 @@ const handleClick = (event) => {
 
 .menu-card:hover {
     transform: translateY(-4px);
+}
+
+/* ⭐ キーボードフォーカス時のスタイル */
+.menu-card:focus {
+    outline: 2px solid rgb(var(--v-theme-primary));
+    outline-offset: 2px;
 }
 </style>

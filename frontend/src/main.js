@@ -1,5 +1,5 @@
-// src/main.js - 完全版
-import { createApp } from 'vue';
+// src/main.js - 最終改善版
+import { createApp, nextTick } from 'vue';
 import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import App from './App.vue';
@@ -27,50 +27,58 @@ app.use(i18n);
 // ⭐ Vuetify インスタンスをグローバルに登録
 window.$vuetify = vuetify;
 
-// ⭐ グローバルエラーハンドラー - コンポーネント内のエラーをキャッチ
+// ⭐ グローバルエラーハンドラー（環境変数対応 + マウントチェック）
 app.config.errorHandler = (err, instance, info) => {
-    console.error('Global error:', err);
-    console.error('Component:', instance);
-    console.error('Error info:', info);
+    // ⭐ 開発環境でのみ詳細ログ
+    if (import.meta.env.DEV) {
+        console.error('Global error:', err);
+        console.error('Component:', instance);
+        console.error('Error info:', info);
+    } else {
+        // ⭐ 本番環境では簡潔に
+        console.error('Error:', err.message);
+    }
 
-    // ⭐ 通知を表示
-    try {
-        const notificationStore = useNotificationStore();
-
-        // i18n から翻訳を取得
-        const errorMessage = i18n.global.t('notifications.error.unknown');
-
-        // ユーザーにエラーを通知
-        notificationStore.error(errorMessage, 7000);
-    } catch (notificationError) {
-        console.error('Failed to show notification:', notificationError);
-        // 最終手段: アラート表示
-        if (import.meta.env.DEV) {
-            alert('予期しないエラーが発生しました: ' + err.message);
+    // ⭐ アプリがマウント済みの場合のみ通知
+    if (app._container) {
+        try {
+            const notificationStore = useNotificationStore();
+            const errorMessage = i18n.global.t('notifications.error.unknown');
+            notificationStore.error(errorMessage, 7000);
+        } catch (notificationError) {
+            console.error('Failed to show notification:', notificationError);
         }
     }
 };
 
-// ⭐ 未処理のPromise拒否をキャッチ（async/awaitのエラー）
+// ⭐ 未処理のPromise拒否をキャッチ（環境変数対応 + マウントチェック）
 window.addEventListener('unhandledrejection', (event) => {
-    console.error('Unhandled promise rejection:', event.reason);
-
-    // ⭐ 通知を表示
-    try {
-        const notificationStore = useNotificationStore();
-        const errorMessage = i18n.global.t('notifications.error.unknown');
-
-        notificationStore.error(errorMessage, 7000);
-    } catch (error) {
-        console.error('Failed to show rejection notification:', error);
+    // ⭐ 開発環境でのみ詳細ログ
+    if (import.meta.env.DEV) {
+        console.error('Unhandled promise rejection:', event.reason);
+    } else {
+        console.error('Promise rejection:', event.reason?.message);
     }
 
-    // ⭐ デフォルトの警告を抑制（オプション）
+    // ⭐ アプリがマウント済みの場合のみ通知
+    if (app._container) {
+        try {
+            const notificationStore = useNotificationStore();
+            const errorMessage = i18n.global.t('notifications.error.unknown');
+            notificationStore.error(errorMessage, 7000);
+        } catch (error) {
+            console.error('Failed to show rejection notification:', error);
+        }
+    }
+
+    // ⭐ デフォルトの警告を抑制
     event.preventDefault();
 });
 
 // ⭐ アプリケーション初期化
 const initializeApp = async () => {
+    let initializationError = null;
+
     try {
         console.log('🔄 アプリケーション事前初期化...');
 
@@ -86,9 +94,15 @@ const initializeApp = async () => {
         console.log('✅ 事前初期化完了');
     } catch (error) {
         console.error('❌ 事前初期化エラー（継続します）:', error);
+        initializationError = error;
+    } finally {
+        // ⭐ 初期化の成否に関わらずアプリを起動
+        app.mount('#app');
+        console.log('✅ アプリケーション起動');
 
-        // ⭐ 初期化失敗を通知（アプリマウント後に表示）
-        setTimeout(() => {
+        // ⭐ マウント後に初期化エラーを通知（nextTick で確実に）
+        if (initializationError) {
+            await nextTick();
             try {
                 const notificationStore = useNotificationStore();
                 notificationStore.warning(
@@ -98,11 +112,7 @@ const initializeApp = async () => {
             } catch (e) {
                 console.error('通知表示失敗:', e);
             }
-        }, 100);
-    } finally {
-        // ⭐ 初期化の成否に関わらずアプリを起動
-        app.mount('#app');
-        console.log('✅ アプリケーション起動');
+        }
     }
 };
 
