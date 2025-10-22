@@ -75,8 +75,12 @@ class AuditMiddleware(MiddlewareMixin):
     """
     API監査ミドルウェア
 
-    ログイン・ログアウト・API操作を監査ログに記録
+    ログイン・ログアウトを監査ログに記録
     リクエストIDを管理（X-Request-ID or UUID生成）
+
+    Note:
+        モデルの作成/更新/削除はシグナルで自動記録されるため
+        ここでは認証関連のみ記録
     """
 
     def process_request(self, request):
@@ -84,19 +88,12 @@ class AuditMiddleware(MiddlewareMixin):
         # リクエストIDを取得 or 生成
         request_id = request.META.get("HTTP_X_REQUEST_ID")
         if not request_id:
-            request_id = str(uuid.uuid4())  # ⭐ UUID生成
+            request_id = str(uuid.uuid4())
 
         request._request_id = request_id
 
         # リクエストをスレッドローカルに保存（シグナルで使用）
         set_current_request(request)
-
-        # リクエスト情報を保存
-        request._audit_data = {
-            "method": request.method,
-            "path": request.path,
-            "request_id": request_id,
-        }
 
         return None
 
@@ -157,29 +154,5 @@ class AuditMiddleware(MiddlewareMixin):
                     "changes": "{}",
                 },
             )
-
-        # API操作（POST/PUT/PATCH/DELETE）
-        elif request.method in ["POST", "PUT", "PATCH", "DELETE"]:
-            # /api/users/ 配下のみ記録
-            if request.path.startswith("/api/users/"):
-                action_map = {
-                    "POST": "CREATE",
-                    "PUT": "UPDATE",
-                    "PATCH": "UPDATE",
-                    "DELETE": "DELETE",
-                }
-
-                audit_logger.info(
-                    f"{request.method} {request.path}",
-                    extra={
-                        "request_id": request_id,
-                        "user": user_info,
-                        "action": action_map[request.method],
-                        "model": "User",
-                        "object_id": None,
-                        "ip": ip,
-                        "changes": json.dumps({"status_code": response.status_code}),
-                    },
-                )
 
         return response
