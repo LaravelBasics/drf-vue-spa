@@ -1,5 +1,8 @@
 監査証跡
 
+vscode用リアルタイム監視コマンド：
+Get-Content -Path backend/logs/audit.log -Wait -Encoding UTF8
+
 DRF＋Vuejsでファイルに監査証跡のログを出力したいって時はミドルウェア＋シグナル＋settingsにlog系追加？したら、既存の環境壊さずにいけるんかな？(´・ω・｀)
 
 

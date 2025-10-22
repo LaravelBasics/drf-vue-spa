@@ -26,6 +26,7 @@ build/
 .coverage
 htmlcov/
 .tox/
+*.log
 
 # Node / Vue
 node_modules/

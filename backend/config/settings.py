@@ -71,6 +71,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "common.middleware.AuditMiddleware",
 ]
 
 # === キャッシュ ===
@@ -186,3 +187,46 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # カスタムユーザーモデルで is_superuser フィールドがない警告を抑制
 # (ビジネス要件に従い is_admin を使用しているため)
 SILENCED_SYSTEM_CHECKS = ["auth.W004"]
+
+# === 監査ログ設定 ===
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,  # 既存のログを無効化しない
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
+        },
+        "audit_json": {
+            "()": "common.formatters.AuditJSONFormatter",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "audit_file": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": BASE_DIR / "logs" / "audit.log",
+            "maxBytes": 10 * 1024 * 1024,  # 10MB
+            "backupCount": 30,  # 過去30ファイル保持
+            "formatter": "audit_json",
+            "encoding": "utf-8",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+        "audit": {
+            "handlers": ["audit_file"],
+            "level": "INFO",
+            "propagate": False,  # 親ロガーに伝播させない
+        },
+    },
+}
