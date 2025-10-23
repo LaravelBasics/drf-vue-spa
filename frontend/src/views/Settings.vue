@@ -7,7 +7,6 @@ import { ICONS } from '@/constants/icons';
 
 const { t } = useI18n();
 
-// パンくずリスト
 const breadcrumbs = computed(() => [
     {
         title: t('breadcrumbs.home'),
@@ -30,7 +29,7 @@ const headerButtons = computed(() => [
 ]);
 
 function openOrderSearch() {
-    console.log('検索する');
+    // TODO: 検索処理を実装
 }
 </script>
 

@@ -1,4 +1,5 @@
-//　Desktop\template\frontend\src\stores\notification.js
+// src/stores/notification.js - 通知メッセージ管理
+
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
 
@@ -19,23 +20,21 @@ export const useNotificationStore = defineStore('notification', () => {
         show.value = true;
     }
 
+    // 通知タイプ別のヘルパー関数
     function success(msg, duration = 5000) {
-        // ⭐ 通常の成功メッセージ5秒
         showNotification(msg, 'success', duration);
     }
 
     function error(msg, duration = 7000) {
-        // ⭐ エラーは長めに7秒
+        // エラーは長めに表示
         showNotification(msg, 'error', duration);
     }
 
     function warning(msg, duration = 5000) {
-        // ⭐ 警告5秒
         showNotification(msg, 'warning', duration);
     }
 
     function info(msg, duration = 5000) {
-        // ⭐ 情報5秒
         showNotification(msg, 'info', duration);
     }
 

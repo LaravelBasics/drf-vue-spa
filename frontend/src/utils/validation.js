@@ -1,21 +1,21 @@
-// src/utils/validation.js - 改善版（正規表現を関数化）
+// src/utils/validation.js - バリデーションルール定義
 
 import { useI18n } from 'vue-i18n';
 
-// ⭐ 正規表現パターンを定数化
+// 正規表現パターンの定義
 const PATTERNS = {
     EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     ALPHA_NUMERIC: /^[a-zA-Z0-9]+$/,
-    EMPLOYEE_ID: /^\d{1,50}$/, // ⭐ 追加
-    PASSWORD_STRENGTH: /(?=.*[a-zA-Z])(?=.*\d)/, // ⭐ 追加
+    EMPLOYEE_ID: /^\d{1,50}$/,
+    PASSWORD_STRENGTH: /(?=.*[a-zA-Z])(?=.*\d)/, // 英字+数字の組み合わせ
 };
 
-// i18n対応バリデーションルール
+// i18n対応のバリデーションルール作成
 export const createValidationRules = () => {
     const { t } = useI18n();
 
     return {
-        // 必須チェック
+        // 必須入力チェック
         required(fieldKey) {
             return (value) => {
                 return (
@@ -27,7 +27,7 @@ export const createValidationRules = () => {
             };
         },
 
-        // 最大文字数
+        // 最大文字数チェック
         maxLength(fieldKey, max) {
             return (value) => {
                 if (!value) return true;
@@ -41,7 +41,7 @@ export const createValidationRules = () => {
             };
         },
 
-        // 最小文字数
+        // 最小文字数チェック
         minLength(fieldKey, min) {
             return (value) => {
                 if (!value) return true;
@@ -55,7 +55,7 @@ export const createValidationRules = () => {
             };
         },
 
-        // メールアドレス
+        // メールアドレス形式チェック
         email() {
             return (value) => {
                 if (!value) return true;
@@ -63,7 +63,7 @@ export const createValidationRules = () => {
             };
         },
 
-        // 英数字のみ
+        // 英数字のみチェック
         alphaNumeric() {
             return (value) => {
                 if (!value) return true;
@@ -74,7 +74,7 @@ export const createValidationRules = () => {
             };
         },
 
-        // ⭐ 社員番号（半角数字、○桁以内）
+        // 社員番号形式チェック（半角数字のみ、50桁以内）
         employeeId() {
             return (value) => {
                 if (!value) return true;
@@ -85,7 +85,7 @@ export const createValidationRules = () => {
             };
         },
 
-        // ⭐ パスワード強度（英字+数字）
+        // パスワード強度チェック（英字+数字の組み合わせ必須）
         passwordStrength() {
             return (value) => {
                 if (!value) return true;
@@ -96,7 +96,7 @@ export const createValidationRules = () => {
             };
         },
 
-        // カスタムパターン
+        // カスタム正規表現パターン
         pattern(regex, messageKey, params = {}) {
             return (value) => {
                 if (!value) return true;
@@ -104,7 +104,7 @@ export const createValidationRules = () => {
             };
         },
 
-        // カスタム関数
+        // カスタムバリデーション関数
         custom(validatorFn, messageKey, params = {}) {
             return (value) => {
                 return validatorFn(value) || t(messageKey, params);

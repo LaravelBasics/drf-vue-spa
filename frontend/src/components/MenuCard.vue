@@ -28,6 +28,7 @@ const props = defineProps({
 
 const emit = defineEmits(['click']);
 
+// toやhrefが設定されていない場合のみカスタムイベントを発火
 const handleClick = (event) => {
     if (!props.to && !props.href) {
         emit('click', event);
@@ -76,7 +77,7 @@ const handleClick = (event) => {
     transform: translateY(-4px);
 }
 
-/* ⭐ キーボードフォーカス時のスタイル */
+/* キーボードフォーカス時のアウトライン表示 */
 .menu-card:focus {
     outline: 2px solid rgb(var(--v-theme-primary));
     outline-offset: 2px;

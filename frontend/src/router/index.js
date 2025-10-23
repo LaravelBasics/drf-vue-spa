@@ -1,8 +1,9 @@
-// src/router/index.js
+// src/router/index.js - Vue Routerの設定
+
 import { createRouter, createWebHistory } from 'vue-router';
 import { authGuard } from './auth-guard.js';
 import { adminGuard } from './admin-guard.js';
-import { screenSizeGuard } from './screen-size-guard.js'; // ⭐ 追加
+import { screenSizeGuard } from './screen-size-guard.js';
 import { routes } from '@/constants/routes';
 import i18n from '@/plugins/i18n';
 
@@ -34,7 +35,7 @@ const router = createRouter({
             meta: { hideForAuth: true, transition: 'fade' },
         },
 
-        // ⭐ 管理者権限必要（全てにrequiresLargeScreenを追加）
+        // 管理者専用ページ
         {
             path: '/admin',
             name: 'AdminMenu',
@@ -42,7 +43,7 @@ const router = createRouter({
             meta: {
                 requiresAuth: true,
                 requiresAdmin: true,
-                requiresLargeScreen: true, // ⭐ 追加
+                requiresLargeScreen: true,
             },
         },
         {
@@ -52,7 +53,7 @@ const router = createRouter({
             meta: {
                 requiresAuth: true,
                 requiresAdmin: true,
-                requiresLargeScreen: true, // ⭐ 追加
+                requiresLargeScreen: true,
             },
         },
         {
@@ -62,7 +63,7 @@ const router = createRouter({
             meta: {
                 requiresAuth: true,
                 requiresAdmin: true,
-                requiresLargeScreen: true, // ⭐ 追加
+                requiresLargeScreen: true,
             },
         },
         {
@@ -72,7 +73,7 @@ const router = createRouter({
             meta: {
                 requiresAuth: true,
                 requiresAdmin: true,
-                requiresLargeScreen: true, // ⭐ 追加
+                requiresLargeScreen: true,
             },
             props: true,
         },
@@ -83,7 +84,7 @@ const router = createRouter({
             meta: {
                 requiresAuth: true,
                 requiresAdmin: true,
-                requiresLargeScreen: true, // ⭐ 追加
+                requiresLargeScreen: true,
             },
             props: true,
         },
@@ -94,12 +95,12 @@ const router = createRouter({
             meta: {
                 requiresAuth: true,
                 requiresAdmin: true,
-                requiresLargeScreen: true, // ⭐ 追加
+                requiresLargeScreen: true,
             },
             props: true,
         },
 
-        // ⭐ 画面サイズ非対応ページ
+        // エラーページ
         {
             path: routes.UNSUPPORTED_DEVICE,
             name: 'UnsupportedDevice',
@@ -107,6 +108,7 @@ const router = createRouter({
             meta: { requiresAuth: false },
         },
 
+        // 404ページはホームにリダイレクト
         {
             path: '/:pathMatch(.*)*',
             name: 'NotFound',
@@ -124,7 +126,7 @@ const router = createRouter({
     },
 });
 
-// ⭐ ナビゲーションガード（統合版）
+// ナビゲーションガード（実行順: 認証 → 画面サイズ → 管理者権限）
 router.beforeEach(async (to, from, next) => {
     document.body.style.cursor = 'progress';
 
@@ -136,7 +138,7 @@ router.beforeEach(async (to, from, next) => {
         return;
     }
 
-    // 2. 画面サイズチェック ⭐ 追加（auth後に実行）
+    // 2. 画面サイズチェック（認証後に実行）
     const screenResult = screenSizeGuard(to, from);
     if (screenResult !== true) {
         document.body.style.cursor = '';
@@ -152,16 +154,17 @@ router.beforeEach(async (to, from, next) => {
         return;
     }
 
-    // 全てのガードを通過
+    // すべてのガードを通過
     document.body.style.cursor = '';
     next();
 });
 
-// ⭐ ナビゲーション完了時の処理
+// ナビゲーション完了後の処理（タイトル設定、フォーカス管理）
 router.afterEach((to, from) => {
     document.body.style.cursor = '';
     document.title = to.meta.title || t('app.tabTitle');
 
+    // メインコンテンツにフォーカスを移動（アクセシビリティ対応）
     const main = document.querySelector('main, [role="main"], #app');
     if (main) {
         main.focus();

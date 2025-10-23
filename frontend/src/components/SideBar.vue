@@ -13,6 +13,7 @@ const localeStore = useLocaleStore();
 const ui = useUiStore();
 const { isAdmin } = usePermissions();
 
+// ナビゲーション項目の定義
 const navItems = computed(() => [
     { title: t('pages.home.title'), icon: ICONS.nav.home, to: routes.HOME },
     {
@@ -28,6 +29,7 @@ const navItems = computed(() => [
     },
 ]);
 
+// 管理者権限が必要な項目をフィルタリング
 const filteredNavItems = computed(() => {
     return navItems.value.filter((item) => {
         if (item.requiresAdmin) {
@@ -41,6 +43,7 @@ const languageDisplayText = computed(() => {
     return localeStore.locale === 'ja' ? '日本語' : 'English';
 });
 
+// モバイル時はナビゲーション後にドロワーを閉じる
 const handleNavItemClick = () => {
     if (!ui.isDesktop) {
         ui.drawer = false;
@@ -54,7 +57,7 @@ function toggleLanguage() {
 </script>
 
 <template>
-    <!-- ⭐ Vuetify 3.9: app プロパティ削除（自動レイアウト） -->
+    <!-- Vuetify 3.9+: appプロパティ不要（自動レイアウト管理） -->
     <v-navigation-drawer
         v-model="ui.drawer"
         :rail="ui.isDesktop && ui.rail"
@@ -80,6 +83,7 @@ function toggleLanguage() {
 
         <template v-slot:append>
             <div class="pa-2">
+                <!-- 言語切り替えボタン（モバイル/デスクトップ/Railモードで表示切替） -->
                 <v-btn
                     @click.stop="toggleLanguage"
                     variant="outlined"
@@ -112,6 +116,7 @@ function toggleLanguage() {
 </template>
 
 <style scoped>
+/* アクティブ状態の透明度調整を無効化 */
 .v-list-item--active {
     --v-activated-opacity: 0 !important;
 }

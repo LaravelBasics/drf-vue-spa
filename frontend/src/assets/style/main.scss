@@ -1,55 +1,50 @@
 // frontend/src/assets/style/main.scss
-// Vuetify のデフォルトスタイルを上書き
+// Vuetifyのデフォルトスタイルをカスタマイズ
 
 // ==================== グローバルフォント設定 ====================
-/* すべての要素にフォントを適用 */
 * {
     font-family:
         'Noto Sans JP',
         /* 日本語フォント（優先） */ 'Roboto',
-        /* 英語フォント（Vuetify標準） */ -apple-system,
-        /* macOS システムフォント */ BlinkMacSystemFont,
+        /* Vuetify標準の英語フォント */ -apple-system,
+        /* macOSシステムフォント */ BlinkMacSystemFont,
         /* macOS Chrome用 */ 'Segoe UI',
-        /* Windows システムフォント */ 'Helvetica Neue',
-        /* macOS 古いバージョン */ Arial,
+        /* Windowsシステムフォント */ 'Helvetica Neue',
+        /* macOS旧バージョン */ Arial,
         /* フォールバック */ sans-serif; /* 最終フォールバック */
 }
 
-/* Vuetify コンポーネントにもフォントを適用 */
 .v-application {
-    font-family: inherit !important; /* 上記のフォント設定を継承 */
+    font-family: inherit !important;
 }
 
-/* Material Symbols アイコンは除外（専用フォントを維持） */
+/* Material Symbolsアイコンは専用フォントを維持 */
 .material-symbols-outlined {
     font-family: 'Material Symbols Outlined' !important;
 }
 
-/* 日本語の letter-spacing 調整（読みやすさ向上） */
+/* 日本語の可読性向上のため文字間隔を調整 */
 body {
-    letter-spacing: 0.05em; /* 文字間隔を少し広げる */
+    letter-spacing: 0.05em;
 }
 
-/* Vuetify ボタンのフォント設定 */
 .v-btn {
-    font-weight: 500; /* 中太字 */
-    letter-spacing: 0.05em; /* 文字間隔 */
+    font-weight: 500;
+    letter-spacing: 0.05em;
 }
 
-/* 見出しのフォント設定 */
 h1,
 h2,
 h3,
 h4,
 h5,
 h6 {
-    font-weight: 700; /* 太字 */
-    letter-spacing: 0.03em; /* 文字間隔（ボタンより狭め） */
+    font-weight: 700;
+    letter-spacing: 0.03em;
 }
 
 // ==================== ページ遷移アニメーション ====================
-/* グローバルなページ遷移スタイル */
-/* 通常のページ遷移（ホーム等） */
+/* 通常のページ遷移（ホーム、管理画面など） */
 .page-transition-enter-active,
 .page-transition-leave-active {
     transition: all 0.25s ease-out;
@@ -57,15 +52,15 @@ h6 {
 
 .page-transition-enter-from {
     opacity: 0;
-    transform: translateY(10px); /* 下から上にフェードイン */
+    transform: translateY(10px);
 }
 
 .page-transition-leave-to {
     opacity: 0;
-    transform: translateY(-10px); /* 上に消える */
+    transform: translateY(-10px);
 }
 
-/* ログインページ専用の遷移（スケールアニメーション） */
+/* ログインページ専用（スケールアニメーション） */
 .login-page-transition-enter-active,
 .login-page-transition-leave-active {
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -73,27 +68,27 @@ h6 {
 
 .login-page-transition-enter-from {
     opacity: 0;
-    transform: scale(0.95); /* 小さい状態から */
+    transform: scale(0.95);
 }
 
 .login-page-transition-leave-to {
     opacity: 0;
-    transform: scale(1.05); /* 大きくなりながら消える */
+    transform: scale(1.05);
 }
 
 // ==================== レイアウト設定 ====================
-/* v-main をフレックスコンテナにしてフッターを押し下げる */
+/* フッターを最下部に固定するためのフレックス設定 */
 .v-main {
-    flex: 1 0 auto; /* 縮小禁止、伸縮可能 */
-    min-height: 0; /* フレックスアイテムの最小高さリセット */
-    background-color: #fafafa; /* 背景色 */
+    flex: 1 0 auto;
+    min-height: 0;
+    background-color: #fafafa;
 }
 
-/* レイアウトシフト防止（CLS対策） */
+/* レイアウトシフト防止（Core Web Vitals対策） */
 *,
 *::before,
 *::after {
-    box-sizing: border-box; /* paddingとborderをwidthに含める */
+    box-sizing: border-box;
 }
 
 body {
@@ -102,7 +97,6 @@ body {
     overflow-x: hidden; /* 横スクロール防止 */
 }
 
-/* Vue Router のリンク遷移を滑らかに */
 .router-link-active {
     transition: all 0.2s ease;
 }

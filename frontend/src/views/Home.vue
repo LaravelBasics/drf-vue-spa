@@ -24,11 +24,10 @@ const breadcrumbs = computed(() => [
     },
 ]);
 
-// ⭐ マウント時に権限エラーチェック（nextTick 不要）
+// マウント時に権限エラーチェック
 onMounted(() => {
     if (route.query.unauthorized === 'admin') {
         showWarning('notifications.unauthorized.admin');
-        // ⭐ nextTick 不要（router.replace は非同期だが await 不要）
         router.replace({ path: routes.HOME, query: {} });
     }
 });
@@ -51,6 +50,7 @@ const menuItems = computed(() => [
     },
 ]);
 
+// 管理者権限が必要なメニューをフィルタリング
 const filteredMenuItems = computed(() => {
     return menuItems.value.filter((item) => {
         if (item.requiresAdmin) {

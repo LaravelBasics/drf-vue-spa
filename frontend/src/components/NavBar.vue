@@ -19,6 +19,7 @@ const { handleApiError } = useApiError();
 
 const loggingOut = ref(false);
 
+// ユーザー名表示（優先順位: username > employee_id > ゲスト）
 const displayName = computed(() => {
     return auth.user?.username || auth.user?.employee_id || 'ゲスト';
 });
@@ -78,7 +79,7 @@ function goToHome() {
 
         <v-spacer />
 
-        <!-- ⭐ offset-y を削除（Vuetify 3 では不要） -->
+        <!-- ユーザーメニュー：Vuetify 3ではoffset-yは不要 -->
         <v-menu location="bottom end">
             <template v-slot:activator="{ props }">
                 <v-chip v-bind="props" :color="primaryColor" class="me-2">
@@ -110,7 +111,7 @@ function goToHome() {
 
                 <v-divider />
 
-                <!-- ⭐ disabled があれば自動的にイベントが無効化されるため、条件チェック不要 -->
+                <!-- ログアウト中はクリック無効化（disabled属性で自動制御） -->
                 <v-list-item
                     :tabindex="loggingOut ? -1 : 0"
                     :prepend-icon="ICONS.nav.logout"

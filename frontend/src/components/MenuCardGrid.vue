@@ -5,9 +5,8 @@ defineProps({
     items: {
         type: Array,
         required: true,
+        // 各アイテムに一意のidが必須（v-forのkey用）
         validator: (items) => items.every((item) => item.id),
-        // ⭐ 例: [{ id: 'admin', icon: 'admin_panel_settings', title: '管理', to: '/admin' }]
-        // ⭐ id プロパティを追加することで、keyの問題を解決
     },
 });
 </script>

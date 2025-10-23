@@ -1,19 +1,20 @@
 // src/constants/theme.js - テーマ・デザイン統一管理
 
+// カラーパレット定義
 export const COLORS = Object.freeze({
     // ブランドカラー
     brand: {
-        primary: '#1976D2', // メインブルー
-        secondary: '#424242', // グレー
-        accent: '#FF5722', // アクセントオレンジ
+        primary: '#1976D2',
+        secondary: '#424242',
+        accent: '#FF5722',
     },
 
     // 状態カラー
     status: {
-        success: '#4CAF50', // 成功・完了・OK
-        error: '#F44336', // 失敗・危険・停止
-        warning: '#FF9800', // 注意・警告・確認
-        info: '#2196F3', // 情報・ヒント・通知
+        success: '#4CAF50', // 成功・完了
+        error: '#F44336', // 失敗・危険
+        warning: '#FF9800', // 注意・警告
+        info: '#2196F3', // 情報・通知
     },
 
     // グレースケール
@@ -72,7 +73,7 @@ export const BORDER_RADIUS = Object.freeze({
     round: 50,
 });
 
-// ⭐ COMPONENT_CONFIGS を追加
+// コンポーネント設定（サイズ、パディング、エレベーションなど）
 export const COMPONENT_CONFIGS = Object.freeze({
     // ヘッダー設定
     header: {
@@ -161,9 +162,8 @@ export const THEME_CONFIG = {
             rounded: BORDER_RADIUS.md,
         },
         VAppBarNavIcon: {
-            // 影（浮き上がり）をなくすために elevation を無効化
+            // ハンバーガーメニューの影を無効化
             elevation: ELEVATION.none,
-            // variantをtextにして、背景色をつけないようにする (念のため)
             variant: 'text',
         },
         VCard: {

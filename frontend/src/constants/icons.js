@@ -1,4 +1,4 @@
-// src/constants/icons.js - Material Symbols (Google公式) 版
+// src/constants/icons.js - Material Symbols (Google公式) アイコン定義
 
 export const ICONS = Object.freeze({
     // アプリケーションのタイトル・ロゴ
@@ -14,10 +14,11 @@ export const ICONS = Object.freeze({
         settings: 'settings',
         profile: 'account_circle',
         logout: 'logout',
-        divider: 'chevron_right',
+        divider: 'chevron_right', // パンくずリストの区切り
         management: 'admin_panel_settings',
     },
 
+    // メニュー（機能別アイコン）
     menu: {
         // ユーザー管理
         users: 'group',
@@ -40,7 +41,7 @@ export const ICONS = Object.freeze({
         export: 'download',
     },
 
-    // ボタン
+    // ボタン操作
     buttons: {
         add: 'add',
         edit: 'edit',
@@ -52,17 +53,17 @@ export const ICONS = Object.freeze({
         refresh: 'refresh',
         download: 'download',
         upload: 'upload',
-        export: 'description', // Excelアイコンの代替
+        export: 'description', // Excel/CSVエクスポート用
         view: 'visibility',
         detail: 'info',
-        close: 'close', // ⭐ 明示的に追加
+        close: 'close',
         arrowForward: 'arrow_forward',
         arrowBack: 'arrow_back',
         csv: 'table_chart',
         pdf: 'picture_as_pdf',
     },
 
-    // 状態
+    // 状態表示
     status: {
         success: 'check_circle',
         error: 'error',
@@ -72,10 +73,10 @@ export const ICONS = Object.freeze({
         admin: 'verified_user',
         check: 'check',
         minus: 'remove',
-        alert: 'notification_important', // ⭐ 追加
+        alert: 'notification_important',
     },
 
-    // フォーム
+    // フォーム入力
     form: {
         user: 'person',
         password: 'lock',
@@ -95,9 +96,9 @@ export const ICONS = Object.freeze({
         folder: 'folder',
     },
 
-    // ⭐ ブランド・その他
+    // ブランド・その他
     brand: {
-        deployed_code: 'deployed_code', // GitHubロゴの代替（Material Symbolsにロゴはないため）
+        deployed_code: 'deployed_code',
         language: 'language', // 言語切り替え用
     },
 });

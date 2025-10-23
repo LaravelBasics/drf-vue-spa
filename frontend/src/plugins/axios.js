@@ -1,4 +1,4 @@
-// src/plugins/axios.js (改善版)
+// src/plugins/axios.js - Axios設定とCSRF管理
 
 import axios from 'axios';
 import Cookies from 'js-cookie';
@@ -6,7 +6,7 @@ import { useLocaleStore } from '@/stores/locale';
 
 const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/';
-const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT || '10000', 10); // デフォルト10秒
+const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT || '10000', 10);
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -14,6 +14,10 @@ const api = axios.create({
     timeout: API_TIMEOUT,
 });
 
+/**
+ * CSRFトークン管理クラス
+ * 重複リクエストを防ぎ、トークン取得を一度だけ実行
+ */
 class CSRFManager {
     constructor() {
         this.tokenFetched = false;
@@ -40,7 +44,6 @@ class CSRFManager {
             await api.get('auth/csrf/');
             this.tokenFetched = true;
         } catch (error) {
-            console.error('CSRFトークンの取得に失敗:', error);
             throw error;
         }
     }
@@ -53,15 +56,16 @@ class CSRFManager {
 
 const csrfManager = new CSRFManager();
 
-// リクエストインターセプター
+// リクエストインターセプター（言語ヘッダー + CSRFトークン）
 api.interceptors.request.use(async (config) => {
-    // ⭐ 言語ヘッダーを追加
+    // 言語設定をヘッダーに追加
     const localeStore = useLocaleStore();
     config.headers['Accept-Language'] = localeStore.locale;
 
     const method = config.method?.toLowerCase();
     const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
 
+    // 更新系メソッドの場合CSRFトークンを付与
     if (methodsRequiringCsrf.includes(method)) {
         try {
             await csrfManager.ensureToken();
@@ -70,49 +74,44 @@ api.interceptors.request.use(async (config) => {
                 config.headers['X-CSRFToken'] = csrfToken;
             }
         } catch (error) {
-            console.warn('CSRFトークンの設定をスキップ:', error);
+            // CSRFトークン取得失敗時はスキップ
         }
     }
 
     return config;
 });
 
-// ⭐ CSRFトークンリセット関数をエクスポート
+// CSRFトークンリセット関数（ログアウト時などに使用）
 export const resetCSRFToken = () => {
     csrfManager.reset();
 };
 
-// レスポンスインターセプター（改善版）
+// レスポンスインターセプター（認証エラー処理）
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const { response, config } = error;
 
         if (response) {
-            // 認証エラーハンドリング
+            // 認証エラー（401/403）時の自動ログアウト
             if ([401, 403].includes(response.status)) {
                 const isLogoutRequest = config.url?.endsWith('auth/logout/');
 
                 if (!isLogoutRequest) {
-                    // ⭐ 直接ストアを呼び出し（コールバック不要）
                     const { useAuthStore } = await import('@/stores/auth');
                     const auth = useAuthStore();
 
                     if (auth.isAuthenticated) {
-                        console.warn(
-                            '認証エラーが発生しました - 自動ログアウトします',
-                        );
                         await auth.logout(true);
                     }
                 }
             }
 
-            // CSRFエラーの場合はトークンをリセット
+            // CSRFエラー時はトークンをリセット
             if (
                 response.status === 403 &&
                 response.data?.detail?.toLowerCase().includes('csrf')
             ) {
-                console.warn('CSRFトークンエラー - リセットします');
                 csrfManager.reset();
             }
         }

@@ -34,10 +34,10 @@ const primaryColor = computed(
 );
 
 onMounted(async () => {
-    // ⭐ nextTick を使用（Vue 3 公式推奨）
     await nextTick();
     isVisible.value = true;
 
+    // ログアウト成功メッセージ表示
     if (route.query.logout === 'success') {
         showInfo('auth.logoutSuccess', {}, 3000);
         router.replace({ path: routes.LOGIN, query: {} });
@@ -45,13 +45,13 @@ onMounted(async () => {
 });
 
 async function onSubmit() {
-    // ⭐ 重複送信防止（最優先）
+    // 重複送信防止
     if (loading.value) return;
 
     const { valid } = await form.value.validate();
 
     if (!valid) {
-        // ⭐ バリデーションエラー時のフォーカス処理
+        // バリデーションエラー時は最初のエラーフィールドにフォーカス
         await nextTick();
         const firstErrorInput = document.querySelector('.v-input--error input');
         if (firstErrorInput) {
@@ -69,7 +69,7 @@ async function onSubmit() {
 
         isVisible.value = false;
 
-        // ⭐ アニメーション完了後に遷移
+        // アニメーション完了後に遷移
         setTimeout(async () => {
             const redirect = route.query.next || routes.HOME;
             await router.push(redirect);

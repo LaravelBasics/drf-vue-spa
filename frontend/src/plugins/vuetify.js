@@ -1,14 +1,15 @@
-// src/plugins/vuetify.js - i18n完全対応版
+// src/plugins/vuetify.js - Vuetify設定（Material Symbols使用）
+
 import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { h } from 'vue';
-import { ja, en } from 'vuetify/locale'; // ⭐ 英語も追加
+import { ja, en } from 'vuetify/locale';
 import { THEME_CONFIG } from '@/constants/theme';
 
 import 'vuetify/styles';
 
-// ⭐ Material Symbols のカスタムアイコンセット
+// Material Symbolsのカスタムアイコンセット
 const materialSymbols = {
     aliases: {
         // ページネーション
@@ -45,6 +46,7 @@ const materialSymbols = {
         subgroup: 'arrow_right',
         delimiter: 'more_horiz',
     },
+    // Material Symbolsアイコンをレンダリングするコンポーネント
     component: (props) => {
         let iconName = props.icon.startsWith('md:')
             ? props.icon.substring(3)
@@ -80,9 +82,9 @@ const vuetify = createVuetify({
     },
     defaults: THEME_CONFIG.defaults,
     locale: {
-        locale: 'ja', // ⭐ デフォルトは日本語
+        locale: 'ja',
         fallback: 'ja',
-        messages: { ja, en }, // ⭐ 日本語と英語の両方を登録
+        messages: { ja, en },
     },
 });
 

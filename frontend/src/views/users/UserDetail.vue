@@ -1,3 +1,4 @@
+<!-- src/views/users/UserDetail.vue - ユーザー詳細画面 -->
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
@@ -13,9 +14,8 @@ const route = useRoute();
 const { t } = useI18n();
 const { handleApiError } = useApiError();
 
-const loading = ref(false); // ← true から false に変更
+const loading = ref(false);
 const user = ref({});
-// ⭐ adminCountを ref として保存
 const adminCount = ref(0);
 
 const userId = computed(() => route.params.id);
@@ -27,14 +27,13 @@ const breadcrumbs = computed(() => [
     { title: t('breadcrumbs.users.detail'), disabled: true },
 ]);
 
-// ⭐ computed で adminCount.value を使う
+// 最後の管理者かどうか判定（削除ボタンの無効化に使用）
 const isLastAdmin = computed(() => {
     if (!user.value.is_admin) return false;
     return adminCount.value === 1;
 });
 
 async function fetchUser() {
-    // ⭐ 重複リクエスト防止
     if (loading.value) return;
 
     loading.value = true;
@@ -45,7 +44,6 @@ async function fetchUser() {
         ]);
 
         user.value = userResponse.data;
-        // ⭐ adminCount を更新
         adminCount.value = adminCountResponse.data.count;
     } catch (error) {
         handleApiError(error);

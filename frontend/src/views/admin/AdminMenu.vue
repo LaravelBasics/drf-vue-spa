@@ -1,11 +1,4 @@
-<template>
-    <!-- ヘッダーコンポーネント -->
-    <Header :app-title="t('pages.admin.title')" :breadcrumbs="breadcrumbs" />
-
-    <!-- 管理者メニューカードグリッド -->
-    <MenuCardGrid :items="adminMenuItems" />
-</template>
-
+<!-- src/views/admin/AdminMenu.vue - 管理者メニュー画面 -->
 <script setup>
 import { computed } from 'vue';
 import { routes } from '@/constants/routes';
@@ -16,7 +9,7 @@ import { ICONS } from '@/constants/icons';
 
 const { t } = useI18n();
 
-// パンくずリスト
+// パンくずリスト定義
 const breadcrumbs = computed(() => [
     {
         title: t('breadcrumbs.home'),
@@ -30,10 +23,10 @@ const breadcrumbs = computed(() => [
     },
 ]);
 
-// 管理者メニューのカード定義
+// 管理者メニューカードの定義
 const adminMenuItems = computed(() => [
     {
-        id: 'users', // ⭐ ユニークなID
+        id: 'users',
         icon: ICONS.menu.users,
         title: t('pages.users.list.title'),
         to: routes.USERS,
@@ -41,3 +34,9 @@ const adminMenuItems = computed(() => [
     },
 ]);
 </script>
+
+<template>
+    <Header :app-title="t('pages.admin.title')" :breadcrumbs="breadcrumbs" />
+
+    <MenuCardGrid :items="adminMenuItems" />
+</template>

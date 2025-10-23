@@ -36,20 +36,20 @@ const usernameRules = createRules.username();
 const employeeIdRules = createRules.employeeId();
 const passwordRules = createRules.newPassword();
 
-// ⭐ Vue 3 公式推奨: nextTick を使用
+// 画面表示時にユーザー名フィールドにフォーカス
 onMounted(async () => {
     await nextTick();
     usernameField.value?.focus();
 });
 
 async function submitForm() {
-    // ⭐ 重複送信防止（最優先）
+    // 重複送信防止
     if (submitting.value) return;
 
     const { valid } = await form.value.validate();
 
     if (!valid) {
-        // ⭐ バリデーションエラー時のフォーカス処理
+        // バリデーションエラー時は最初のエラーフィールドにフォーカス
         await nextTick();
         const firstErrorInput = document.querySelector('.v-input--error input');
         if (firstErrorInput) {

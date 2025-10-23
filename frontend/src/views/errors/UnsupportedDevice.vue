@@ -1,3 +1,4 @@
+<!-- src/views/errors/UnsupportedDevice.vue - 画面サイズ非対応ページ -->
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -8,7 +9,7 @@ const { t } = useI18n();
 const windowWidth = ref(window.innerWidth);
 const windowHeight = ref(window.innerHeight);
 
-// ⭐ 表示更新のみ（遷移は App.vue に任せる）
+// ウィンドウサイズ変更時の表示更新（遷移はApp.vueが自動処理）
 const handleResize = () => {
     windowWidth.value = window.innerWidth;
     windowHeight.value = window.innerHeight;
@@ -53,19 +54,6 @@ onBeforeUnmount(() => {
                     {{ BREAKPOINTS.LARGE_SCREEN }}px 以上
                 </p>
             </v-card-text>
-
-            <!-- ⭐ オプション: 手動で遷移するボタン -->
-            <!-- <v-card-actions class="justify-center pb-4">
-                <v-btn
-                    color="primary"
-                    variant="elevated"
-                    size="large"
-                    @click="handleGoToApp"
-                    :disabled="windowWidth < BREAKPOINTS.LARGE_SCREEN"
-                >
-                    {{ auth.isAuthenticated ? t('errors.unsupportedDevice.home') : t('auth.login') }}
-                </v-btn>
-            </v-card-actions> -->
         </v-card>
     </v-container>
 </template>

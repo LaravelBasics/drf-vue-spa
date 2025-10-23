@@ -1,4 +1,4 @@
-// src/constants/routes.js
+// src/constants/routes.js - ルート定義の一元管理
 
 export const routes = Object.freeze({
     // 認証関連
@@ -9,8 +9,6 @@ export const routes = Object.freeze({
     HOME: '/',
 
     // サブページ
-    // DASHBOARD: '/dashboard',
-    // PROFILE: '/profile',
     SETTINGS: '/settings',
 
     // 管理機能
@@ -21,6 +19,6 @@ export const routes = Object.freeze({
     USER_UPDATE: '/users/:id/update',
     USER_DELETE: '/users/:id/delete',
 
-    // ⭐ エラーページ
+    // エラーページ
     UNSUPPORTED_DEVICE: '/unsupported-device',
 });

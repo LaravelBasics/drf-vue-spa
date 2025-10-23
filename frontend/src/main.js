@@ -1,4 +1,4 @@
-// src/main.js - 最終改善版
+// src/main.js - アプリケーションのエントリーポイント
 import { createApp, nextTick } from 'vue';
 import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
@@ -16,6 +16,7 @@ import { useLocaleStore } from '@/stores/locale';
 
 const app = createApp(App);
 
+// Piniaセットアップ（永続化プラグイン有効化）
 const pinia = createPinia();
 pinia.use(piniaPluginPersistedstate);
 
@@ -24,22 +25,24 @@ app.use(router);
 app.use(vuetify);
 app.use(i18n);
 
-// ⭐ Vuetify インスタンスをグローバルに登録
+// Vuetifyインスタンスをグローバルに登録（locale.jsで使用）
 window.$vuetify = vuetify;
 
-// ⭐ グローバルエラーハンドラー（環境変数対応 + マウントチェック）
+/**
+ * グローバルエラーハンドラー
+ * - 開発環境: 詳細なログを出力
+ * - 本番環境: 簡潔なログのみ出力し、ユーザーに通知を表示
+ */
 app.config.errorHandler = (err, instance, info) => {
-    // ⭐ 開発環境でのみ詳細ログ
     if (import.meta.env.DEV) {
         console.error('Global error:', err);
         console.error('Component:', instance);
         console.error('Error info:', info);
     } else {
-        // ⭐ 本番環境では簡潔に
         console.error('Error:', err.message);
     }
 
-    // ⭐ アプリがマウント済みの場合のみ通知
+    // アプリがマウント済みの場合のみ通知表示
     if (app._container) {
         try {
             const notificationStore = useNotificationStore();
@@ -51,16 +54,18 @@ app.config.errorHandler = (err, instance, info) => {
     }
 };
 
-// ⭐ 未処理のPromise拒否をキャッチ（環境変数対応 + マウントチェック）
+/**
+ * 未処理のPromise拒否をキャッチ
+ * async/awaitやPromiseチェーンで捕捉されなかったエラーを処理
+ */
 window.addEventListener('unhandledrejection', (event) => {
-    // ⭐ 開発環境でのみ詳細ログ
     if (import.meta.env.DEV) {
         console.error('Unhandled promise rejection:', event.reason);
     } else {
         console.error('Promise rejection:', event.reason?.message);
     }
 
-    // ⭐ アプリがマウント済みの場合のみ通知
+    // アプリがマウント済みの場合のみ通知表示
     if (app._container) {
         try {
             const notificationStore = useNotificationStore();
@@ -71,36 +76,34 @@ window.addEventListener('unhandledrejection', (event) => {
         }
     }
 
-    // ⭐ デフォルトの警告を抑制
     event.preventDefault();
 });
 
-// ⭐ アプリケーション初期化
+/**
+ * アプリケーション初期化
+ * - 認証状態の復元
+ * - 言語設定の適用
+ * - 初期化失敗時もアプリを起動（部分的な機能提供）
+ */
 const initializeApp = async () => {
     let initializationError = null;
 
     try {
-        console.log('🔄 アプリケーション事前初期化...');
-
         const authStore = useAuthStore();
         const localeStore = useLocaleStore();
 
-        // ⭐ 認証状態を初期化
+        // 認証状態を初期化（セッション復元）
         await authStore.initialize();
 
-        // ⭐ Vuetify の初期言語を設定
+        // Vuetifyの初期言語を設定
         vuetify.locale.current = localeStore.locale;
-
-        console.log('✅ 事前初期化完了');
     } catch (error) {
-        console.error('❌ 事前初期化エラー（継続します）:', error);
         initializationError = error;
     } finally {
-        // ⭐ 初期化の成否に関わらずアプリを起動
+        // 初期化の成否に関わらずアプリを起動
         app.mount('#app');
-        console.log('✅ アプリケーション起動');
 
-        // ⭐ マウント後に初期化エラーを通知（nextTick で確実に）
+        // マウント後に初期化エラーを通知
         if (initializationError) {
             await nextTick();
             try {

@@ -15,14 +15,17 @@ const { t } = useI18n();
 const { createRules } = useValidation();
 const { showSuccess, handleApiError } = useApiError();
 
+// ローディング・送信状態
 const loading = ref(false);
 const submitting = ref(false);
 const form = ref(null);
 
+// パスワード変更UI制御
 const changePassword = ref(false);
 const showPassword = ref(false);
 const showPasswordConfirm = ref(false);
 
+// フォームデータ
 const formData = ref({
     username: '',
     employee_id: '',
@@ -48,6 +51,7 @@ const breadcrumbs = computed(() => [
 const usernameRules = createRules.username();
 const employeeIdRules = createRules.employeeId();
 
+// パスワード変更時のみバリデーションを適用
 const passwordRules = computed(() => {
     if (!changePassword.value) return [];
     return createRules.newPassword();
@@ -60,6 +64,9 @@ const passwordConfirmRules = computed(() => {
 
 const userId = computed(() => route.params.id);
 
+/**
+ * ユーザー情報を取得してフォームに反映
+ */
 async function fetchUser() {
     if (loading.value) return;
 
@@ -81,14 +88,20 @@ async function fetchUser() {
     }
 }
 
+/**
+ * フォーム送信処理
+ * - 重複送信防止
+ * - バリデーションエラー時は最初のエラー入力欄にフォーカス
+ * - パスワード変更時のみパスワードを送信
+ */
 async function submitForm() {
-    // ⭐ 重複送信防止（最優先）
+    // 重複送信を防止
     if (submitting.value) return;
 
     const { valid } = await form.value.validate();
 
     if (!valid) {
-        // ⭐ バリデーションエラー時のフォーカス処理（修正版）
+        // バリデーションエラー時、最初のエラー入力欄にフォーカス
         await nextTick();
         const firstErrorInput = document.querySelector('.v-input--error input');
         if (firstErrorInput) {
@@ -106,6 +119,7 @@ async function submitForm() {
             is_active: formData.value.is_active,
         };
 
+        // パスワード変更時のみパスワードを含める
         if (changePassword.value && formData.value.password) {
             updateData.password = formData.value.password;
         }

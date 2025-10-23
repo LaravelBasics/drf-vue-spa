@@ -2,55 +2,38 @@
 import { computed } from 'vue';
 
 const props = defineProps({
-    // モーダルの表示/非表示
     modelValue: {
         type: Boolean,
         default: false,
     },
-
-    // タイトル
     title: {
         type: String,
         default: '確認',
     },
-
-    // メッセージ
     message: {
         type: String,
         required: true,
     },
-
-    // 確認ボタンのテキスト
     confirmText: {
         type: String,
         default: '実行',
     },
-
-    // キャンセルボタンのテキスト
     cancelText: {
         type: String,
         default: 'キャンセル',
     },
-
-    // 確認ボタンの色（error, warning, primary等）
     confirmColor: {
         type: String,
         default: 'error',
     },
-
-    // アイコン
     icon: {
         type: String,
         default: 'alert-circle',
     },
-
-    // 確認ボタンのアイコン
     confirmIcon: {
         type: String,
         default: 'check',
     },
-
-    // ローディング状態
     loading: {
         type: Boolean,
         default: false,
@@ -64,7 +47,7 @@ const dialog = computed({
     set: (value) => emit('update:modelValue', value),
 });
 
-// ヘッダーの色クラス
+// 確認ボタンの色に応じてヘッダー背景を切り替え
 const headerClass = computed(() => {
     const colorMap = {
         error: 'bg-error text-white',
@@ -93,21 +76,18 @@ function handleCancel() {
         class="dialog-offset-up"
     >
         <v-card>
-            <!-- ヘッダー -->
             <v-card-title class="text-h5 pa-4" :class="headerClass">
                 <v-icon :icon="icon" class="me-2"></v-icon>
                 {{ title }}
             </v-card-title>
 
-            <!-- メッセージ -->
             <v-card-text class="pa-6">
                 <p class="text-body-1">{{ message }}</p>
 
-                <!-- 追加情報（オプション） -->
+                <!-- スロットで追加情報を差し込み可能 -->
                 <slot name="content"></slot>
             </v-card-text>
 
-            <!-- ボタン -->
             <v-card-actions class="pa-4">
                 <v-btn
                     :color="confirmColor"
@@ -135,32 +115,27 @@ function handleCancel() {
 
 <style scoped>
 .v-btn.custom-confirm {
-    /* ボーダーをボタン全体に追加 */
     border: 2px solid;
 }
 
-/* error color が指定された場合のボーダー色 */
 .v-btn.custom-confirm.v-btn--theme-error {
     border-color: rgb(var(--v-theme-error)) !important;
 }
 
-/* warning color が指定された場合のボーダー色 */
 .v-btn.custom-confirm.v-btn--theme-warning {
     border-color: rgb(var(--v-theme-warning)) !important;
 }
 
-/* primary color が指定された場合のボーダー色 */
 .v-btn.custom-confirm.v-btn--theme-primary {
     border-color: rgb(var(--v-theme-primary)) !important;
 }
 
-/* success color が指定された場合のボーダー色 */
 .v-btn.custom-confirm.v-btn--theme-success {
     border-color: rgb(var(--v-theme-success)) !important;
 }
 
+/* ダイアログ位置を上方向にオフセット */
 .dialog-offset-up :deep(.v-overlay__content) {
-    /* 垂直方向の上端から30pxの位置に配置 */
     top: 50px !important;
     width: 80%;
     height: 40%;

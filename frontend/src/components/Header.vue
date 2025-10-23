@@ -37,6 +37,7 @@ const headerHeight = computed(
     () => COMPONENT_CONFIGS.header.height.desktop || 64,
 );
 
+// ボタンの色を動的に取得（デフォルトはprimary）
 function getButtonColor(type = 'primary') {
     const colors = theme.global.current.value?.colors;
     const colorMap = {
@@ -59,6 +60,7 @@ function getButtonColor(type = 'primary') {
         :height="headerHeight"
         app
     >
+        <!-- アプリタイトル（PC以上で表示） -->
         <div
             class="ml-5 d-none d-sm-inline align-center"
             style="min-width: 0; flex-shrink: 1"
@@ -68,6 +70,7 @@ function getButtonColor(type = 'primary') {
             </span>
         </div>
 
+        <!-- パンくずリスト（breadcrumbsが存在する場合のみ表示） -->
         <div
             v-if="breadcrumbs && breadcrumbs.length > 0"
             class="flex-grow-1 d-flex justify-center"
@@ -98,6 +101,7 @@ function getButtonColor(type = 'primary') {
 
         <v-spacer v-else></v-spacer>
 
+        <!-- ページ固有のアクションボタン群 -->
         <div class="d-flex align-center" style="flex-shrink: 0">
             <v-btn
                 v-for="(button, index) in props.pageButtons"

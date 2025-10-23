@@ -1,3 +1,4 @@
+<!-- src/views/users/UserList.vue - ユーザー一覧画面 -->
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
@@ -21,7 +22,6 @@ const currentPage = ref(1);
 const itemsPerPage = ref(10);
 const sortBy = ref([]);
 
-// ⭐ デバウンス用タイマー
 let searchTimer = null;
 
 const headerButtons = computed(() => [
@@ -50,6 +50,7 @@ const breadcrumbs = computed(() => [
     },
 ]);
 
+// レスポンシブ対応: PC画面では作成日時も表示
 const headers = computed(() => {
     const baseHeaders = [
         { title: t('form.fields.id'), key: 'id', sortable: true },
@@ -103,23 +104,14 @@ const hoverTooltipText = computed(() => {
     return `"${text}"`;
 });
 
-// ⭐ 外部ページネーション用
+// ページネーション用の総ページ数
 const totalPages = computed(() => {
-    const pages = Math.ceil(totalItems.value / itemsPerPage.value);
-    console.log('📄 Total Pages:', {
-        totalItems: totalItems.value,
-        itemsPerPage: itemsPerPage.value,
-        pages,
-    });
-    return pages;
+    return Math.ceil(totalItems.value / itemsPerPage.value);
 });
 
-// ⭐ データ取得関数
+// データ取得処理（ページネーション、ソート、検索対応）
 async function loadItems({ page, itemsPerPage, sortBy }) {
-    console.log('📊 loadItems called:', { page, itemsPerPage, sortBy });
-
     if (loading.value) {
-        console.log('⏳ Already loading, skipping...');
         return;
     }
 
@@ -141,7 +133,6 @@ async function loadItems({ page, itemsPerPage, sortBy }) {
             params.ordering = `${orderPrefix}${sort.key}`;
         }
 
-        console.log('🔄 Fetching with params:', params);
         const response = await usersAPI.list(params);
 
         if (response.data.results) {
@@ -152,27 +143,18 @@ async function loadItems({ page, itemsPerPage, sortBy }) {
             totalItems.value = response.data.length;
         }
 
-        console.log('✅ Data loaded:', {
-            usersCount: users.value.length,
-            totalItems: totalItems.value,
-        });
-
         updateURLParams({ page, itemsPerPage, sortBy });
     } catch (error) {
-        console.error('❌ ユーザー一覧取得エラー:', error);
+        // エラーは親コンポーネントで処理
     } finally {
         loading.value = false;
     }
 }
 
-// ⭐ 検索クエリの変更を監視（デバウンス付き）
-watch(searchQuery, (newValue, oldValue) => {
-    console.log('🔍 Search query changed:', { from: oldValue, to: newValue });
-
+// 検索クエリ変更時の処理（デバウンス: 300ms）
+watch(searchQuery, () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
-        console.log('🔍 Executing search...');
-        // ⭐ ページを1にリセットして再検索
         currentPage.value = 1;
         loadItems({
             page: 1,
@@ -182,7 +164,7 @@ watch(searchQuery, (newValue, oldValue) => {
     }, 300);
 });
 
-// URL パラメータ更新
+// URLパラメータにフィルタ条件を保存
 function updateURLParams({ page, itemsPerPage, sortBy }) {
     const query = {};
 
@@ -207,7 +189,7 @@ function updateURLParams({ page, itemsPerPage, sortBy }) {
     router.replace({ query });
 }
 
-// URL パラメータから初期化
+// URLパラメータから初期状態を復元
 function initFromURLParams() {
     const query = route.query;
 
@@ -251,14 +233,12 @@ function handleRowClick(event, { item }) {
 }
 
 function exportCSV() {
-    console.log('Export CSV');
+    // TODO: CSV出力処理を実装
 }
 
 onMounted(() => {
-    console.log('🚀 UserList mounted');
     initFromURLParams();
 
-    // ⭐ 初回データ取得
     loadItems({
         page: currentPage.value,
         itemsPerPage: itemsPerPage.value,
@@ -266,9 +246,8 @@ onMounted(() => {
     });
 });
 
-// ⭐ クリーンアップ（メモリリーク対策）
+// クリーンアップ（メモリリーク対策）
 onBeforeUnmount(() => {
-    console.log('👋 UserList unmounting');
     if (searchTimer) {
         clearTimeout(searchTimer);
         searchTimer = null;
@@ -381,7 +360,7 @@ onBeforeUnmount(() => {
                 </template>
             </v-data-table-server>
 
-            <!-- ⭐ 外部ページネーション（元のデザイン） -->
+            <!-- 外部ページネーション -->
             <div class="d-flex justify-center mt-4">
                 <v-pagination
                     v-model="currentPage"

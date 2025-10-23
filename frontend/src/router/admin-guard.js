@@ -1,4 +1,5 @@
-// src/router/admin-guard.js
+// src/router/admin-guard.js - 管理者権限チェック
+
 import { useAuthStore } from '@/stores/auth';
 import { routes } from '@/constants/routes';
 
@@ -10,32 +11,22 @@ export const adminGuard = async (to, from) => {
 
     const auth = useAuthStore();
 
-    console.log('🔐 Admin Guard:', {
-        path: to.path,
-        user: auth.user?.employee_id,
-        isAdmin: auth.user?.is_admin,
-    });
-
     // ユーザー情報がない場合（念のため）
     if (!auth.user) {
-        console.log('⏳ ユーザー情報を待機中...');
         return true;
     }
 
     // 管理者権限チェック
     if (!auth.user.is_admin) {
-        console.warn('🚫 管理者権限がありません');
-
-        // ⭐ ホームにリダイレクト + 通知用フラグ
+        // ホームにリダイレクト + 通知用フラグを設定
         return {
             path: routes.HOME,
             replace: true,
             query: {
-                unauthorized: 'admin', // ⭐ シンプルなフラグ
+                unauthorized: 'admin',
             },
         };
     }
 
-    console.log('✅ 管理者権限確認完了');
     return true;
 };

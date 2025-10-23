@@ -21,7 +21,7 @@ const route = useRoute();
 const router = useRouter();
 const appReady = ref(false);
 
-// ⭐ リサイズ監視用
+// リサイズ監視用
 const windowWidth = ref(window.innerWidth);
 let resizeTimer = null;
 
@@ -29,6 +29,7 @@ const isUnsupportedRoute = computed(() => {
     return route.path === routes.UNSUPPORTED_DEVICE;
 });
 
+// フォント・アイコン読み込み待機
 const waitForFontsAndIcons = () => {
     return new Promise((resolve) => {
         if (document.fonts) {
@@ -39,7 +40,7 @@ const waitForFontsAndIcons = () => {
     });
 };
 
-// ⭐ デバウンス付きリサイズハンドラー
+// デバウンス付きリサイズハンドラー（250ms待機）
 function handleResize() {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
@@ -47,32 +48,22 @@ function handleResize() {
     }, 250);
 }
 
-// ⭐ watch で画面サイズの変化を監視
+// 画面サイズ変更時の自動遷移処理
 watch(windowWidth, (newWidth) => {
     const isLarge = newWidth >= BREAKPOINTS.LARGE_SCREEN;
 
-    console.log('📱 Window Width Changed:', {
-        width: newWidth,
-        threshold: BREAKPOINTS.LARGE_SCREEN,
-        isLarge,
-        currentRoute: route.path,
-        requiresLargeScreen: route.meta?.requiresLargeScreen,
-    });
-
-    // パターン1: 大画面必須のページで画面が小さくなった
+    // パターン1: 大画面必須ページで画面が小さくなった → UNSUPPORTED_DEVICEへ
     if (
         route.meta?.requiresLargeScreen &&
         !isLarge &&
         route.path !== routes.UNSUPPORTED_DEVICE
     ) {
-        console.warn('📱 画面が小さくなりました - UNSUPPORTED_DEVICE へ遷移');
         router.push({ path: routes.UNSUPPORTED_DEVICE, replace: true });
         return;
     }
 
-    // パターン2: UNSUPPORTED_DEVICE で画面が大きくなった
+    // パターン2: UNSUPPORTED_DEVICEで画面が大きくなった → 適切なページへ
     if (route.path === routes.UNSUPPORTED_DEVICE && isLarge) {
-        console.log('✅ 画面が大きくなりました - 適切なページへ遷移');
         const targetRoute = auth.isAuthenticated ? routes.HOME : routes.LOGIN;
         router.push({ path: targetRoute, replace: true });
     }
@@ -80,30 +71,25 @@ watch(windowWidth, (newWidth) => {
 
 onMounted(async () => {
     try {
-        console.log('🔄 UI準備開始...');
-
         await Promise.all([
             auth.initialized ? Promise.resolve() : auth.initialize(),
             waitForFontsAndIcons(),
         ]);
 
         await nextTick();
-
-        console.log('✅ UI準備完了 - 表示開始');
         appReady.value = true;
 
-        // ⭐ リサイズイベントリスナー登録
+        // リサイズイベントリスナー登録
         window.addEventListener('resize', handleResize);
 
-        // ⭐ 初回チェック（マウント時に一度だけ実行）
+        // 初回チェック
         windowWidth.value = window.innerWidth;
     } catch (error) {
-        console.error('❌ UI準備エラー:', error);
         appReady.value = true;
     }
 });
 
-// ⭐ クリーンアップ
+// クリーンアップ
 onBeforeUnmount(() => {
     window.removeEventListener('resize', handleResize);
     if (resizeTimer) {
@@ -115,14 +101,16 @@ onBeforeUnmount(() => {
 
 <template>
     <v-app>
+        <!-- 通知コンポーネント（全画面共通） -->
         <Notification />
 
+        <!-- メインコンテンツ（フェードインアニメーション付き） -->
         <div
             v-show="appReady"
             :class="['app-content', { 'fade-in': appReady }]"
         >
+            <!-- ログイン済み & UNSUPPORTED_DEVICE以外でナビゲーションを表示 -->
             <NavBar v-if="auth.user && !isUnsupportedRoute" />
-
             <SideBar v-if="auth.user && !isUnsupportedRoute" />
 
             <v-main>
@@ -132,6 +120,7 @@ onBeforeUnmount(() => {
             <Footer v-if="auth.user && !isUnsupportedRoute" />
         </div>
 
+        <!-- ローディング画面 -->
         <div v-show="!appReady" class="loading-screen"></div>
     </v-app>
 </template>

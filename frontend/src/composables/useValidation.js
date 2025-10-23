@@ -1,24 +1,38 @@
-// src/composables/useValidation.js - 改善版（重複削除）
+// src/composables/useValidation.js
+// バリデーションルールの組み合わせを提供するComposable
 
 import { useI18n } from 'vue-i18n';
 import { createValidationRules } from '@/utils/validation';
 
+/**
+ * よく使われるバリデーションルールの組み合わせを提供
+ * 各画面で個別にルールを組み立てる手間を省き、統一したバリデーションを実現
+ */
 export function useValidation() {
     const { t } = useI18n();
     const rules = createValidationRules();
 
-    // よく使われる組み合わせを定義
     const createRules = {
-        // ログイン用社員番号
+        /**
+         * ログイン画面用の社員番号バリデーション
+         * - 必須チェック
+         * - フォーマットチェック（数値のみ）
+         * - 最大長チェック
+         */
         loginEmployeeId() {
             return [
                 rules.required('employeeId'),
-                rules.employeeId(), // ⭐ utils から使用
-                rules.maxLength('employeeId', 50), // ⭐ 追加
+                rules.employeeId(),
+                rules.maxLength('employeeId', 50),
             ];
         },
 
-        // ログイン用パスワード
+        /**
+         * ログイン画面用のパスワードバリデーション
+         * - 必須チェック
+         * - 最大長チェック
+         * ※ログイン時は強度チェックなし
+         */
         loginPassword() {
             return [
                 rules.required('password'),
@@ -26,7 +40,12 @@ export function useValidation() {
             ];
         },
 
-        // ユーザー管理用ユーザー名
+        /**
+         * ユーザー管理用のユーザー名バリデーション
+         * - 必須チェック
+         * - 最小3文字
+         * - 最大50文字
+         */
         username() {
             return [
                 rules.required('username'),
@@ -35,26 +54,42 @@ export function useValidation() {
             ];
         },
 
-        // ユーザー管理用社員番号
+        /**
+         * ユーザー管理用の社員番号バリデーション
+         * - 必須チェック
+         * - フォーマットチェック（数値のみ）
+         * - 最大長チェック
+         */
         employeeId() {
             return [
                 rules.required('employeeId'),
-                rules.employeeId(), // ⭐ utils から使用
-                rules.maxLength('employeeId', 50), // ⭐ 追加
+                rules.employeeId(),
+                rules.maxLength('employeeId', 50),
             ];
         },
 
-        // 新規登録用パスワード
+        /**
+         * 新規登録・パスワード変更用のパスワードバリデーション
+         * - 必須チェック
+         * - 最小8文字
+         * - 最大128文字
+         * - 強度チェック（英字+数字の組み合わせ必須）
+         */
         newPassword() {
             return [
                 rules.required('password'),
                 rules.minLength('password', 8),
                 rules.maxLength('password', 128),
-                rules.passwordStrength(), // 英字+数字チェック
+                rules.passwordStrength(),
             ];
         },
 
-        // パスワード確認用
+        /**
+         * パスワード確認入力用のバリデーション
+         * - 必須チェック
+         * - 元のパスワードとの一致チェック
+         * @param {string} originalPassword - 比較元のパスワード
+         */
         passwordConfirm(originalPassword) {
             return [
                 rules.required('password'),
@@ -64,7 +99,12 @@ export function useValidation() {
             ];
         },
 
-        // メールアドレス
+        /**
+         * メールアドレス用のバリデーション
+         * - 必須チェック
+         * - メールフォーマットチェック
+         * - 最大255文字
+         */
         email() {
             return [
                 rules.required('email'),

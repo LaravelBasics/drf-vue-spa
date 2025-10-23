@@ -1,4 +1,4 @@
-// src/stores/auth.js - 修正版
+// src/stores/auth.js - 認証状態管理
 
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
@@ -18,7 +18,7 @@ export const useAuthStore = defineStore(
         const isAuthenticated = computed(() => !!user.value);
         const isLoading = computed(() => loading.value);
 
-        // ⭐ 修正: 不要な return を削除、catch 文を簡潔化
+        // ログイン処理（セッションベース）
         async function loginSession(employeeId, password) {
             loading.value = true;
             error.value = null;
@@ -26,12 +26,12 @@ export const useAuthStore = defineStore(
             try {
                 await authAPI.login(employeeId, password);
                 await fetchUser();
-                // ✅ 成功時は何も返さない（エラーがなければ成功）
             } finally {
                 loading.value = false;
             }
         }
 
+        // ユーザー情報取得
         async function fetchUser() {
             if (loading.value) return;
 
@@ -40,13 +40,10 @@ export const useAuthStore = defineStore(
                 const response = await authAPI.me();
                 user.value = response.data;
                 error.value = null;
-                console.log('✅ ユーザー情報取得成功:', user.value);
             } catch (err) {
                 if (err.response?.status === 403) {
                     user.value = null;
-                    console.log('ℹ️ 未認証状態を確認');
                 } else {
-                    console.error('❌ ユーザー情報の取得に失敗:', err);
                     error.value = 'ユーザー情報の取得に失敗しました';
                 }
             } finally {
@@ -54,6 +51,7 @@ export const useAuthStore = defineStore(
             }
         }
 
+        // ログアウト処理
         async function logout(redirect = true) {
             loading.value = true;
 
@@ -62,7 +60,7 @@ export const useAuthStore = defineStore(
                     await authAPI.logout();
                 }
             } catch (e) {
-                console.error('Logout API failed:', e);
+                // ログアウトAPIが失敗してもクライアント側の状態はクリア
             } finally {
                 user.value = null;
                 error.value = null;
@@ -73,9 +71,7 @@ export const useAuthStore = defineStore(
                     redirect &&
                     router.currentRoute.value.path !== routes.LOGIN
                 ) {
-                    router.push(routes.LOGIN).catch((err) => {
-                        console.warn('リダイレクトエラー:', err);
-                    });
+                    router.push(routes.LOGIN).catch(() => {});
                 }
             }
         }
@@ -84,68 +80,43 @@ export const useAuthStore = defineStore(
             error.value = null;
         }
 
+        // 初期化処理（アプリ起動時に実行）
         async function initialize() {
             if (initialized.value) {
-                console.log('ℹ️ 既に初期化済みのためスキップ');
                 return;
             }
 
-            console.log('🔄 認証状態の初期化を開始...');
             loading.value = true;
 
             try {
                 if (user.value) {
-                    console.log(
-                        'ℹ️ 永続化されたユーザー情報を発見 - サーバーと同期します',
-                    );
-
+                    // 永続化されたユーザー情報がある場合はサーバーと同期
                     try {
                         await fetchUser();
-                        console.log('✅ サーバーとの同期完了');
                     } catch (error) {
                         if (error.response?.status === 403) {
-                            console.log(
-                                '⚠️ セッション無効 - ログアウト処理実行',
-                            );
+                            // セッション無効の場合はログアウト
                             user.value = null;
                             error.value = null;
-                        } else {
-                            console.warn(
-                                '⚠️ 一時的なエラー - 永続化データを保持:',
-                                error.message,
-                            );
                         }
                     }
-                } else {
-                    console.log(
-                        'ℹ️ 永続化されたユーザー情報なし - 未認証状態で開始',
-                    );
                 }
             } finally {
                 initialized.value = true;
                 loading.value = false;
-                console.log('✅ 認証状態の初期化完了');
             }
         }
 
+        // セッション有効性チェック
         async function validateSession() {
             if (!user.value) {
-                console.log(
-                    'ℹ️ ユーザー情報がないためセッション検証をスキップ',
-                );
                 return false;
             }
 
-            console.log('🔄 セッション有効性を検証中...');
             try {
                 await fetchUser();
-                const isValid = !!user.value;
-                console.log(
-                    isValid ? '✅ セッション有効' : '❌ セッション無効',
-                );
-                return isValid;
+                return !!user.value;
             } catch (error) {
-                console.error('❌ セッション検証エラー:', error);
                 return false;
             }
         }
