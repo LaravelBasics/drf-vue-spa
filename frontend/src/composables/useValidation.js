@@ -1,24 +1,15 @@
-// src/composables/useValidation.js
-// バリデーションルールの組み合わせを提供するComposable
+// src/composables/useValidation.js - フォームバリデーション
 
 import { useI18n } from 'vue-i18n';
 import { createValidationRules } from '@/utils/validation';
 
-/**
- * よく使われるバリデーションルールの組み合わせを提供
- * 各画面で個別にルールを組み立てる手間を省き、統一したバリデーションを実現
- */
 export function useValidation() {
     const { t } = useI18n();
     const rules = createValidationRules();
 
+    // よく使われるバリデーションルールの組み合わせ
     const createRules = {
-        /**
-         * ログイン画面用の社員番号バリデーション
-         * - 必須チェック
-         * - フォーマットチェック（数値のみ）
-         * - 最大長チェック
-         */
+        // ログイン用社員番号（既存ユーザー向け）
         loginEmployeeId() {
             return [
                 rules.required('employeeId'),
@@ -27,12 +18,7 @@ export function useValidation() {
             ];
         },
 
-        /**
-         * ログイン画面用のパスワードバリデーション
-         * - 必須チェック
-         * - 最大長チェック
-         * ※ログイン時は強度チェックなし
-         */
+        // ログイン用パスワード（強度チェックなし）
         loginPassword() {
             return [
                 rules.required('password'),
@@ -40,12 +26,7 @@ export function useValidation() {
             ];
         },
 
-        /**
-         * ユーザー管理用のユーザー名バリデーション
-         * - 必須チェック
-         * - 最小3文字
-         * - 最大50文字
-         */
+        // ユーザー管理用ユーザー名
         username() {
             return [
                 rules.required('username'),
@@ -54,12 +35,7 @@ export function useValidation() {
             ];
         },
 
-        /**
-         * ユーザー管理用の社員番号バリデーション
-         * - 必須チェック
-         * - フォーマットチェック（数値のみ）
-         * - 最大長チェック
-         */
+        // ユーザー管理用社員番号
         employeeId() {
             return [
                 rules.required('employeeId'),
@@ -68,28 +44,17 @@ export function useValidation() {
             ];
         },
 
-        /**
-         * 新規登録・パスワード変更用のパスワードバリデーション
-         * - 必須チェック
-         * - 最小8文字
-         * - 最大128文字
-         * - 強度チェック（英字+数字の組み合わせ必須）
-         */
+        // 新規登録用パスワード（強度チェックあり）
         newPassword() {
             return [
                 rules.required('password'),
                 rules.minLength('password', 8),
                 rules.maxLength('password', 128),
-                rules.passwordStrength(),
+                rules.passwordStrength(), // 英字+数字の組み合わせ必須
             ];
         },
 
-        /**
-         * パスワード確認入力用のバリデーション
-         * - 必須チェック
-         * - 元のパスワードとの一致チェック
-         * @param {string} originalPassword - 比較元のパスワード
-         */
+        // パスワード確認用（元のパスワードと一致チェック）
         passwordConfirm(originalPassword) {
             return [
                 rules.required('password'),
@@ -99,12 +64,7 @@ export function useValidation() {
             ];
         },
 
-        /**
-         * メールアドレス用のバリデーション
-         * - 必須チェック
-         * - メールフォーマットチェック
-         * - 最大255文字
-         */
+        // メールアドレス
         email() {
             return [
                 rules.required('email'),

@@ -14,12 +14,9 @@ const route = useRoute();
 const { t } = useI18n();
 const { showSuccess, handleApiError } = useApiError();
 
-// ローディング・削除状態
 const loading = ref(false);
 const deleting = ref(false);
 const user = ref({});
-
-// 管理者数を保持（最後の管理者判定に使用）
 const adminCount = ref(0);
 const showConfirmDialog = ref(false);
 
@@ -33,18 +30,12 @@ const breadcrumbs = computed(() => [
 
 const userId = computed(() => route.params.id);
 
-/**
- * 最後の管理者かどうか判定
- * システムには最低1人の管理者が必要なため、最後の管理者は削除不可
- */
+// 最後の管理者かどうか判定（削除防止）
 const isLastAdmin = computed(() => {
     if (!user.value.is_admin) return false;
     return adminCount.value === 1;
 });
 
-/**
- * ユーザー情報と管理者数を並行取得
- */
 async function fetchUser() {
     if (loading.value) return;
 
@@ -65,10 +56,6 @@ async function fetchUser() {
     }
 }
 
-/**
- * ユーザー削除処理
- * 最後の管理者の場合は削除をブロック
- */
 async function deleteUser() {
     if (isLastAdmin.value) return;
 
@@ -181,7 +168,6 @@ onMounted(() => {
                                 </v-card-text>
                             </v-card>
 
-                            <!-- 最後の管理者の場合は削除不可の警告を表示 -->
                             <v-alert
                                 v-if="isLastAdmin"
                                 type="error"
