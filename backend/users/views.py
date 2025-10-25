@@ -11,6 +11,10 @@ from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Q
+from django.http import HttpResponse
+from django.utils.translation import gettext as _
+import csv
+from io import StringIO
 
 from .serializers import (
     UserSerializer,
@@ -84,7 +88,7 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
         if instance.deleted_at:
             return self.error_response(
                 error_code="CANNOT_UPDATE_DELETED",
-                detail="削除済みユーザーは編集できません",
+                detail=_("削除済みユーザーは編集できません。"),
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -204,3 +208,91 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
         """管理者数取得"""
         count = User.objects.filter(is_admin=True, is_active=True).count()
         return Response({"count": count, "can_delete": count > 1})
+
+    @action(detail=False, methods=["get"], url_path="export-csv")
+    def export_csv(self, request):
+        """
+        CSV出力
+        検索条件を反映し、100件以下のデータをCSV形式で出力
+        100件超過時はエラーレスポンスを返す
+        """
+        # フィルタリングを適用
+        queryset = self.filter_queryset(self.get_queryset())
+
+        # 件数チェック
+        count = queryset.count()
+        if count > 100:
+            return self.error_response(
+                error_code="CSV_EXPORT_LIMIT_EXCEEDED",
+                detail=_(
+                    "CSV出力は100件までです。現在の検索条件では%(count)d件が該当します。"
+                )
+                % {"count": count},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if count == 0:
+            return self.error_response(
+                error_code="CSV_EXPORT_NO_DATA",
+                detail=_("出力対象のデータがありません。"),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ソートを適用
+        ALLOWED_ORDERING = [
+            "id",
+            "-id",
+            "employee_id",
+            "-employee_id",
+            "username",
+            "-username",
+            "email",
+            "-email",
+            "created_at",
+            "-created_at",
+        ]
+        ordering = request.query_params.get("ordering", "id")
+        if ordering not in ALLOWED_ORDERING:
+            ordering = "id"
+
+        queryset = queryset.order_by(ordering)
+
+        # CSV生成
+        output = StringIO()
+        writer = csv.writer(output)
+
+        # ヘッダー行
+        writer.writerow(
+            [
+                "ID",
+                _("社員番号"),
+                _("ユーザー名"),
+                _("メールアドレス"),
+                _("管理者"),
+                _("アクティブ"),
+                _("作成日時"),
+            ]
+        )
+
+        # データ行
+        for user in queryset:
+            writer.writerow(
+                [
+                    user.id,
+                    user.employee_id,
+                    user.username or "",
+                    user.email or "",
+                    "○" if user.is_admin else "",
+                    "○" if user.is_active else "",
+                    user.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                ]
+            )
+
+        # レスポンス生成
+        response = HttpResponse(
+            output.getvalue().encode("utf-8-sig"),  # BOM付きUTF-8でExcel対応
+            content_type="text/csv; charset=utf-8-sig",
+        )
+        response["Content-Disposition"] = 'attachment; filename="users.csv"'
+
+        return response

@@ -147,7 +147,8 @@
                 "searchPlaceholder": "ユーザー名または社員番号",
                 "createButton": "登録画面",
                 "itemCount": "{start} - {end} / {total} 件",
-                "noData": "データがありません"
+                "noData": "データがありません",
+                "csvExportSuccess": "CSVファイルをダウンロードしました"
             },
             "create": {
                 "title": "ユーザー登録",

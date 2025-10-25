@@ -8,11 +8,13 @@ import { usersAPI } from '@/api/users';
 import { routes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons.js';
 import { useDisplay } from 'vuetify';
+import { useApiError } from '@/composables/useApiError';
 
 const { mdAndUp } = useDisplay();
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
+const { handleApiError, showSuccess } = useApiError();
 
 const users = ref([]);
 const loading = ref(false);
@@ -21,6 +23,7 @@ const totalItems = ref(0);
 const currentPage = ref(1);
 const itemsPerPage = ref(10);
 const sortBy = ref([]);
+const csvExporting = ref(false);
 
 let searchTimer = null;
 
@@ -30,6 +33,7 @@ const headerButtons = computed(() => [
         action: exportCSV,
         icon: ICONS.buttons.csv,
         type: 'success',
+        loading: csvExporting.value,
     },
 ]);
 
@@ -145,9 +149,86 @@ async function loadItems({ page, itemsPerPage, sortBy }) {
 
         updateURLParams({ page, itemsPerPage, sortBy });
     } catch (error) {
-        // エラーは親コンポーネントで処理
+        handleApiError(error);
     } finally {
         loading.value = false;
+    }
+}
+
+// CSV出力処理
+async function exportCSV() {
+    if (csvExporting.value) {
+        return;
+    }
+
+    csvExporting.value = true;
+
+    try {
+        // 現在の検索・ソート条件を取得
+        const params = {};
+
+        if (searchQuery.value?.trim()) {
+            params.search = searchQuery.value.trim();
+        }
+
+        if (sortBy.value && sortBy.value.length > 0) {
+            const sort = sortBy.value[0];
+            const orderPrefix = sort.order === 'desc' ? '-' : '';
+            params.ordering = `${orderPrefix}${sort.key}`;
+        }
+
+        const response = await usersAPI.exportCSV(params);
+
+        // Blobを作成してダウンロード
+        const blob = new Blob([response.data], {
+            type: 'text/csv; charset=utf-8-sig',
+        });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+
+        // ファイル名に日時を含める
+        const now = new Date();
+        const dateStr = now
+            .toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            })
+            .replace(/\//g, '');
+        const timeStr = now
+            .toLocaleTimeString('ja-JP', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false,
+            })
+            .replace(/:/g, '');
+
+        link.download = `users_${dateStr}_${timeStr}.csv`;
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        showSuccess('pages.users.list.csvExportSuccess');
+    } catch (error) {
+        // Blobエラーレスポンスの場合はJSONに変換
+        if (error.response && error.response.data instanceof Blob) {
+            try {
+                const text = await error.response.data.text();
+                const jsonError = JSON.parse(text);
+                // エラーオブジェクトを更新
+                error.response.data = jsonError;
+            } catch (e) {
+                console.error('Failed to parse error response:', e);
+            }
+        }
+
+        handleApiError(error);
+    } finally {
+        csvExporting.value = false;
     }
 }
 
@@ -230,10 +311,6 @@ function goToCreate() {
 
 function handleRowClick(event, { item }) {
     router.push(routes.USER_DETAIL.replace(':id', item.id));
-}
-
-function exportCSV() {
-    // TODO: CSV出力処理を実装
 }
 
 onMounted(() => {

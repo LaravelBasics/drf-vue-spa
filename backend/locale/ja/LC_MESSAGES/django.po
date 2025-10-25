@@ -74,3 +74,31 @@ msgstr "日本語"
 
 msgid "English"
 msgstr "English"
+
+# ==================== CSV出力エラー ====================
+
+msgid "CSV出力は100件までです。現在の検索条件では%(count)d件が該当します。"
+msgstr "CSV出力は100件までです。現在の検索条件では%(count)d件が該当します。"
+
+msgid "出力対象のデータがありません。"
+msgstr "出力対象のデータがありません。"
+
+# ==================== CSVヘッダー ====================
+
+msgid "社員番号"
+msgstr "社員番号"
+
+msgid "ユーザー名"
+msgstr "ユーザー名"
+
+msgid "メールアドレス"
+msgstr "メールアドレス"
+
+msgid "管理者"
+msgstr "管理者"
+
+msgid "アクティブ"
+msgstr "アクティブ"
+
+msgid "作成日時"
+msgstr "作成日時"

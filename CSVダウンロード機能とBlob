@@ -1,0 +1,459 @@
+# CSVダウンロード機能とBlob解説ドキュメント
+
+## 📋 目次
+1. [Blobとは](#blobとは)
+2. [バイナリデータとは](#バイナリデータとは)
+3. [CSVダウンロードの全体フロー](#csvダウンロードの全体フロー)
+4. [なぜBlobを使うのか](#なぜblobを使うのか)
+5. [エラー時の問題と解決方法](#エラー時の問題と解決方法)
+6. [実装コード例](#実装コード例)
+
+---
+
+## Blobとは
+
+### 基本情報
+- **Blob** = Binary Large Object（ブロブ）
+- ブラウザでバイナリデータ（ファイル）を扱うためのオブジェクト
+- 「ファイルの中身そのもの」をメモリ上で保持する箱のようなもの
+
+### 用途
+Blobは以下のようなファイルダウンロードで使われます：
+
+| ファイル種類 | 例 |
+|------------|---|
+| CSV | ユーザーデータ.csv |
+| PDF | レポート.pdf |
+| 画像 | photo.jpg |
+| Excel | データ.xlsx |
+| 音声・動画 | audio.mp3, video.mp4 |
+
+**結論**: ブラウザでファイルをダウンロードさせたい = Blobを使う
+
+---
+
+## バイナリデータとは
+
+### 簡単な説明
+**バイナリ = コンピュータが直接理解できる0と1の羅列**
+
+### テキストとバイナリの違い
+
+```
+【テキストデータ】（人間が読める）
+Hello
+こんにちは
+{"name": "太郎"}
+
+【バイナリデータ】（コンピュータ用）
+01001000 01100101 01101100 01101100 01101111
+ファイルそのもの
+```
+
+### 実用的な分類
+
+| 種類 | 説明 | 例 |
+|------|------|-----|
+| テキストデータ | 人間が読める文字 | JSON, HTML, CSV(中身の文字列) |
+| バイナリデータ | コンピュータ用の生データ | 画像, PDF, **ファイルとしてのCSV** |
+
+**ポイント**: CSVの中身はテキストだが、**ファイルとしてダウンロード**するにはバイナリ(Blob)扱いが必要
+
+---
+
+## CSVダウンロードの全体フロー
+
+### 正常時のフロー
+
+```
+┌─────────────┐
+│  フロント   │
+│  (Vue.js)   │
+└──────┬──────┘
+       │ 1. API呼び出し
+       │    responseType: 'blob' 指定
+       ▼
+┌─────────────┐
+│ バックエンド │
+│  (Django)   │
+└──────┬──────┘
+       │ 2. CSV生成
+       │    HttpResponse(csv_data)
+       ▼
+┌─────────────┐
+│  ネットワーク │  CSVファイル(バイナリ)を転送
+└──────┬──────┘
+       ▼
+┌─────────────┐
+│  フロント   │
+│  axios      │
+└──────┬──────┘
+       │ 3. response.data = Blob(CSVファイル)
+       ▼
+┌─────────────┐
+│ ダウンロード │
+│  処理       │
+└──────┬──────┘
+       │ 4. window.URL.createObjectURL(blob)
+       │    <a>タグでダウンロード
+       ▼
+┌─────────────┐
+│ ユーザーの  │
+│ ダウンロード │
+└─────────────┘
+```
+
+### エラー時のフロー（問題発生）
+
+```
+┌─────────────┐
+│  フロント   │
+└──────┬──────┘
+       │ 1. API呼び出し
+       │    responseType: 'blob' 指定 ← ここが原因!
+       ▼
+┌─────────────┐
+│ バックエンド │
+└──────┬──────┘
+       │ 2. エラー発生!
+       │    Response({"error": "100件超過"})
+       │    ← JSONを返す
+       ▼
+┌─────────────┐
+│  ネットワーク │  JSONデータを転送
+└──────┬──────┘
+       ▼
+┌─────────────┐
+│  フロント   │
+│  axios      │
+└──────┬──────┘
+       │ 3. responseType: 'blob' のせい
+       │    error.response.data = Blob {...}
+       │    ← JSONなのにBlobに包まれる!
+       ▼
+┌─────────────┐
+│ handleApiError │
+└──────┬──────┘
+       │ 4. error.response.data.error を読もうとする
+       │    → Blobだから読めない! ❌
+       ▼
+     (失敗)
+```
+
+---
+
+## なぜBlobを使うのか
+
+### responseType: 'blob' を指定する理由
+
+```javascript
+// ❌ これだとダウンロードできない
+axios.get('users/export-csv/') 
+// → response.data = "ID,名前,メール\n1,太郎,..." (文字列)
+// → ファイルとしてダウンロードする方法がない
+
+// ✅ これならダウンロードできる
+axios.get('users/export-csv/', { responseType: 'blob' })
+// → response.data = Blob {...} (ファイルオブジェクト)
+// → window.URL.createObjectURL() でダウンロードURLが作れる
+```
+
+### Blobからダウンロードする仕組み
+
+```javascript
+// 1. BlobからダウンロードURLを生成
+const url = window.URL.createObjectURL(blob);
+// → "blob:http://localhost:5173/abc-123-def"
+
+// 2. <a>タグを使ってダウンロード
+const link = document.createElement('a');
+link.href = url;
+link.download = 'users.csv'; // ファイル名指定
+link.click(); // クリックを自動実行
+
+// 3. メモリ解放
+window.URL.revokeObjectURL(url);
+```
+
+---
+
+## エラー時の問題と解決方法
+
+### 問題の詳細
+
+```javascript
+// responseType: 'blob' を指定すると...
+
+【正常時】
+バックエンド: CSVファイル送信
+↓
+axios: Blobとして受信 ✅ 正しい
+
+【エラー時】
+バックエンド: JSON送信 {"error": "100件超過"}
+↓
+axios: responseType: 'blob' 指定してるから
+↓
+Blobとして受信 ❌ JSONをBlobに包んじゃう!
+↓
+error.response.data = Blob {
+  // 中身: {"error": "100件超過"}
+  // 外側: Blob
+}
+```
+
+### axiosの自動変換について
+
+| responseType | 受信データ | axiosの処理 |
+|-------------|----------|-----------|
+| (デフォルト) | JSON | 自動でJSオブジェクトに変換 ✅ |
+| 'blob' | JSON | Blobに包む ❌ |
+| 'blob' | バイナリ | Blobに包む ✅ |
+
+### 解決方法：Blob → JSON変換
+
+```javascript
+catch (error) {
+    // エラーレスポンスがBlobの場合
+    if (error.response && error.response.data instanceof Blob) {
+        try {
+            // 手順1: Blob → 文字列
+            const text = await error.response.data.text();
+            // → '{"error_code": "...", "detail": "..."}'
+            
+            // 手順2: 文字列 → JSONオブジェクト
+            const jsonError = JSON.parse(text);
+            // → {error_code: "...", detail: "..."}
+            
+            // 手順3: エラーオブジェクトを更新
+            error.response.data = jsonError;
+            
+        } catch (e) {
+            // JSON変換失敗しても続行
+            // (サーバーがHTMLエラーページを返した場合など)
+            console.error('Failed to parse error response:', e);
+        }
+    }
+    
+    // これでhandleApiErrorが正しく動く
+    handleApiError(error);
+}
+```
+
+### なぜ内側のtry-catchが必要か
+
+```javascript
+// try-catchがないと...
+
+const text = await error.response.data.text(); 
+// ← Blobが壊れてたら失敗
+
+const jsonError = JSON.parse(text);
+// ← サーバーがHTML返したら失敗（一番ありえる）
+
+// → handleApiError(error) が実行されない!
+// → ユーザーに何も表示されない 😱
+```
+
+**内側のtry-catchは保険**：変換失敗しても最低限エラー処理は動くようにする
+
+---
+
+## 実装コード例
+
+### 1. バックエンド (Django/DRF)
+
+```python
+from django.http import HttpResponse
+from rest_framework.decorators import action
+from rest_framework import status
+import csv
+from io import StringIO
+
+@action(detail=False, methods=["get"], url_path="export-csv")
+def export_csv(self, request):
+    """CSV出力（100件まで）"""
+    
+    # フィルタリング適用
+    queryset = self.filter_queryset(self.get_queryset())
+    
+    # 件数チェック
+    count = queryset.count()
+    if count > 100:
+        return self.error_response(
+            error_code="CSV_EXPORT_LIMIT_EXCEEDED",
+            detail=f"CSV出力は100件までです。現在{count}件が該当します。",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    
+    if count == 0:
+        return self.error_response(
+            error_code="CSV_EXPORT_NO_DATA",
+            detail="出力対象のデータがありません。",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    
+    # CSV生成
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # ヘッダー
+    writer.writerow(["ID", "社員番号", "ユーザー名", "メール"])
+    
+    # データ
+    for user in queryset:
+        writer.writerow([
+            user.id,
+            user.employee_id,
+            user.username or "",
+            user.email or "",
+        ])
+    
+    # レスポンス生成
+    response = HttpResponse(
+        output.getvalue().encode("utf-8-sig"),  # BOM付きUTF-8
+        content_type="text/csv; charset=utf-8-sig",
+    )
+    response["Content-Disposition"] = 'attachment; filename="users.csv"'
+    
+    return response
+```
+
+### 2. API定義 (JavaScript)
+
+```javascript
+// src/api/users.js
+import api from '@/plugins/axios';
+
+export const usersAPI = {
+    // CSV出力
+    exportCSV(params = {}) {
+        return api.get('users/export-csv/', {
+            params,
+            responseType: 'blob', // 重要: Blobとして受信
+        });
+    },
+};
+```
+
+### 3. フロントエンド (Vue.js)
+
+```javascript
+// CSV出力処理
+async function exportCSV() {
+    if (csvExporting.value) {
+        return;
+    }
+    
+    csvExporting.value = true;
+    
+    try {
+        // 検索・ソート条件を取得
+        const params = {};
+        
+        if (searchQuery.value?.trim()) {
+            params.search = searchQuery.value.trim();
+        }
+        
+        if (sortBy.value && sortBy.value.length > 0) {
+            const sort = sortBy.value[0];
+            const orderPrefix = sort.order === 'desc' ? '-' : '';
+            params.ordering = `${orderPrefix}${sort.key}`;
+        }
+        
+        // API呼び出し
+        const response = await usersAPI.exportCSV(params);
+        
+        // Blobを作成してダウンロード
+        const blob = new Blob([response.data], {
+            type: 'text/csv; charset=utf-8-sig',
+        });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // ファイル名に日時を含める
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+        const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '');
+        link.download = `users_${dateStr}_${timeStr}.csv`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        showSuccess('CSVファイルをダウンロードしました');
+        
+    } catch (error) {
+        // Blobエラーレスポンスの場合はJSONに変換
+        if (error.response && error.response.data instanceof Blob) {
+            try {
+                const text = await error.response.data.text();
+                const jsonError = JSON.parse(text);
+                error.response.data = jsonError;
+            } catch (e) {
+                console.error('Failed to parse error response:', e);
+            }
+        }
+        
+        handleApiError(error);
+        
+    } finally {
+        csvExporting.value = false;
+    }
+}
+```
+
+---
+
+## まとめ
+
+### 重要ポイント
+
+1. **Blob = ファイルデータを扱う箱**
+   - ブラウザでファイルダウンロードするには必須
+
+2. **responseType: 'blob' の副作用**
+   - 正常時: CSVをBlobで受け取る ✅
+   - エラー時: JSONもBlobで受け取る ❌
+
+3. **エラー処理の必要性**
+   - Blob → JSON変換が必要
+   - 変換失敗に備えたtry-catchも必要
+
+4. **console.errorについて**
+   - 本番環境でも使ってOK
+   - 開発者向けのデバッグ情報
+   - エラー監視の手がかりになる
+
+### データフロー全体像
+
+```
+リクエスト → responseType: 'blob' 指定
+    ↓
+成功: CSV(バイナリ) → Blob → ダウンロード ✅
+    ↓
+エラー: JSON → Blob → JSON変換 → エラー表示 ✅
+```
+
+---
+
+## FAQ
+
+**Q: なぜCSVなのにバイナリ扱い？**  
+A: CSVの中身はテキストですが、「ファイルとしてダウンロード」させるにはBlob(バイナリ扱い)が必要です。
+
+**Q: 他のダウンロード方法はない？**  
+A: ありますが、Blob方式が最も一般的で確実です。
+
+**Q: console.errorは本番で消すべき？**  
+A: いいえ。予期しないエラーのデバッグ情報として残すべきです。
+
+**Q: serializerは関係ある？**  
+A: serializerはバックエンドでのPython↔JSON変換。今回の問題はフロント側のaxiosの挙動です。
+
+---
+
+作成日: 2025年10月  
+対象: Django REST Framework + Vue.js 3 SPA

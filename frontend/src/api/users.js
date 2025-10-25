@@ -3,7 +3,7 @@
 import api from '@/plugins/axios';
 
 export const usersAPI = {
-    // ユーザー一覧取得（フィルタ・ページネーション対応）
+    // ユーザー一覧取得(フィルタ・ページネーション対応)
     list(params = {}) {
         return api.get('users/', { params });
     },
@@ -33,8 +33,16 @@ export const usersAPI = {
         return api.get('users/stats/');
     },
 
-    // 管理者数取得（最後の管理者削除防止用）
+    // 管理者数取得(最後の管理者削除防止用)
     adminCount() {
         return api.get('users/admin-count/');
+    },
+
+    // CSV出力(検索条件を反映)
+    exportCSV(params = {}) {
+        return api.get('users/export-csv/', {
+            params,
+            responseType: 'blob', // バイナリデータとして受信
+        });
     },
 };

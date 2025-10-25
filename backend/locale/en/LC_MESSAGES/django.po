@@ -65,3 +65,31 @@ msgstr "Login failed %(max_attempts)d times. Please try again after %(lockout_du
 
 msgid "ログアウトに失敗しました"
 msgstr "Logout failed"
+
+# ==================== CSV出力エラー ====================
+
+msgid "CSV出力は100件までです。現在の検索条件では%(count)d件が該当します。"
+msgstr "CSV export is limited to 100 records. The current search conditions match %(count)d records."
+
+msgid "出力対象のデータがありません。"
+msgstr "No data available for export."
+
+# ==================== CSVヘッダー ====================
+
+msgid "社員番号"
+msgstr "Employee ID"
+
+msgid "ユーザー名"
+msgstr "Username"
+
+msgid "メールアドレス"
+msgstr "Email Address"
+
+msgid "管理者"
+msgstr "Admin"
+
+msgid "アクティブ"
+msgstr "Active"
+
+msgid "作成日時"
+msgstr "Created At"

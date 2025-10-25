@@ -147,7 +147,8 @@
                 "searchPlaceholder": "Username or Employee ID",
                 "createButton": "Create User",
                 "itemCount": "{start} - {end} / {total} items",
-                "noData": "No data available"
+                "noData": "No data available",
+                "csvExportSuccess": "CSV file downloaded successfully"
             },
             "create": {
                 "title": "Create User",
