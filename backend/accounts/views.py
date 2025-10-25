@@ -28,7 +28,7 @@ class CSRFView(APIView):
 
 
 class LoginAPIView(ErrorResponseMixin, APIView):
-    """ログインAPI（ブルートフォース攻撃対策付き）"""
+    """ログインAPI（ブルートフォース攻撃対策）"""
 
     permission_classes = [AllowAny]
 

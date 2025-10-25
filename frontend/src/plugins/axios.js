@@ -58,14 +58,12 @@ const csrfManager = new CSRFManager();
 
 // リクエストインターセプター（言語ヘッダー + CSRFトークン）
 api.interceptors.request.use(async (config) => {
-    // 言語設定をヘッダーに追加
     const localeStore = useLocaleStore();
     config.headers['Accept-Language'] = localeStore.locale;
 
     const method = config.method?.toLowerCase();
     const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
 
-    // 更新系メソッドの場合CSRFトークンを付与
     if (methodsRequiringCsrf.includes(method)) {
         try {
             await csrfManager.ensureToken();
@@ -86,22 +84,33 @@ export const resetCSRFToken = () => {
     csrfManager.reset();
 };
 
-// レスポンスインターセプター（認証エラー処理）
+// レスポンスインターセプター（認証エラー処理 + 通知）
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const { response, config } = error;
 
         if (response) {
-            // 認証エラー（401/403）時の自動ログアウト
+            // 認証エラー（401/403）時の自動ログアウト + 通知
             if ([401, 403].includes(response.status)) {
                 const isLogoutRequest = config.url?.endsWith('auth/logout/');
 
                 if (!isLogoutRequest) {
                     const { useAuthStore } = await import('@/stores/auth');
+                    const { useNotificationStore } = await import(
+                        '@/stores/notification'
+                    );
                     const auth = useAuthStore();
 
                     if (auth.isAuthenticated) {
+                        // セッション切れ通知を表示
+                        const notification = useNotificationStore();
+                        const message =
+                            response.data?.detail ||
+                            'セッションの有効期限が切れました。再度ログインしてください';
+
+                        notification.warning(message, 5000);
+
                         await auth.logout(true);
                     }
                 }

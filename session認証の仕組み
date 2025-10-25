@@ -1,0 +1,532 @@
+# セッション認証の仕組み 完全ガイド
+
+## 📋 目次
+
+1. [概要](#概要)
+2. [全体フロー図](#全体フロー図)
+3. [フロントエンド（axios.js）](#フロントエンドaxiosjs)
+4. [バックエンド（Django自動処理）](#バックエンドdjango自動処理)
+5. [セッション切れの検知](#セッション切れの検知)
+6. [設定](#設定)
+7. [トラブルシューティング](#トラブルシューティング)
+
+---
+
+## 概要
+
+このシステムは **Django のセッション認証** を使用しています。
+
+### 主な特徴
+- 🔒 Cookie ベースのセッション管理
+- 🔄 自動セッション検証（Django が自動）
+- ⏰ 有効期限管理（デフォルト14日間）
+- 🚨 セッション切れ時の自動ログアウト
+- 🌐 クロスドメイン対応（withCredentials）
+
+---
+
+## 全体フロー図
+
+### 1. ログイン時
+
+```
+┌─────────────┐                           ┌──────────────┐
+│  ブラウザ   │                           │   Django     │
+│ (Vue.js)    │                           │  サーバー    │
+└──────┬──────┘                           └──────┬───────┘
+       │                                          │
+       │ POST /api/auth/login/                   │
+       │ { employee_id, password }               │
+       │────────────────────────────────────────→│
+       │                                          │
+       │                           1. ユーザー認証（DB検索）
+       │                                          │
+       │                           2. セッション作成
+       │                              - session_key 生成
+       │                              - user_id 保存
+       │                              - expire_date 設定
+       │                                          │
+       │                           3. django_session テーブルに保存
+       │                              ┌───────────────────────┐
+       │                              │ session_key: abc123   │
+       │                              │ user_id: 1            │
+       │                              │ expire_date: 14日後   │
+       │                              └───────────────────────┘
+       │                                          │
+       │ 200 OK                                   │
+       │ Set-Cookie: sessionid=abc123;            │
+       │            HttpOnly; SameSite=Lax        │
+       │←────────────────────────────────────────│
+       │                                          │
+  4. ブラウザが Cookie を保存
+     ┌─────────────────────┐
+     │ sessionid=abc123    │
+     │ 自動的に保存される  │
+     └─────────────────────┘
+```
+
+### 2. API リクエスト時
+
+```
+┌─────────────┐                           ┌──────────────┐
+│  ブラウザ   │                           │   Django     │
+└──────┬──────┘                           └──────┬───────┘
+       │                                          │
+       │ GET /api/users/                          │
+       │ Cookie: sessionid=abc123 ⭐              │
+       │────────────────────────────────────────→│
+       │      (withCredentials: true で自動送信)  │
+       │                                          │
+       │                           1. SessionMiddleware 起動
+       │                              - Cookie から sessionid 取得
+       │                                          │
+       │                           2. データベース検索
+       │                              SELECT * FROM django_session
+       │                              WHERE session_key = 'abc123'
+       │                                          │
+       │                           3. 有効期限チェック ⭐
+       │                              expire_date < 現在時刻？
+       │                                ├─ YES → セッション削除
+       │                                │         → 認証失敗(401)
+       │                                └─ NO  → 処理続行
+       │                                          │
+       │                           4. ユーザー情報取得
+       │                              - session_data から user_id
+       │                              - User テーブルから検索
+       │                              - request.user に設定
+       │                                          │
+       │                           5. DRF 認証チェック
+       │                              - request.user.is_authenticated
+       │                              - permission_classes 検証
+       │                                          │
+       │ 200 OK                                   │
+       │ { users: [...] }                         │
+       │←────────────────────────────────────────│
+```
+
+### 3. セッション切れ時
+
+```
+┌─────────────┐                           ┌──────────────┐
+│  ブラウザ   │                           │   Django     │
+└──────┬──────┘                           └──────┬───────┘
+       │                                          │
+       │ GET /api/users/                          │
+       │ Cookie: sessionid=abc123                 │
+       │────────────────────────────────────────→│
+       │                                          │
+       │                           1. SessionMiddleware
+       │                              - sessionid 検証
+       │                                          │
+       │                           2. データベース検索
+       │                              expire_date = 2025-10-22
+       │                              現在時刻    = 2025-10-23
+       │                                          │
+       │                           3. 期限切れ検知 ⭐
+       │                              - セッション削除
+       │                              - request.user = AnonymousUser
+       │                                          │
+       │                           4. DRF 認証失敗
+       │                              - is_authenticated = False
+       │                                          │
+       │ 401 Unauthorized                         │
+       │ {                                        │
+       │   "detail": "認証情報が含まれていません。" │
+       │ }                                        │
+       │←────────────────────────────────────────│
+       │                                          │
+  5. axios.js の interceptor が検知
+     - notification.warning() で通知
+     - auth.logout(true) で自動ログアウト
+     - ログインページへリダイレクト
+```
+
+---
+
+## フロントエンド（axios.js）
+
+### withCredentials の役割
+
+```javascript
+const api = axios.create({
+    baseURL: API_BASE_URL,
+    withCredentials: true,  // ⭐ これが重要！
+    timeout: API_TIMEOUT,
+});
+```
+
+**`withCredentials: true` の効果**:
+- すべてのリクエストに **Cookie を自動送信**
+- Django からの `Set-Cookie` ヘッダーを **自動保存**
+- クロスドメインでも Cookie を送信可能
+
+### 実際の通信
+
+```javascript
+// ユーザーリスト取得
+api.get('/users/')
+
+// ↓ 実際に送信されるリクエスト
+GET http://localhost:8000/api/users/
+Headers:
+  Cookie: sessionid=abc123xyz...  ⭐ 自動で付与される
+  Accept-Language: ja
+```
+
+**開発者が意識する必要なし！Axios が自動でやってくれる！**
+
+---
+
+## バックエンド（Django自動処理）
+
+### Django の自動処理フロー
+
+Django は **何もコードを書かなくても** 以下を自動で行います：
+
+#### 1. SessionMiddleware（自動実行）
+
+```python
+# django/contrib/sessions/middleware.py
+# ⭐ settings.py の MIDDLEWARE に登録するだけで自動動作
+
+class SessionMiddleware:
+    def process_request(self, request):
+        # 1. Cookie から sessionid 取得
+        session_key = request.COOKIES.get('sessionid')
+        
+        # 2. データベースからセッション検索
+        request.session = SessionStore(session_key)
+        
+        # 3. 有効期限チェック（自動）
+        # expire_date < 現在時刻 → セッション削除
+```
+
+#### 2. AuthenticationMiddleware（自動実行）
+
+```python
+# django/contrib/auth/middleware.py
+
+class AuthenticationMiddleware:
+    def process_request(self, request):
+        # セッションから user_id 取得
+        user_id = request.session.get('_auth_user_id')
+        
+        if user_id:
+            # データベースからユーザー取得
+            request.user = User.objects.get(pk=user_id)
+        else:
+            # 未認証
+            request.user = AnonymousUser()
+```
+
+#### 3. DRF SessionAuthentication（自動実行）
+
+```python
+# rest_framework/authentication.py
+
+class SessionAuthentication:
+    def authenticate(self, request):
+        user = request.user
+        
+        if not user or not user.is_authenticated:
+            # 認証失敗 → 401 エラー
+            return None
+        
+        return (user, None)
+```
+
+### データベース構造
+
+#### django_session テーブル
+
+```sql
+CREATE TABLE django_session (
+    session_key VARCHAR(40) PRIMARY KEY,
+    session_data TEXT,
+    expire_date DATETIME
+);
+```
+
+**例**:
+```
+session_key: abc123xyz...
+session_data: {
+    "_auth_user_id": "1",
+    "_auth_user_backend": "django.contrib.auth.backends.ModelBackend",
+    "_auth_user_hash": "..."
+}
+expire_date: 2025-11-06 12:00:00
+```
+
+### 有効期限の計算
+
+```python
+# ログイン時（自動実行）
+from datetime import timedelta
+from django.utils import timezone
+
+expire_date = timezone.now() + timedelta(seconds=SESSION_COOKIE_AGE)
+# SESSION_COOKIE_AGE = 1209600（14日）
+# → 14日後の日時が設定される
+```
+
+---
+
+## セッション切れの検知
+
+### フロントエンドの処理
+
+```javascript
+// axios.js のレスポンスインターセプター
+
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const { response } = error;
+
+        // 401/403 エラーをキャッチ
+        if ([401, 403].includes(response?.status)) {
+            // セッション切れ通知
+            const message =
+                response.data?.detail ||
+                'セッションの有効期限が切れました。再度ログインしてください';
+            
+            notification.warning(message, 5000);
+            
+            // 自動ログアウト
+            await auth.logout(true);
+        }
+    }
+);
+```
+
+### バックエンドの処理
+
+```python
+# Django が自動で返す
+
+# セッション切れ
+HTTP 401 Unauthorized
+{
+    "detail": "認証情報が含まれていません。"
+}
+
+# CSRF エラー
+HTTP 403 Forbidden
+{
+    "detail": "CSRF Failed: CSRF token missing."
+}
+
+# 権限エラー
+HTTP 403 Forbidden
+{
+    "detail": "この操作を実行する権限がありません。"
+}
+```
+
+---
+
+## 設定
+
+### バックエンド（settings.py）
+
+```python
+# セッション設定
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+SESSION_COOKIE_NAME = 'sessionid'
+SESSION_COOKIE_AGE = 1209600  # 14日（秒）
+SESSION_SAVE_EVERY_REQUEST = False
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# Cookie 設定
+SESSION_COOKIE_HTTPONLY = True  # JavaScript からアクセス不可
+SESSION_COOKIE_SECURE = False   # 本番環境では True（HTTPS必須）
+SESSION_COOKIE_SAMESITE = 'Lax' # CSRF 対策
+
+# CORS 設定（クロスドメインの場合）
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5173',  # Vite 開発サーバー
+]
+
+# ミドルウェア（これらが自動でセッション管理）
+MIDDLEWARE = [
+    'django.contrib.sessions.middleware.SessionMiddleware',  # ⭐
+    'django.contrib.auth.middleware.AuthenticationMiddleware',  # ⭐
+    # ...
+]
+```
+
+### フロントエンド（axios.js）
+
+```javascript
+const api = axios.create({
+    baseURL: 'http://localhost:8000/api/',
+    withCredentials: true,  // ⭐ Cookie 自動送信
+    timeout: 10000,
+});
+```
+
+### 環境変数（.env）
+
+```bash
+# フロントエンド
+VITE_API_BASE_URL=http://localhost:8000/api/
+VITE_API_TIMEOUT=10000
+
+# バックエンド
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+```
+
+---
+
+## トラブルシューティング
+
+### ❌ セッションが保存されない
+
+**原因**: `withCredentials: true` が設定されていない
+
+**解決策**:
+```javascript
+// axios.js
+const api = axios.create({
+    withCredentials: true,  // 追加
+});
+```
+
+---
+
+### ❌ CORS エラーが出る
+
+**エラー**:
+```
+Access to XMLHttpRequest has been blocked by CORS policy:
+The value of the 'Access-Control-Allow-Credentials' header is false
+```
+
+**解決策**:
+```python
+# settings.py
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5173',
+]
+```
+
+---
+
+### ❌ sessionid Cookie が見えない
+
+**原因**: `HttpOnly` フラグが設定されている（正常）
+
+**確認方法**:
+```
+デベロッパーツール
+→ Application タブ
+→ Cookies
+→ http://localhost:8000
+→ sessionid を確認
+
+Name: sessionid
+Value: abc123xyz...
+HttpOnly: ✓ ← これは正常（JavaScript からアクセス不可）
+```
+
+---
+
+### ❌ セッションがすぐ切れる
+
+**原因1**: `SESSION_EXPIRE_AT_BROWSER_CLOSE = True`
+
+**解決策**:
+```python
+# settings.py
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+```
+
+**原因2**: `SESSION_COOKIE_AGE` が短い
+
+**解決策**:
+```python
+# settings.py
+SESSION_COOKIE_AGE = 1209600  # 14日（秒）
+```
+
+---
+
+### ❌ 本番環境でセッションが保存されない
+
+**原因**: `SESSION_COOKIE_SECURE = True` だが HTTPS 未使用
+
+**解決策**:
+```python
+# settings.py（開発環境）
+SESSION_COOKIE_SECURE = False
+
+# settings.py（本番環境）
+SESSION_COOKIE_SECURE = True  # HTTPS 必須
+```
+
+---
+
+## セッション管理コマンド
+
+### 期限切れセッションの削除
+
+```bash
+# 定期的に実行（cron 推奨）
+python manage.py clearsessions
+```
+
+### セッション確認
+
+```bash
+# Django shell
+python manage.py shell
+
+from django.contrib.sessions.models import Session
+from django.utils import timezone
+
+# 全セッション表示
+for s in Session.objects.all():
+    print(f"Key: {s.session_key}")
+    print(f"Expire: {s.expire_date}")
+    print(f"Data: {s.get_decoded()}")
+    print("---")
+
+# 有効なセッション数
+active = Session.objects.filter(expire_date__gt=timezone.now()).count()
+print(f"有効なセッション: {active}件")
+
+# 期限切れセッション数
+expired = Session.objects.filter(expire_date__lt=timezone.now()).count()
+print(f"期限切れ: {expired}件")
+```
+
+---
+
+## まとめ
+
+### ✅ 自動で行われること
+
+| 処理 | 担当 | 設定 |
+|------|------|------|
+| Cookie の送受信 | axios (withCredentials) | 自動 |
+| セッション検証 | SessionMiddleware | 自動 |
+| 有効期限チェック | Django | 自動 |
+| ユーザー認証 | AuthenticationMiddleware | 自動 |
+| 認証失敗検知 | DRF SessionAuthentication | 自動 |
+| エラー通知 | axios interceptor | 自動 |
+| 自動ログアウト | axios interceptor | 自動 |
+
+### 🎯 開発者がやること
+
+1. **バックエンド**: settings.py で SESSION_COOKIE_AGE を設定
+2. **フロントエンド**: axios.js で withCredentials: true を設定
+3. **定期実行**: clearsessions コマンドを cron 登録
+
+**あとは Django と axios が全部やってくれます！** (｀・ω・´)b
+
+---

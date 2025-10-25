@@ -1,3 +1,20 @@
+(venv) PS C:\Users\pvufx\Desktop\template\backend> python -c "import rest_framework; print(rest_framework.__path__)"
+
+['C:\\Users\\pvufx\\Desktop\\template\\venv\\Lib\\site-packages\\rest_framework']
+
+site-packages/
+└── rest_framework/
+    └── locale/
+        ├── ja/
+        │   └── LC_MESSAGES/
+        │       ├── django.mo  ← ここ
+        │       └── django.mo
+
+# rest_framework/locale/ja/LC_MESSAGES/django.po
+
+msgid "Authentication credentials were not provided."
+msgstr "認証情報が含まれていません。"
+
 # Django REST Framework 超初心者ガイド
 
 ## 🎯 このドキュメントの目的
