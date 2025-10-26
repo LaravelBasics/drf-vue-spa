@@ -1,4 +1,4 @@
-<!-- src/components/Header.vue - パンくずリスト対応（リンク強調版） -->
+<!-- src/components/Header.vue - パンくずリスト対応 -->
 <script setup>
 import { computed } from 'vue';
 import { useTheme } from 'vuetify';
@@ -94,7 +94,7 @@ function getButtonColor(type = 'primary') {
                 density="compact"
             >
                 <template v-slot:divider>
-                    <v-icon :size="ICON_SIZES.sm">{{
+                    <v-icon :size="ICON_SIZES.sm" class="breadcrumb-divider">{{
                         ICONS.nav.divider
                     }}</v-icon>
                 </template>
@@ -135,7 +135,7 @@ function getButtonColor(type = 'primary') {
 </template>
 
 <style scoped>
-/* クリック可能なパンくずリンク（モダンなBootstrapスタイル） */
+/* クリック可能なパンくずリンク（Bootstrapスタイル） */
 .breadcrumb-link {
     color: #0d6efd !important; /* Bootstrap 5のリンク色（明るい青） */
     text-decoration: underline !important;
@@ -157,5 +157,11 @@ function getButtonColor(type = 'primary') {
     color: rgba(var(--v-theme-on-surface), 0.87) !important;
     text-decoration: none !important;
     cursor: default !important;
+}
+
+/* 区切りアイコンの垂直位置調整 */
+.breadcrumb-divider {
+    vertical-align: middle !important;
+    margin-top: -3px !important; /* 微調整 */
 }
 </style>

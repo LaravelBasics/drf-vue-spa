@@ -1,10 +1,11 @@
-// src/composables/useBreadcrumbs.js - パンくずリスト自動生成
+// src/composables/useBreadcrumbs.js - パンくずリスト自動生成（詳細画面対応版）
 import { computed } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 
 export function useBreadcrumbs() {
     const route = useRoute();
+    const router = useRouter();
     const { t } = useI18n();
 
     /**
@@ -15,7 +16,7 @@ export function useBreadcrumbs() {
         const crumbs = [];
         const matched = route.matched;
 
-        matched.forEach((record) => {
+        matched.forEach((record, index) => {
             const meta = record.meta;
 
             // breadcrumb が false の場合はスキップ
@@ -55,6 +56,31 @@ export function useBreadcrumbs() {
                 crumbs.push(crumb);
             }
         });
+
+        // 🎯 編集・削除画面の場合は「詳細」を途中に挿入
+        const currentRoute = matched[matched.length - 1];
+        const meta = currentRoute?.meta;
+
+        if (meta?.breadcrumbParent) {
+            // 親ルート（詳細画面）を探す
+            const parentRoute = router
+                .getRoutes()
+                .find((r) => r.name === meta.breadcrumbParent);
+
+            if (parentRoute && route.params.id) {
+                // 詳細画面のパンくずを作成
+                const detailCrumb = {
+                    title: t(parentRoute.meta.breadcrumb),
+                    to: parentRoute.path.replace(':id', route.params.id),
+                    disabled: false,
+                };
+
+                // 最後の要素（現在のページ）の直前に詳細を挿入
+                if (crumbs.length > 0) {
+                    crumbs.splice(crumbs.length - 1, 0, detailCrumb);
+                }
+            }
+        }
 
         // 最後のパンくずは常に無効化
         if (crumbs.length > 0) {

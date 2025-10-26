@@ -1,4 +1,4 @@
-// src/router/index.js - 定数を使ったchildren構造
+// src/router/index.js - 定数を使ったchildren構造（breadcrumbParent対応版）
 
 import { createRouter, createWebHistory } from 'vue-router';
 import { authGuard } from './auth-guard.js';
@@ -97,6 +97,7 @@ const router = createRouter({
                                 import('@/views/users/UserUpdate.vue'),
                             meta: {
                                 breadcrumb: 'breadcrumbs.users.update',
+                                breadcrumbParent: 'UserDetail', // ✅ 詳細画面を親として指定
                             },
                             props: true,
                         },
@@ -107,6 +108,7 @@ const router = createRouter({
                                 import('@/views/users/UserDelete.vue'),
                             meta: {
                                 breadcrumb: 'breadcrumbs.users.delete',
+                                breadcrumbParent: 'UserDetail', // ✅ 詳細画面を親として指定
                             },
                             props: true,
                         },
