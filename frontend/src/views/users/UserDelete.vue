@@ -1,3 +1,4 @@
+<!-- src/views/users/UserDelete.vue - ユーザー削除画面 -->
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
@@ -6,7 +7,7 @@ import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { usersAPI } from '@/api/users';
-import { routes } from '@/constants/routes';
+import { userRoutes } from '@/constants/routes'; // ✅ userRoutesをインポート
 import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
@@ -19,14 +20,6 @@ const deleting = ref(false);
 const user = ref({});
 const adminCount = ref(0);
 const showConfirmDialog = ref(false);
-
-const breadcrumbs = computed(() => [
-    { title: t('breadcrumbs.home'), to: routes.HOME, disabled: false },
-    { title: t('breadcrumbs.admin'), to: routes.ADMIN, disabled: false },
-    { title: t('breadcrumbs.users.list'), to: routes.USERS, disabled: false },
-    { title: t('breadcrumbs.users.detail'), disabled: true },
-    { title: t('breadcrumbs.users.delete'), disabled: true },
-]);
 
 const userId = computed(() => route.params.id);
 
@@ -50,7 +43,7 @@ async function fetchUser() {
         adminCount.value = adminCountResponse.data.count;
     } catch (error) {
         handleApiError(error);
-        router.push(routes.USERS);
+        router.push(userRoutes.list()); // ✅ ヘルパー関数を使用
     } finally {
         loading.value = false;
     }
@@ -66,7 +59,7 @@ async function deleteUser() {
             username: user.value.username,
         });
         showConfirmDialog.value = false;
-        router.replace(routes.USERS);
+        router.replace(userRoutes.list()); // ✅ ヘルパー関数を使用
     } catch (error) {
         handleApiError(error, 'pages.users.delete.error');
     } finally {
@@ -81,10 +74,7 @@ onMounted(() => {
 
 <template>
     <div>
-        <Header
-            :app-title="t('pages.users.delete.title')"
-            :breadcrumbs="breadcrumbs"
-        />
+        <Header :app-title="t('pages.users.delete.title')" />
 
         <v-container class="pa-4">
             <v-row justify="center">

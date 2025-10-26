@@ -1,4 +1,4 @@
-// src/router/index.js - Vue Routerの設定
+// src/router/index.js - 定数を使ったchildren構造
 
 import { createRouter, createWebHistory } from 'vue-router';
 import { authGuard } from './auth-guard.js';
@@ -20,84 +20,99 @@ const router = createRouter({
                 requiresAuth: true,
                 requiresLargeScreen: true,
                 transition: 'slide-left',
+                breadcrumb: 'breadcrumbs.home',
             },
         },
         {
             path: routes.SETTINGS,
             name: 'Settings',
             component: () => import('@/views/Settings.vue'),
-            meta: { requiresAuth: true, requiresLargeScreen: true },
+            meta: {
+                requiresAuth: true,
+                requiresLargeScreen: true,
+                breadcrumb: 'breadcrumbs.settings',
+            },
         },
         {
             path: routes.LOGIN,
             name: 'Login',
             component: () => import('@/views/Login.vue'),
-            meta: { hideForAuth: true, transition: 'fade' },
+            meta: {
+                hideForAuth: true,
+                transition: 'fade',
+                breadcrumb: false,
+            },
         },
 
-        // 管理者専用ページ
+        // 管理者専用ページ（階層構造 + 定数使用）
         {
-            path: '/admin',
-            name: 'AdminMenu',
-            component: () => import('@/views/admin/AdminMenu.vue'),
+            path: routes.ADMIN.ROOT, // '/admin'
             meta: {
                 requiresAuth: true,
                 requiresAdmin: true,
                 requiresLargeScreen: true,
+                breadcrumb: 'breadcrumbs.admin',
             },
-        },
-        {
-            path: routes.USERS,
-            name: 'UserList',
-            component: () => import('@/views/users/UserList.vue'),
-            meta: {
-                requiresAuth: true,
-                requiresAdmin: true,
-                requiresLargeScreen: true,
-            },
-        },
-        {
-            path: routes.USER_CREATE,
-            name: 'UserCreate',
-            component: () => import('@/views/users/UserCreate.vue'),
-            meta: {
-                requiresAuth: true,
-                requiresAdmin: true,
-                requiresLargeScreen: true,
-            },
-        },
-        {
-            path: routes.USER_DETAIL,
-            name: 'UserDetail',
-            component: () => import('@/views/users/UserDetail.vue'),
-            meta: {
-                requiresAuth: true,
-                requiresAdmin: true,
-                requiresLargeScreen: true,
-            },
-            props: true,
-        },
-        {
-            path: routes.USER_UPDATE,
-            name: 'UserUpdate',
-            component: () => import('@/views/users/UserUpdate.vue'),
-            meta: {
-                requiresAuth: true,
-                requiresAdmin: true,
-                requiresLargeScreen: true,
-            },
-            props: true,
-        },
-        {
-            path: routes.USER_DELETE,
-            name: 'UserDelete',
-            component: () => import('@/views/users/UserDelete.vue'),
-            meta: {
-                requiresAuth: true,
-                requiresAdmin: true,
-                requiresLargeScreen: true,
-            },
-            props: true,
+            children: [
+                {
+                    path: routes.ADMIN.INDEX, // ''
+                    name: 'AdminMenu',
+                    component: () => import('@/views/admin/AdminMenu.vue'),
+                },
+                {
+                    path: routes.ADMIN.USERS.SEGMENT, // 'users'
+                    meta: {
+                        breadcrumb: 'breadcrumbs.users.list',
+                    },
+                    children: [
+                        {
+                            path: routes.ADMIN.USERS.INDEX, // ''
+                            name: 'UserList',
+                            component: () =>
+                                import('@/views/users/UserList.vue'),
+                        },
+                        {
+                            path: routes.ADMIN.USERS.CREATE, // 'create'
+                            name: 'UserCreate',
+                            component: () =>
+                                import('@/views/users/UserCreate.vue'),
+                            meta: {
+                                breadcrumb: 'breadcrumbs.users.create',
+                            },
+                        },
+                        {
+                            path: routes.ADMIN.USERS.DETAIL, // ':id'
+                            name: 'UserDetail',
+                            component: () =>
+                                import('@/views/users/UserDetail.vue'),
+                            meta: {
+                                breadcrumb: 'breadcrumbs.users.detail',
+                            },
+                            props: true,
+                        },
+                        {
+                            path: routes.ADMIN.USERS.UPDATE, // ':id/update'
+                            name: 'UserUpdate',
+                            component: () =>
+                                import('@/views/users/UserUpdate.vue'),
+                            meta: {
+                                breadcrumb: 'breadcrumbs.users.update',
+                            },
+                            props: true,
+                        },
+                        {
+                            path: routes.ADMIN.USERS.DELETE, // ':id/delete'
+                            name: 'UserDelete',
+                            component: () =>
+                                import('@/views/users/UserDelete.vue'),
+                            meta: {
+                                breadcrumb: 'breadcrumbs.users.delete',
+                            },
+                            props: true,
+                        },
+                    ],
+                },
+            ],
         },
 
         // エラーページ
@@ -105,7 +120,10 @@ const router = createRouter({
             path: routes.UNSUPPORTED_DEVICE,
             name: 'UnsupportedDevice',
             component: () => import('@/views/errors/UnsupportedDevice.vue'),
-            meta: { requiresAuth: false },
+            meta: {
+                requiresAuth: false,
+                breadcrumb: false,
+            },
         },
 
         // 404ページはホームにリダイレクト

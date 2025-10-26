@@ -1,10 +1,13 @@
+<!-- src/components/Header.vue - パンくずリスト対応（リンク強調版） -->
 <script setup>
 import { computed } from 'vue';
 import { useTheme } from 'vuetify';
+import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { ICONS } from '@/constants/icons';
 import { ICON_SIZES, THEME_CONFIG, COMPONENT_CONFIGS } from '@/constants/theme';
 
 const theme = useTheme();
+const { breadcrumbs: autoBreadcrumbs } = useBreadcrumbs(); // 自動生成
 
 const props = defineProps({
     appTitle: {
@@ -21,7 +24,7 @@ const props = defineProps({
     },
     breadcrumbs: {
         type: Array,
-        default: () => [],
+        default: null, // null にすることで「未指定」を判定可能に
     },
 });
 
@@ -36,6 +39,16 @@ const elevation = computed(() => COMPONENT_CONFIGS.header?.elevation || 4);
 const headerHeight = computed(
     () => COMPONENT_CONFIGS.header.height.desktop || 64,
 );
+
+// 🎯 重要！propsが渡されてなければ自動生成を使う
+const displayBreadcrumbs = computed(() => {
+    // props.breadcrumbs が明示的に渡された場合はそれを使う
+    if (props.breadcrumbs !== null) {
+        return props.breadcrumbs;
+    }
+    // 渡されてない場合は自動生成を使う
+    return autoBreadcrumbs.value;
+});
 
 // ボタンの色を動的に取得（デフォルトはprimary）
 function getButtonColor(type = 'primary') {
@@ -70,13 +83,13 @@ function getButtonColor(type = 'primary') {
             </span>
         </div>
 
-        <!-- パンくずリスト（breadcrumbsが存在する場合のみ表示） -->
+        <!-- パンくずリスト（displayBreadcrumbsが存在する場合のみ表示） -->
         <div
-            v-if="breadcrumbs && breadcrumbs.length > 0"
+            v-if="displayBreadcrumbs && displayBreadcrumbs.length > 0"
             class="flex-grow-1 d-flex justify-center"
         >
             <v-breadcrumbs
-                :items="breadcrumbs"
+                :items="displayBreadcrumbs"
                 class="pa-0 d-none d-sm-inline"
                 density="compact"
             >
@@ -91,7 +104,10 @@ function getButtonColor(type = 'primary') {
                         :to="item.to"
                         :disabled="item.disabled"
                         class="text-caption text-sm-subtitle-2"
-                        :color="item.disabled ? 'default' : 'primary'"
+                        :class="{
+                            'breadcrumb-link': !item.disabled,
+                            'breadcrumb-current': item.disabled,
+                        }"
                     >
                         {{ item.title }}
                     </v-breadcrumbs-item>
@@ -117,3 +133,29 @@ function getButtonColor(type = 'primary') {
         </div>
     </v-app-bar>
 </template>
+
+<style scoped>
+/* クリック可能なパンくずリンク（モダンなBootstrapスタイル） */
+.breadcrumb-link {
+    color: #0d6efd !important; /* Bootstrap 5のリンク色（明るい青） */
+    text-decoration: underline !important;
+    cursor: pointer !important;
+    transition: color 0.15s ease-in-out;
+}
+
+.breadcrumb-link:hover {
+    color: #0a58ca !important; /* ホバー時の濃い青 */
+    text-decoration: underline !important;
+}
+
+.breadcrumb-link:active {
+    color: #084298 !important; /* クリック時のさらに濃い青 */
+}
+
+/* 現在のページ（クリック不可） */
+.breadcrumb-current {
+    color: rgba(var(--v-theme-on-surface), 0.87) !important;
+    text-decoration: none !important;
+    cursor: default !important;
+}
+</style>

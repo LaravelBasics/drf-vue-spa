@@ -5,7 +5,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { routes } from '@/constants/routes';
+import { userRoutes } from '@/constants/routes'; // ✅ userRoutesをインポート
 import { ICONS } from '@/constants/icons.js';
 import { useDisplay } from 'vuetify';
 import { useApiError } from '@/composables/useApiError';
@@ -34,23 +34,6 @@ const headerButtons = computed(() => [
         icon: ICONS.buttons.csv,
         type: 'success',
         loading: csvExporting.value,
-    },
-]);
-
-const breadcrumbs = computed(() => [
-    {
-        title: t('breadcrumbs.home'),
-        to: routes.HOME,
-        disabled: false,
-    },
-    {
-        title: t('breadcrumbs.admin'),
-        to: routes.ADMIN,
-        disabled: false,
-    },
-    {
-        title: t('breadcrumbs.users.list'),
-        disabled: true,
     },
 ]);
 
@@ -306,11 +289,11 @@ function formatDate(dateString) {
 }
 
 function goToCreate() {
-    router.push(routes.USER_CREATE);
+    router.push(userRoutes.create()); // ✅ ヘルパー関数を使用
 }
 
 function handleRowClick(event, { item }) {
-    router.push(routes.USER_DETAIL.replace(':id', item.id));
+    router.push(userRoutes.detail(item.id)); // ✅ ヘルパー関数を使用
 }
 
 onMounted(() => {
@@ -337,7 +320,6 @@ onBeforeUnmount(() => {
         <Header
             :app-title="t('pages.users.list.title')"
             :page-buttons="headerButtons"
-            :breadcrumbs="breadcrumbs"
         />
 
         <v-container fluid class="pa-4">
@@ -409,9 +391,10 @@ onBeforeUnmount(() => {
                 @update:options="loadItems"
                 @click:row="handleRowClick"
             >
+                <!-- ✅ IDカラムのリンクもヘルパー関数を使用 -->
                 <template v-slot:item.id="{ item }">
                     <RouterLink
-                        :to="routes.USER_DETAIL.replace(':id', item.id)"
+                        :to="userRoutes.detail(item.id)"
                         class="font-weight-medium text-decoration-none text-primary"
                         @click.stop
                     >

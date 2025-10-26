@@ -1,3 +1,4 @@
+<!-- src/views/users/UserUpdate.vue - ユーザー更新画面 -->
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
@@ -6,7 +7,7 @@ import { useValidation } from '@/composables/useValidation';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { routes } from '@/constants/routes';
+import { userRoutes } from '@/constants/routes'; // ✅ userRoutesをインポート
 import { ICONS } from '@/constants/icons.js';
 
 const router = useRouter();
@@ -32,19 +33,6 @@ const formData = ref({
 });
 
 const passwordConfirm = ref('');
-
-const breadcrumbs = computed(() => [
-    { title: t('breadcrumbs.home'), to: routes.HOME, disabled: false },
-    { title: t('breadcrumbs.admin'), to: routes.ADMIN, disabled: false },
-    { title: t('breadcrumbs.users.list'), to: routes.USERS, disabled: false },
-    {
-        title: t('breadcrumbs.users.detail'),
-        to: routes.USER_DETAIL,
-        disabled: true,
-    },
-    { title: t('breadcrumbs.users.update'), disabled: true },
-]);
-
 const usernameRules = createRules.username();
 const employeeIdRules = createRules.employeeId();
 
@@ -76,7 +64,7 @@ async function fetchUser() {
         };
     } catch (error) {
         handleApiError(error, 'pages.users.detail.error');
-        router.push(routes.USERS);
+        router.push(userRoutes.list()); // ✅ ヘルパー関数を使用
     } finally {
         loading.value = false;
     }
@@ -118,7 +106,7 @@ async function submitForm() {
             username: formData.value.username,
         });
 
-        router.replace(routes.USERS);
+        router.replace(userRoutes.list()); // ✅ ヘルパー関数を使用
     } catch (error) {
         handleApiError(error);
     } finally {
@@ -133,10 +121,7 @@ onMounted(() => {
 
 <template>
     <div>
-        <Header
-            :app-title="t('pages.users.update.title')"
-            :breadcrumbs="breadcrumbs"
-        />
+        <Header :app-title="t('pages.users.update.title')" />
 
         <v-container class="pa-4">
             <v-row justify="center">

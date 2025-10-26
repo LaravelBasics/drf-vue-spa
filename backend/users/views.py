@@ -51,7 +51,7 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
         filters.OrderingFilter,
     ]
     filterset_fields = ["is_admin", "is_active"]
-    search_fields = ["^employee_id", "username"]
+    search_fields = ["^employee_id", "^username"]
     ordering_fields = ["id", "employee_id", "created_at", "is_admin"]
     ordering = ["id"]
 

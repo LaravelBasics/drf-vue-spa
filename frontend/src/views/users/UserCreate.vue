@@ -1,3 +1,4 @@
+<!-- src/views/users/UserCreate.vue - ユーザー作成画面 -->
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
@@ -6,7 +7,7 @@ import { useValidation } from '@/composables/useValidation';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { routes } from '@/constants/routes';
+import { userRoutes } from '@/constants/routes'; // ✅ userRoutesをインポート
 import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
@@ -24,13 +25,6 @@ const formData = ref({
     password: '',
     is_admin: false,
 });
-
-const breadcrumbs = computed(() => [
-    { title: t('breadcrumbs.home'), to: routes.HOME, disabled: false },
-    { title: t('breadcrumbs.admin'), to: routes.ADMIN, disabled: false },
-    { title: t('breadcrumbs.users.list'), to: routes.USERS, disabled: false },
-    { title: t('breadcrumbs.users.create'), disabled: true },
-]);
 
 const usernameRules = createRules.username();
 const employeeIdRules = createRules.employeeId();
@@ -64,7 +58,7 @@ async function submitForm() {
         showSuccess('pages.users.create.success', {
             username: formData.value.username,
         });
-        router.replace(routes.USERS);
+        router.replace(userRoutes.list()); // ✅ ヘルパー関数を使用
     } catch (error) {
         handleApiError(error);
     } finally {
@@ -73,16 +67,13 @@ async function submitForm() {
 }
 
 function goBack() {
-    router.replace(routes.USERS);
+    router.replace(userRoutes.list()); // ✅ ヘルパー関数を使用
 }
 </script>
 
 <template>
     <div>
-        <Header
-            :app-title="t('pages.users.create.title')"
-            :breadcrumbs="breadcrumbs"
-        />
+        <Header :app-title="t('pages.users.create.title')" />
 
         <v-container class="pa-4">
             <v-row justify="center">

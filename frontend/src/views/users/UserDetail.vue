@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { routes } from '@/constants/routes';
+import { userRoutes } from '@/constants/routes'; // ✅ userRoutesをインポート
 import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
@@ -19,13 +19,6 @@ const user = ref({});
 const adminCount = ref(0);
 
 const userId = computed(() => route.params.id);
-
-const breadcrumbs = computed(() => [
-    { title: t('breadcrumbs.home'), to: routes.HOME, disabled: false },
-    { title: t('breadcrumbs.admin'), to: routes.ADMIN, disabled: false },
-    { title: t('breadcrumbs.users.list'), to: routes.USERS, disabled: false },
-    { title: t('breadcrumbs.users.detail'), disabled: true },
-]);
 
 // 最後の管理者かどうか判定（削除ボタンの無効化に使用）
 const isLastAdmin = computed(() => {
@@ -47,7 +40,7 @@ async function fetchUser() {
         adminCount.value = adminCountResponse.data.count;
     } catch (error) {
         handleApiError(error);
-        router.push(routes.USERS);
+        router.push(userRoutes.list()); // ✅ ヘルパー関数を使用
     } finally {
         loading.value = false;
     }
@@ -63,15 +56,15 @@ function formatDate(dateString) {
 }
 
 function goToUpdate() {
-    router.push(routes.USER_UPDATE.replace(':id', userId.value));
+    router.push(userRoutes.update(userId.value)); // ✅ ヘルパー関数を使用
 }
 
 function goToDelete() {
-    router.push(routes.USER_DELETE.replace(':id', userId.value));
+    router.push(userRoutes.delete(userId.value)); // ✅ ヘルパー関数を使用
 }
 
 function goBack() {
-    router.push(routes.USERS);
+    router.push(userRoutes.list()); // ✅ ヘルパー関数を使用
 }
 
 onMounted(() => {
@@ -81,10 +74,7 @@ onMounted(() => {
 
 <template>
     <div>
-        <Header
-            :app-title="t('pages.users.detail.title')"
-            :breadcrumbs="breadcrumbs"
-        />
+        <Header :app-title="t('pages.users.detail.title')" />
 
         <v-container class="pa-4">
             <v-row justify="center">

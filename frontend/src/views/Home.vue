@@ -1,3 +1,4 @@
+<!-- src/views/Home.vue -->
 <script setup>
 import { computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -6,7 +7,7 @@ import { usePermissions } from '@/composables/usePermissions';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import MenuCardGrid from '@/components/MenuCardGrid.vue';
-import { routes } from '@/constants/routes';
+import { routes } from '@/constants/routes'; // ✅ routesだけインポート
 import { ICONS } from '@/constants/icons';
 import { COLORS } from '@/constants/theme';
 
@@ -15,14 +16,6 @@ const router = useRouter();
 const route = useRoute();
 const { showWarning } = useApiError();
 const { isAdmin } = usePermissions();
-
-const breadcrumbs = computed(() => [
-    {
-        title: t('breadcrumbs.home'),
-        to: routes.HOME,
-        disabled: true,
-    },
-]);
 
 // マウント時に権限エラーチェック
 onMounted(() => {
@@ -37,7 +30,7 @@ const menuItems = computed(() => [
         id: 'admin',
         icon: ICONS.nav.management,
         title: t('pages.admin.title'),
-        to: routes.ADMIN,
+        to: routes.ADMIN.ROOT, // ✅ そのまま使える
         color: 'secondary',
         requiresAdmin: true,
     },
@@ -45,7 +38,7 @@ const menuItems = computed(() => [
         id: 'settings',
         icon: ICONS.nav.settings,
         title: t('pages.settings.title'),
-        to: routes.SETTINGS,
+        to: routes.SETTINGS, // ✅ そのまま使える
         color: COLORS.neutral.medium,
     },
 ]);
@@ -62,7 +55,7 @@ const filteredMenuItems = computed(() => {
 </script>
 
 <template>
-    <Header :app-title="t('pages.home.title')" :breadcrumbs="breadcrumbs" />
+    <Header :app-title="t('pages.home.title')" />
 
     <MenuCardGrid :items="filteredMenuItems" />
 </template>
