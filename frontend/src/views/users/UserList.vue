@@ -419,17 +419,16 @@ onBeforeUnmount(() => {
                     {{ formatDate(item.created_at) }}
                 </template>
             </v-data-table-server>
-
-            <!-- 外部ページネーション -->
-            <div class="d-flex justify-center mt-4">
-                <v-pagination
-                    v-model="currentPage"
-                    :length="totalPages"
-                    :total-visible="5"
-                    density="compact"
-                />
-            </div>
         </v-container>
+        <!-- 外部ページネーション -->
+        <div class="d-flex justify-center">
+            <v-pagination
+                v-model="currentPage"
+                :length="totalPages"
+                :total-visible="5"
+                density="compact"
+            />
+        </div>
     </div>
 </template>
 

@@ -55,7 +55,7 @@ const handleClick = (event) => {
                 :icon="icon"
                 :color="color"
                 :size="iconSize"
-                class="mb-3"
+                class="mt-1 mb-3"
             ></v-icon>
             <div class="text-subtitle-1 font-weight-medium text-center">
                 {{ title }}
@@ -66,7 +66,7 @@ const handleClick = (event) => {
 
 <style scoped>
 .menu-card {
-    min-width: 160px;
+    /* min-width: 200px; */
     max-width: 200px;
     aspect-ratio: 4/3;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
