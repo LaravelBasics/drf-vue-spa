@@ -31,6 +31,7 @@ async function fetchUser() {
 
     loading.value = true;
     try {
+        // 依存関係がないため並列取得で表示を高速化（最後の管理者判定のため両方必要）
         const [userResponse, adminCountResponse] = await Promise.all([
             usersAPI.get(userId.value),
             usersAPI.adminCount(),

@@ -116,6 +116,12 @@ class User(AbstractBaseUser, PermissionsMixin):
             models.Index(fields=["deleted_at"]),
             models.Index(fields=["is_admin", "is_active"]),
             models.Index(fields=["-created_at"]),
+            # 管理者カウントクエリの高速化用
+            # 大規模データ（数十万件以上）でさらに高速化が必要な場合はキャッシュの導入を検討
+            models.Index(
+                fields=["deleted_at", "is_admin", "is_active"],
+                name="users_admin_count_idx",
+            ),
         ]
 
     def __str__(self):

@@ -330,7 +330,7 @@ onBeforeUnmount(() => {
                         :label="t('pages.users.list.searchPlaceholder')"
                         :prepend-inner-icon="ICONS.buttons.search"
                         variant="outlined"
-                        density="compact"
+                        density="default"
                         hide-details
                     >
                         <template v-slot:append-inner>
@@ -385,7 +385,7 @@ onBeforeUnmount(() => {
                 v-model:items-per-page="itemsPerPage"
                 v-model:sort-by="sortBy"
                 class="elevation-2 clickable-table"
-                density="compact"
+                density="default"
                 hover
                 hide-default-footer
                 @update:options="loadItems"
@@ -426,7 +426,7 @@ onBeforeUnmount(() => {
                 v-model="currentPage"
                 :length="totalPages"
                 :total-visible="5"
-                density="compact"
+                density="default"
             />
         </div>
     </div>

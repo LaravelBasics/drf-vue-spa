@@ -34,17 +34,22 @@ export const routes = Object.freeze({
     UNSUPPORTED_DEVICE: '/unsupported-device',
 });
 
-/**
- * ユーザー関連のパスヘルパー
- * パラメータを含むパスを簡単に生成
- */
-export const userRoutes = {
-    list: () => '/admin/users',
-    create: () => '/admin/users/create',
-    detail: (id) => `/admin/users/${id}`,
-    update: (id) => `/admin/users/${id}/update`,
-    delete: (id) => `/admin/users/${id}/delete`,
-};
+// ✅ 汎用化したヘルパー関数
+function createResourceRoutes(basePath) {
+    return {
+        list: () => basePath,
+        create: () => `${basePath}/create`,
+        detail: (id) => `${basePath}/${id}`,
+        update: (id) => `${basePath}/${id}/update`,
+        delete: (id) => `${basePath}/${id}/delete`,
+    };
+}
+
+export const userRoutes = createResourceRoutes('/admin/users');
+
+// 将来的に追加する場合
+// export const productRoutes = createResourceRoutes('/admin/products');
+// export const orderRoutes = createResourceRoutes('/admin/orders');
 
 /**
  * ルート名定義（router.push({ name }) 用）

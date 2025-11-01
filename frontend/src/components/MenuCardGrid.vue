@@ -22,6 +22,7 @@ defineProps({
                 md="3"
                 lg="2"
                 xl="2"
+                class="mr-5"
             >
                 <MenuCard
                     :icon="item.icon"
@@ -29,7 +30,7 @@ defineProps({
                     :to="item.to"
                     :href="item.href"
                     :color="item.color || 'primary'"
-                    :icon-size="item.iconSize || 64"
+                    :icon-size="item.iconSize || 100"
                     @click="item.onClick && item.onClick()"
                 />
             </v-col>

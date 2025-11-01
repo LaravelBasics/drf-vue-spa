@@ -48,16 +48,14 @@ const handleClick = (event) => {
         @keydown.enter.prevent="handleClick"
         @keydown.space.prevent.stop="handleClick"
     >
-        <v-card-text
-            class="d-flex flex-column align-center justify-center pa-6"
-        >
+        <v-card-text class="d-flex flex-column align-center justify-center">
             <v-icon
                 :icon="icon"
                 :color="color"
                 :size="iconSize"
-                class="mt-1 mb-3"
+                class="mt-2 mb-5"
             ></v-icon>
-            <div class="text-subtitle-1 font-weight-medium text-center">
+            <div class="text-h6 font-weight-medium text-center">
                 {{ title }}
             </div>
         </v-card-text>
@@ -66,8 +64,8 @@ const handleClick = (event) => {
 
 <style scoped>
 .menu-card {
-    /* min-width: 200px; */
-    max-width: 200px;
+    min-width: 260px;
+    max-width: 260px;
     aspect-ratio: 4/3;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;

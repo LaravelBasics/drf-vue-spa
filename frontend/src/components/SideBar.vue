@@ -19,7 +19,7 @@ const navItems = computed(() => [
     {
         title: t('pages.admin.title'),
         icon: ICONS.nav.management,
-        to: routes.ADMIN,
+        to: routes.ADMIN.ROOT,
         requiresAdmin: true,
     },
     {
