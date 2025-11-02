@@ -213,19 +213,19 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
     def export_csv(self, request):
         """
         CSV出力
-        検索条件を反映し、100件以下のデータをCSV形式で出力
-        100件超過時はエラーレスポンスを返す
+        検索条件を反映し、1100件以下のデータをCSV形式で出力
+        1100件超過時はエラーレスポンスを返す
         """
         # フィルタリングを適用
         queryset = self.filter_queryset(self.get_queryset())
 
         # 件数チェック
         count = queryset.count()
-        if count > 100:
+        if count > 1100:
             return self.error_response(
                 error_code="CSV_EXPORT_LIMIT_EXCEEDED",
                 detail=_(
-                    "CSV出力は100件までです。現在の検索条件では%(count)d件が該当します。"
+                    "CSV出力は1100件までです。現在の検索条件では%(count)d件が該当します。"
                 )
                 % {"count": count},
                 status_code=status.HTTP_400_BAD_REQUEST,

@@ -68,8 +68,8 @@ msgstr "Logout failed"
 
 # ==================== CSV出力エラー ====================
 
-msgid "CSV出力は100件までです。現在の検索条件では%(count)d件が該当します。"
-msgstr "CSV export is limited to 100 records. The current search conditions match %(count)d records."
+msgid "CSV出力は1100件までです。現在の検索条件では%(count)d件が該当します。"
+msgstr "CSV export is limited to 1100 records. The current search conditions match %(count)d records."
 
 msgid "出力対象のデータがありません。"
 msgstr "No data available for export."

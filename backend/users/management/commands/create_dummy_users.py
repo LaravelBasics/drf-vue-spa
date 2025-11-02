@@ -80,7 +80,7 @@ class Command(BaseCommand):
 
         # 既存の最大社員番号を取得
         max_id = User.all_objects.aggregate(max_id=Max("employee_id"))["max_id"]
-        start_id = int(max_id) + 1 if max_id and max_id.isdigit() else 10000
+        start_id = int(max_id) + 1 if max_id and max_id.isdigit() else 1
 
         # 管理者が存在するか確認
         has_admin = User.objects.filter(is_admin=True, is_active=True).exists()
