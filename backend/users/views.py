@@ -10,7 +10,6 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.utils.translation import gettext as _
 import csv
@@ -20,10 +19,12 @@ from .serializers import (
     UserSerializer,
     UserCreateSerializer,
     UserUpdateSerializer,
-    BulkActionSerializer,
 )
 from .services.user_service import UserService
-from .exceptions import UserServiceException
+from .exceptions import (
+    UserServiceException,
+    CannotUpdateDeletedError,
+)
 from .permissions import IsAdminUser
 from common.mixins import ErrorResponseMixin
 
@@ -60,8 +61,6 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
             return UserCreateSerializer
         elif self.action in ["update", "partial_update"]:
             return UserUpdateSerializer
-        elif self.action in ["bulk_delete", "bulk_restore"]:
-            return BulkActionSerializer
         return UserSerializer
 
     def create(self, request, *args, **kwargs):
@@ -86,11 +85,7 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
         instance = self.get_object()
 
         if instance.deleted_at:
-            return self.error_response(
-                error_code="CANNOT_UPDATE_DELETED",
-                detail=_("削除済みユーザーは編集できません。"),
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
+            raise CannotUpdateDeletedError()
 
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
 
@@ -112,96 +107,6 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
         except UserServiceException as e:
             return self.error_response(e.error_code, e.detail, e.status_code)
-
-    @action(detail=False, methods=["post"], url_path="bulk-delete")
-    def bulk_delete(self, request):
-        """一括削除"""
-        serializer = self.get_serializer(data=request.data)
-
-        try:
-            serializer.is_valid(raise_exception=True)
-            user_ids = serializer.validated_data["ids"]
-
-            deleted_count = UserService.bulk_delete_users(user_ids)
-            return Response(
-                {
-                    "message": f"{deleted_count}件のユーザーを削除しました",
-                    "deleted_count": deleted_count,
-                }
-            )
-        except ValidationError as e:
-            return self.validation_error_response(e)
-        except UserServiceException as e:
-            return self.error_response(e.error_code, e.detail, e.status_code)
-
-    @action(detail=True, methods=["post"])
-    def restore(self, request, pk=None):
-        """ユーザー復元"""
-        try:
-            user = UserService.restore_user(pk)
-            return Response(
-                {"message": "ユーザーを復元しました", "user": UserSerializer(user).data}
-            )
-        except UserServiceException as e:
-            return self.error_response(e.error_code, e.detail, e.status_code)
-
-    @action(detail=False, methods=["post"], url_path="bulk-restore")
-    def bulk_restore(self, request):
-        """一括復元"""
-        serializer = self.get_serializer(data=request.data)
-
-        try:
-            serializer.is_valid(raise_exception=True)
-            user_ids = serializer.validated_data["ids"]
-
-            restored_count = UserService.bulk_restore_users(user_ids)
-            return Response(
-                {
-                    "message": f"{restored_count}件のユーザーを復元しました",
-                    "restored_count": restored_count,
-                }
-            )
-        except ValidationError as e:
-            return self.validation_error_response(e)
-        except UserServiceException as e:
-            return self.error_response(e.error_code, e.detail, e.status_code)
-
-    @action(detail=False, methods=["get"])
-    def deleted(self, request):
-        """削除済みユーザー一覧"""
-        deleted_users = User.all_objects.filter(deleted_at__isnull=False).order_by(
-            "-deleted_at"
-        )
-        deleted_users = self.filter_queryset(deleted_users)
-
-        page = self.paginate_queryset(deleted_users)
-        if page is not None:
-            serializer = UserSerializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        return Response(UserSerializer(deleted_users, many=True).data)
-
-    @action(detail=False, methods=["get"])
-    def stats(self, request):
-        """ユーザー統計"""
-        stats = User.objects.aggregate(
-            total=Count("id"),
-            active=Count("id", filter=Q(is_active=True)),
-            inactive=Count("id", filter=Q(is_active=False)),
-            admins=Count("id", filter=Q(is_admin=True, is_active=True)),
-        )
-
-        deleted_count = User.all_objects.filter(deleted_at__isnull=False).count()
-
-        return Response(
-            {
-                "total_users": stats["total"],
-                "active_users": stats["active"],
-                "inactive_users": stats["inactive"],
-                "admin_users": stats["admins"],
-                "deleted_users": deleted_count,
-            }
-        )
 
     @action(detail=False, methods=["get"], url_path="admin-count")
     def admin_count(self, request):

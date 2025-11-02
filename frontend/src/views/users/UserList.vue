@@ -425,7 +425,7 @@ onBeforeUnmount(() => {
             <v-pagination
                 v-model="currentPage"
                 :length="totalPages"
-                :total-visible="5"
+                :total-visible="3"
                 density="default"
             />
         </div>

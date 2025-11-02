@@ -4,9 +4,7 @@
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.utils import timezone
-from datetime import timedelta
-from ..exceptions import LastAdminError, UserNotFoundError, CannotDeleteSelfError
+from ..exceptions import LastAdminError, CannotDeleteSelfError
 
 User = get_user_model()
 
@@ -141,96 +139,3 @@ class UserService:
             UserService._check_last_admin_for_delete(user_id=user_instance.id)
 
         user_instance.soft_delete()
-
-    @staticmethod
-    @transaction.atomic
-    def bulk_delete_users(user_ids):
-        """
-        一括削除
-
-        Args:
-            user_ids: 削除対象IDリスト
-
-        Returns:
-            削除件数
-        """
-        admin_ids = list(
-            User.objects.filter(
-                id__in=user_ids, is_admin=True, is_active=True
-            ).values_list("id", flat=True)
-        )
-
-        if admin_ids:
-            remaining_admins = (
-                User.objects.filter(is_admin=True, is_active=True)
-                .exclude(id__in=user_ids)
-                .exists()
-            )
-
-            if not remaining_admins:
-                raise LastAdminError(action="delete")
-
-        updated_count = User.objects.filter(id__in=user_ids).update(
-            deleted_at=timezone.now(), is_active=False
-        )
-
-        return updated_count
-
-    @staticmethod
-    @transaction.atomic
-    def restore_user(user_id):
-        """
-        ユーザー復元
-
-        Args:
-            user_id: 復元対象ID
-
-        Returns:
-            復元されたユーザー
-        """
-        try:
-            user = User.all_objects.get(id=user_id, deleted_at__isnull=False)
-        except User.DoesNotExist:
-            raise UserNotFoundError()
-
-        user.restore()
-        return user
-
-    @staticmethod
-    @transaction.atomic
-    def bulk_restore_users(user_ids):
-        """
-        一括復元
-
-        Args:
-            user_ids: 復元対象IDリスト
-
-        Returns:
-            復元件数
-        """
-        updated_count = User.all_objects.filter(
-            id__in=user_ids, deleted_at__isnull=False
-        ).update(deleted_at=None, is_active=True)
-
-        return updated_count
-
-    @staticmethod
-    @transaction.atomic
-    def permanent_delete_old_users(days=90):
-        """
-        古い削除済みユーザーを物理削除
-
-        Args:
-            days: 削除後の経過日数
-
-        Returns:
-            物理削除件数
-        """
-        threshold_date = timezone.now() - timedelta(days=days)
-
-        old_deleted_users = User.all_objects.filter(deleted_at__lte=threshold_date)
-
-        count = old_deleted_users.count()
-        old_deleted_users.delete()
-
-        return count

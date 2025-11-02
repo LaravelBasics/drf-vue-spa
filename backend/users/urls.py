@@ -4,12 +4,8 @@
 生成されるエンドポイント:
 - GET/POST    /api/users/
 - GET/PUT/PATCH/DELETE /api/users/{id}/
-- POST  /api/users/bulk-delete/
-- POST  /api/users/{id}/restore/
-- POST  /api/users/bulk-restore/
-- GET   /api/users/deleted/
-- GET   /api/users/stats/
 - GET   /api/users/admin-count/
+- GET   /api/users/export-csv/
 """
 
 from django.urls import path, include

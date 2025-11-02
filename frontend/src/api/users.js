@@ -28,11 +28,6 @@ export const usersAPI = {
         return api.delete(`users/${id}/`);
     },
 
-    // ユーザー統計情報取得
-    stats() {
-        return api.get('users/stats/');
-    },
-
     // 管理者数取得(最後の管理者削除防止用)
     adminCount() {
         return api.get('users/admin-count/');
