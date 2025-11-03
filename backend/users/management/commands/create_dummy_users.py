@@ -1,8 +1,20 @@
 """
-ダミーユーザー作成コマンド
+ダミーユーザー作成コマンド(パフォーマンステスト・開発用)
 
 Usage:
-    python manage.py create_dummy_users --count=100 --password=test1234
+    # 100件作成(デフォルト)
+    python manage.py create_dummy_users
+
+    # 100万件作成(パフォーマンステスト)
+    python manage.py create_dummy_users --count=1000000
+
+    # 確認せずに実行
+    python manage.py create_dummy_users --count=10000 --yes
+
+Safety:
+    - DEBUG=False(本番環境)では実行不可
+    - 1万件以上は確認プロンプト表示
+    - バッチ処理で安全に挿入
 """
 
 from django.core.management.base import BaseCommand
@@ -10,14 +22,16 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 from django.db.models import Max
+from django.conf import settings
 from datetime import timedelta
 import random
+import sys
 
 User = get_user_model()
 
 
 class Command(BaseCommand):
-    help = "ダミーユーザーを効率的に作成"
+    help = "ダミーユーザーを効率的に作成(開発・テスト専用)"
 
     LAST_NAMES = [
         "佐藤",
@@ -66,17 +80,57 @@ class Command(BaseCommand):
     ]
 
     def add_arguments(self, parser):
-        parser.add_argument("--count", type=int, default=100, help="作成するユーザー数")
         parser.add_argument(
-            "--password", type=str, default="test1234", help="デフォルトパスワード"
+            "--count",
+            type=int,
+            default=100,
+            help="作成するユーザー数(デフォルト: 100)",
+        )
+        parser.add_argument(
+            "--password",
+            type=str,
+            default="test1234",
+            help="デフォルトパスワード(デフォルト: test1234)",
+        )
+        parser.add_argument(
+            "--batch-size",
+            type=int,
+            default=1000,
+            help="バッチサイズ(デフォルト: 1000)",
+        )
+        parser.add_argument(
+            "--yes",
+            action="store_true",
+            help="確認なしで実行",
         )
 
     def handle(self, *args, **options):
-        count = options["count"]
-        default_password = options["password"]
+        # セーフティチェック: DEBUG=False では実行不可
+        if not settings.DEBUG:
+            self.stdout.write(
+                self.style.ERROR("❌ エラー: 本番環境(DEBUG=False)では実行できません")
+            )
+            sys.exit(1)
 
-        # パスワードは1回だけハッシュ化（全ユーザー共通）
-        hashed_password = make_password(default_password)
+        count = options["count"]
+        password = options["password"]
+        batch_size = options["batch_size"]
+        skip_confirm = options["yes"]
+
+        # 確認プロンプト(1万件以上)
+        if count >= 10000 and not skip_confirm:
+            self.stdout.write(
+                self.style.WARNING(f"\n⚠️  {count:,}件のダミーユーザーを作成します")
+            )
+            self.stdout.write("   これには時間がかかる可能性があります。")
+            confirm = input("\n続行しますか? [y/N]: ")
+
+            if confirm.lower() != "y":
+                self.stdout.write("キャンセルしました")
+                sys.exit(0)
+
+        # パスワードは1回だけハッシュ化
+        hashed_password = make_password(password)
 
         # 既存の最大社員番号を取得
         max_id = User.all_objects.aggregate(max_id=Max("employee_id"))["max_id"]
@@ -88,9 +142,13 @@ class Command(BaseCommand):
         # 基準時刻を1回だけ取得
         base_time = timezone.now()
 
-        users_to_create = []
+        self.stdout.write(f"\nダミーユーザー作成開始...")
+        self.stdout.write(f"  作成数: {count:,}件")
+        self.stdout.write(f"  バッチサイズ: {batch_size:,}件")
 
-        self.stdout.write("ダミーユーザー作成開始...")
+        # バッチ処理で作成
+        total_created = 0
+        batch = []
 
         for i in range(count):
             employee_id = str(start_id + i)
@@ -98,9 +156,8 @@ class Command(BaseCommand):
                 f"{random.choice(self.LAST_NAMES)}{random.choice(self.FIRST_NAMES)}"
             )
 
-            # 基準時刻から相対的に計算
             created_at = base_time - timedelta(
-                days=random.randint(0, 30),
+                days=random.randint(0, 365),
                 hours=random.randint(0, 23),
                 minutes=random.randint(0, 59),
             )
@@ -117,29 +174,72 @@ class Command(BaseCommand):
                 created_at=created_at,
             )
 
-            users_to_create.append(user)
+            batch.append(user)
 
-        if users_to_create:
-            try:
-                User.objects.bulk_create(users_to_create, ignore_conflicts=True)
+            # バッチサイズに達したら挿入
+            if len(batch) >= batch_size:
+                try:
+                    User.objects.bulk_create(batch, ignore_conflicts=True)
+                    total_created += len(batch)
 
-                self.stdout.write(self.style.SUCCESS(f"\n✅ {count}人作成しました"))
-
-                self.stdout.write("\n作成されたユーザー（サンプル）:")
-                for user in users_to_create[:5]:
-                    admin_mark = " [管理者]" if user.is_admin else ""
+                    # 進捗表示
+                    progress = (total_created / count) * 100
                     self.stdout.write(
-                        f"  - 社員番号: {user.employee_id} / 名前: {user.username}{admin_mark}"
+                        f"\r  進捗: {total_created:,}/{count:,}件 ({progress:.1f}%)",
+                        ending="",
                     )
+                    self.stdout.flush()
 
-                if len(users_to_create) > 5:
-                    self.stdout.write(f"  ... 他 {len(users_to_create) - 5}人")
+                    batch = []
 
-                self.stdout.write(f"\nログイン情報:")
-                self.stdout.write(f"  社員番号: {users_to_create[0].employee_id}")
-                self.stdout.write(f"  パスワード: {default_password}")
+                except Exception as e:
+                    self.stdout.write(self.style.ERROR(f"\n❌ エラー: {str(e)}"))
+                    sys.exit(1)
 
+        # 残りを挿入
+        if batch:
+            try:
+                User.objects.bulk_create(batch, ignore_conflicts=True)
+                total_created += len(batch)
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"\n❌ エラー: {str(e)}"))
-        else:
-            self.stdout.write(self.style.WARNING("作成するユーザーがありません"))
+                sys.exit(1)
+
+        # 完了メッセージ
+        self.stdout.write(
+            f"\n\n{self.style.SUCCESS(f'✅ {total_created:,}件作成しました')}"
+        )
+
+        # サンプル表示
+        sample_users = User.objects.filter(employee_id__gte=start_id).order_by(
+            "employee_id"
+        )[:5]
+
+        self.stdout.write("\n作成されたユーザー(サンプル):")
+        for user in sample_users:
+            admin_mark = " [管理者]" if user.is_admin else ""
+            self.stdout.write(
+                f"  - 社員番号: {user.employee_id} / 名前: {user.username}{admin_mark}"
+            )
+
+        if total_created > 5:
+            self.stdout.write(f"  ... 他 {total_created - 5:,}人")
+
+        self.stdout.write(f"\nログイン情報:")
+        self.stdout.write(f"  社員番号: {start_id}")
+        self.stdout.write(f"  パスワード: {password}")
+
+        # パフォーマンステスト用の情報
+        if count >= 10000:
+            self.stdout.write(
+                f"\n{self.style.WARNING('💡 パフォーマンステストのヒント:')}"
+            )
+            self.stdout.write(
+                f"  - インデックス効果: employee_id で検索してみてください"
+            )
+            self.stdout.write(
+                f"  - ページネーション: 1000件/ページで試してみてください"
+            )
+            self.stdout.write(
+                f"  - 複合検索: is_admin + is_active で絞り込んでみてください"
+            )

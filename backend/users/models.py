@@ -3,7 +3,7 @@
 
 Features:
 - employee_id でログイン
-- 論理削除対応（deleted_at）
+- 論理削除対応(deleted_at)
 - 条件付きユニーク制約で番号再利用可能
 """
 
@@ -17,13 +17,19 @@ from django.utils import timezone
 
 
 class CustomUserManager(BaseUserManager):
-    """論理削除対応マネージャー（削除済み除外）"""
+    """論理削除対応マネージャー(削除済み除外)"""
 
     def get_queryset(self):
         return super().get_queryset().filter(deleted_at__isnull=True)
 
     def create_user(self, employee_id, password=None, **extra_fields):
-        """通常ユーザー作成"""
+        """
+        通常ユーザー作成
+
+        Note:
+            管理者ユーザーは0002マイグレーションで自動作成されます。
+            手動作成が必要な場合は、このメソッドで is_admin=True を指定してください。
+        """
         if not employee_id:
             raise ValueError("社員番号は必須です")
 
@@ -35,22 +41,9 @@ class CustomUserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, employee_id, password=None, **extra_fields):
-        """スーパーユーザー作成"""
-        extra_fields.setdefault("is_admin", True)
-        extra_fields.setdefault("is_staff", True)
-        extra_fields.setdefault("is_superuser", True)
-
-        if extra_fields.get("is_admin") is not True:
-            raise ValueError("スーパーユーザーは is_admin=True である必要があります")
-        if extra_fields.get("is_staff") is not True:
-            raise ValueError("スーパーユーザーは is_staff=True である必要があります")
-
-        return self.create_user(employee_id, password, **extra_fields)
-
 
 class AllObjectsManager(BaseUserManager):
-    """全レコード取得マネージャー（削除済み含む）"""
+    """全レコード取得マネージャー(削除済み含む)"""
 
     def get_queryset(self):
         return super().get_queryset()
@@ -117,7 +110,6 @@ class User(AbstractBaseUser, PermissionsMixin):
             models.Index(fields=["is_admin", "is_active"]),
             models.Index(fields=["-created_at"]),
             # 管理者カウントクエリの高速化用
-            # 大規模データ（数十万件以上）でさらに高速化が必要な場合はキャッシュの導入を検討
             models.Index(
                 fields=["deleted_at", "is_admin", "is_active"],
                 name="users_admin_count_idx",
@@ -129,13 +121,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"{self.employee_id} ({self.username or '名前未設定'}){status}"
 
     def soft_delete(self):
-        """論理削除（1回のSQLで完結）"""
+        """論理削除(1回のSQLで完結)"""
         self.deleted_at = timezone.now()
         self.is_active = False
         self.save(update_fields=["deleted_at", "is_active"])
 
     def restore(self):
-        """復元（1回のSQLで完結）"""
+        """復元(1回のSQLで完結)"""
         self.deleted_at = None
         self.is_active = True
         self.save(update_fields=["deleted_at", "is_active"])
