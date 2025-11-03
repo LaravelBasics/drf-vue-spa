@@ -80,7 +80,6 @@ const vuetify = createVuetify({
             },
         },
     },
-    defaults: THEME_CONFIG.defaults,
     locale: {
         locale: 'ja',
         fallback: 'ja',

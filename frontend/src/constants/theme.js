@@ -43,93 +43,6 @@ export const ICON_SIZES = Object.freeze({
     xl: 40,
 });
 
-// スペーシング統一
-export const SPACING = Object.freeze({
-    xs: 4,
-    sm: 8,
-    md: 16,
-    lg: 24,
-    xl: 32,
-    xxl: 48,
-});
-
-// エレベーション（影）統一
-export const ELEVATION = Object.freeze({
-    none: 0,
-    subtle: 1,
-    low: 2,
-    medium: 4,
-    high: 8,
-    highest: 12,
-});
-
-// ボーダーRadius統一
-export const BORDER_RADIUS = Object.freeze({
-    none: 0,
-    sm: 4,
-    md: 8,
-    lg: 12,
-    xl: 16,
-    round: 50,
-});
-
-// コンポーネント設定（サイズ、パディング、エレベーションなど）
-export const COMPONENT_CONFIGS = Object.freeze({
-    // ヘッダー設定
-    header: {
-        height: {
-            mobile: 56,
-            tablet: 64,
-            desktop: 64,
-        },
-        elevation: ELEVATION.low,
-    },
-
-    // カード設定
-    card: {
-        padding: {
-            sm: SPACING.md,
-            md: SPACING.lg,
-            lg: SPACING.xl,
-        },
-        elevation: ELEVATION.subtle,
-        borderRadius: BORDER_RADIUS.lg,
-    },
-
-    // ボタン設定
-    button: {
-        size: {
-            small: { height: 32, fontSize: '0.875rem' },
-            default: { height: 40, fontSize: '1rem' },
-            large: { height: 48, fontSize: '1.125rem' },
-        },
-        padding: {
-            sm: `${SPACING.xs}px ${SPACING.sm}px`,
-            md: `${SPACING.sm}px ${SPACING.md}px`,
-            lg: `${SPACING.md}px ${SPACING.lg}px`,
-        },
-    },
-
-    // フォーム設定
-    form: {
-        spacing: SPACING.md,
-        fieldHeight: 48,
-        labelFontSize: '0.875rem',
-    },
-
-    // モーダル・ダイアログ設定
-    modal: {
-        width: {
-            sm: 400,
-            md: 600,
-            lg: 800,
-            xl: 1000,
-        },
-        maxWidth: '90vw',
-        elevation: ELEVATION.high,
-    },
-});
-
 // Vuetifyテーマ設定
 export const THEME_CONFIG = {
     colors: {
@@ -154,25 +67,6 @@ export const THEME_CONFIG = {
             info: '#64B5F6',
             background: '#121212',
             surface: '#1E1E1E',
-        },
-    },
-    defaults: {
-        VBtn: {
-            elevation: ELEVATION.low,
-            rounded: BORDER_RADIUS.md,
-        },
-        VAppBarNavIcon: {
-            // ハンバーガーメニューの影を無効化
-            elevation: ELEVATION.none,
-            variant: 'text',
-        },
-        VCard: {
-            elevation: ELEVATION.subtle,
-            rounded: BORDER_RADIUS.lg,
-        },
-        VTextField: {
-            variant: 'outlined',
-            density: 'default',
         },
     },
 };

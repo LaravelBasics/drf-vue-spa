@@ -1,13 +1,13 @@
-<!-- src/components/Header.vue - パンくずリスト対応 -->
+<!-- src/components/Header.vue - Vuetifyネイティブプロパティ版 -->
 <script setup>
 import { computed } from 'vue';
 import { useTheme } from 'vuetify';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { ICONS } from '@/constants/icons';
-import { ICON_SIZES, THEME_CONFIG, COMPONENT_CONFIGS } from '@/constants/theme';
+import { ICON_SIZES, THEME_CONFIG } from '@/constants/theme';
 
 const theme = useTheme();
-const { breadcrumbs: autoBreadcrumbs } = useBreadcrumbs(); // 自動生成
+const { breadcrumbs: autoBreadcrumbs } = useBreadcrumbs();
 
 const props = defineProps({
     appTitle: {
@@ -16,7 +16,11 @@ const props = defineProps({
     },
     headerHeight: {
         type: [String, Number],
-        default: 64,
+        default: 64, // 直接指定
+    },
+    headerElevation: {
+        type: [String, Number],
+        default: 2, // Vuetifyのデフォルト値
     },
     pageButtons: {
         type: Array,
@@ -24,7 +28,7 @@ const props = defineProps({
     },
     breadcrumbs: {
         type: Array,
-        default: null, // null にすることで「未指定」を判定可能に
+        default: null,
     },
 });
 
@@ -34,23 +38,13 @@ const surfaceColor = computed(
         THEME_CONFIG.colors.light.surface,
 );
 
-const elevation = computed(() => COMPONENT_CONFIGS.header?.elevation || 4);
-
-const headerHeight = computed(
-    () => COMPONENT_CONFIGS.header.height.desktop || 64,
-);
-
-// 🎯 重要！propsが渡されてなければ自動生成を使う
 const displayBreadcrumbs = computed(() => {
-    // props.breadcrumbs が明示的に渡された場合はそれを使う
     if (props.breadcrumbs !== null) {
         return props.breadcrumbs;
     }
-    // 渡されてない場合は自動生成を使う
     return autoBreadcrumbs.value;
 });
 
-// ボタンの色を動的に取得（デフォルトはprimary）
 function getButtonColor(type = 'primary') {
     const colors = theme.global.current.value?.colors;
     const colorMap = {
@@ -69,8 +63,8 @@ function getButtonColor(type = 'primary') {
 <template>
     <v-app-bar
         :color="surfaceColor"
-        :elevation="elevation"
-        :height="headerHeight"
+        :elevation="props.headerElevation"
+        :height="props.headerHeight"
         app
     >
         <!-- アプリタイトル（PC以上で表示） -->
@@ -83,7 +77,7 @@ function getButtonColor(type = 'primary') {
             </span>
         </div>
 
-        <!-- パンくずリスト（displayBreadcrumbsが存在する場合のみ表示） -->
+        <!-- パンくずリスト -->
         <div
             v-if="displayBreadcrumbs && displayBreadcrumbs.length > 0"
             class="flex-grow-1 d-flex justify-center"
@@ -135,33 +129,30 @@ function getButtonColor(type = 'primary') {
 </template>
 
 <style scoped>
-/* クリック可能なパンくずリンク（Bootstrapスタイル） */
 .breadcrumb-link {
-    color: #0d6efd !important; /* Bootstrap 5のリンク色（明るい青） */
+    color: #0d6efd !important;
     text-decoration: underline !important;
     cursor: pointer !important;
     transition: color 0.15s ease-in-out;
 }
 
 .breadcrumb-link:hover {
-    color: #0a58ca !important; /* ホバー時の濃い青 */
+    color: #0a58ca !important;
     text-decoration: underline !important;
 }
 
 .breadcrumb-link:active {
-    color: #084298 !important; /* クリック時のさらに濃い青 */
+    color: #084298 !important;
 }
 
-/* 現在のページ（クリック不可） */
 .breadcrumb-current {
     color: rgba(var(--v-theme-on-surface), 0.87) !important;
     text-decoration: none !important;
     cursor: default !important;
 }
 
-/* 区切りアイコンの垂直位置調整 */
 .breadcrumb-divider {
     vertical-align: middle !important;
-    margin-top: -3px !important; /* 微調整 */
+    margin-top: -3px !important;
 }
 </style>
