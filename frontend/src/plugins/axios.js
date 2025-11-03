@@ -42,6 +42,18 @@ class CSRFManager {
     async _fetchToken() {
         try {
             await api.get('auth/csrf/');
+
+            // Cookie反映待ち（ブラウザのタイミング差対策）
+            let token = Cookies.get('csrftoken');
+            if (!token) {
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                token = Cookies.get('csrftoken');
+            }
+
+            if (!token) {
+                throw new Error('CSRF cookie not set after endpoint call');
+            }
+
             this.tokenFetched = true;
         } catch (error) {
             throw error;
@@ -61,7 +73,7 @@ api.interceptors.request.use(async (config) => {
     const localeStore = useLocaleStore();
     config.headers['Accept-Language'] = localeStore.locale;
 
-    const method = config.method?.toLowerCase();
+    const method = (config.method || '').toLowerCase();
     const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
 
     if (methodsRequiringCsrf.includes(method)) {
@@ -72,17 +84,12 @@ api.interceptors.request.use(async (config) => {
                 config.headers['X-CSRFToken'] = csrfToken;
             }
         } catch (error) {
-            // CSRFトークン取得失敗時はスキップ
+            // CSRFトークン取得失敗時はスキップ（サーバー側でエラー）
         }
     }
 
     return config;
 });
-
-// CSRFトークンリセット関数（ログアウト時などに使用）
-export const resetCSRFToken = () => {
-    csrfManager.reset();
-};
 
 // レスポンスインターセプター（認証エラー処理 + 通知）
 api.interceptors.response.use(
@@ -103,14 +110,12 @@ api.interceptors.response.use(
                     const auth = useAuthStore();
 
                     if (auth.isAuthenticated) {
-                        // セッション切れ通知を表示
                         const notification = useNotificationStore();
                         const message =
                             response.data?.detail ||
-                            'セッションの有効期限が切れました。再度ログインしてください';
+                            'セッションの有効期限が切れました。再度ログインしてください。';
 
                         notification.warning(message, 5000);
-
                         await auth.logout(true);
                     }
                 }
@@ -128,5 +133,10 @@ api.interceptors.response.use(
         return Promise.reject(error);
     },
 );
+
+// CSRFトークンリセット関数（ログアウト時などに使用）
+export const resetCSRFToken = () => {
+    csrfManager.reset();
+};
 
 export default api;

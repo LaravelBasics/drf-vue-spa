@@ -3,11 +3,6 @@
 import api from '@/plugins/axios';
 
 export const authAPI = {
-    // CSRFトークン取得（Django CSRF保護用）
-    getCsrf() {
-        return api.get('auth/csrf/');
-    },
-
     // ログイン処理
     login(employeeId, password) {
         return api.post('auth/login/', { employee_id: employeeId, password });
