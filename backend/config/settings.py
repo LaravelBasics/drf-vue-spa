@@ -33,7 +33,7 @@ INSTALLED_APPS = [
     "django_filters",
     "accounts",
     "users",
-    # "debug_toolbar",  # 開発ツール（最後に追加）
+    "debug_toolbar",  # 開発ツール（最後に追加）
 ]
 
 # === 認証 ===
@@ -65,7 +65,7 @@ REST_FRAMEWORK = {
 # === ミドルウェア ===
 
 MIDDLEWARE = [
-    # "debug_toolbar.middleware.DebugToolbarMiddleware",  # ← 先頭付近に追加
+    "debug_toolbar.middleware.DebugToolbarMiddleware",  # ← 先頭付近に追加
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -77,7 +77,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "common.middleware.AuditMiddleware",  # 監査ミドルウェア
-    # "querycount.middleware.QueryCountMiddleware",  # ← どこでもOK
+    "querycount.middleware.QueryCountMiddleware",  # ← どこでもOK
 ]
 
 # === キャッシュ ===
@@ -101,8 +101,16 @@ CORS_ALLOW_CREDENTIALS = True
 
 SESSION_COOKIE_AGE = 86400
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
-SESSION_SAVE_EVERY_REQUEST = True
-SESSION_COOKIE_SECURE = False
+SESSION_SAVE_EVERY_REQUEST = False  # DB負荷考慮
+SESSION_COOKIE_SECURE = False  # 本番ではNG
+
+# 本番設定
+# SESSION_COOKIE_HTTPONLY = True  # ✅ 必須
+# SESSION_COOKIE_SECURE = True  # ✅ 必須
+# SESSION_COOKIE_SAMESITE = "Lax"  # ✅ 推奨
+# CSRF_COOKIE_HTTPONLY = False  # ✅ 必須（JSから読む）
+# CSRF_COOKIE_SECURE = True  # ✅ 必須
+# CSRF_COOKIE_SAMESITE = "Lax"  # ✅ 推奨
 
 # === CSRF ===
 
@@ -110,7 +118,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
 ]
 CSRF_COOKIE_HTTPONLY = False
-CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False  # 本番はTrue
 
 # === URL設定 ===
 
@@ -250,20 +258,20 @@ LOGGING = {
 }
 
 # Debug Toolbar設定（最後に追加）
-# INTERNAL_IPS = [
-#     "127.0.0.1",
-# ]
+INTERNAL_IPS = [
+    "127.0.0.1",
+]
 
 # querycount設定（最後に追加）
-# QUERYCOUNT = {
-#     "THRESHOLDS": {
-#         "MEDIUM": 50,
-#         "HIGH": 200,
-#         "MIN_TIME_TO_LOG": 0,
-#         "MIN_QUERY_COUNT_TO_LOG": 0,
-#     },
-#     "IGNORE_REQUEST_PATTERNS": [],
-#     "IGNORE_SQL_PATTERNS": [],
-#     "DISPLAY_DUPLICATES": 10,
-#     "RESPONSE_HEADER": "X-DjangoQueryCount-Count",
-# }
+QUERYCOUNT = {
+    "THRESHOLDS": {
+        "MEDIUM": 50,
+        "HIGH": 200,
+        "MIN_TIME_TO_LOG": 0,
+        "MIN_QUERY_COUNT_TO_LOG": 0,
+    },
+    "IGNORE_REQUEST_PATTERNS": [],
+    "IGNORE_SQL_PATTERNS": [],
+    "DISPLAY_DUPLICATES": 10,
+    "RESPONSE_HEADER": "X-DjangoQueryCount-Count",
+}
