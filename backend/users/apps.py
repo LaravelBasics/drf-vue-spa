@@ -12,7 +12,12 @@ class UsersConfig(AppConfig):
     name = "users"
 
     def ready(self):
-        """アプリ起動時にシグナルを登録"""
-        from common.signals import register_audit_signals
+        """
+        アプリ起動時の初期化処理
 
-        register_audit_signals()  # ⭐ 全モデルに適用
+        Note:
+            監査ログのシグナルは@receiverデコレーターで自動登録されるため
+            明示的な登録処理は不要
+        """
+        # シグナルをインポートして登録を有効化
+        import common.signals  # noqa: F401

@@ -19,11 +19,6 @@ const { handleApiError } = useApiError();
 
 const loggingOut = ref(false);
 
-// ユーザー名表示（優先順位: username > employee_id > ゲスト）
-const displayName = computed(() => {
-    return auth.user?.username || auth.user?.employee_id || 'ゲスト';
-});
-
 const primaryColor = computed(
     () =>
         theme.global.current.value?.colors?.primary ||
@@ -86,7 +81,7 @@ function goToHome() {
                     <v-icon :size="ICON_SIZES.sm" class="me-2">
                         {{ ICONS.nav.profile }}
                     </v-icon>
-                    <span>{{ displayName }}</span>
+                    <span>{{ auth.user?.display_name }}</span>
                 </v-chip>
             </template>
 

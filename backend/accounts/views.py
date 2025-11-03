@@ -2,6 +2,8 @@
 認証関連API
 """
 
+import logging
+import json
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -12,9 +14,11 @@ from django.utils.decorators import method_decorator
 from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
+from common.context import get_client_ip
 
 from .serializers import LoginSerializer, UserSerializer
-from common.mixins import ErrorResponseMixin
+
+audit_logger = logging.getLogger("audit")
 
 
 class CSRFView(APIView):
@@ -27,8 +31,8 @@ class CSRFView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class LoginAPIView(ErrorResponseMixin, APIView):
-    """ログインAPI（ブルートフォース攻撃対策）"""
+class LoginAPIView(APIView):
+    """ログインAPI(ブルートフォース攻撃対策)"""
 
     permission_classes = [AllowAny]
 
@@ -72,18 +76,19 @@ class LoginAPIView(ErrorResponseMixin, APIView):
 
         # ロックチェック
         if self._is_locked(employee_id):
-            return self.error_response(
-                error_code="ACCOUNT_LOCKED",
-                detail=str(
-                    _(
-                        "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください"
+            return Response(
+                {
+                    "detail": str(
+                        _(
+                            "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください"
+                        )
+                        % {
+                            "max_attempts": settings.LOGIN_MAX_ATTEMPTS,
+                            "lockout_duration": settings.LOGIN_LOCKOUT_DURATION,
+                        }
                     )
-                    % {
-                        "max_attempts": settings.LOGIN_MAX_ATTEMPTS,
-                        "lockout_duration": settings.LOGIN_LOCKOUT_DURATION,
-                    }
-                ),
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
         # 認証
@@ -92,10 +97,9 @@ class LoginAPIView(ErrorResponseMixin, APIView):
         if user:
             if not user.is_active:
                 self._increment_attempts(employee_id)
-                return self.error_response(
-                    error_code="INVALID_CREDENTIALS",
-                    detail=str(_("社員番号またはパスワードが正しくありません")),
-                    status_code=status.HTTP_401_UNAUTHORIZED,
+                return Response(
+                    {"detail": str(_("社員番号またはパスワードが正しくありません"))},
+                    status=status.HTTP_401_UNAUTHORIZED,
                 )
 
             # ログイン成功
@@ -114,24 +118,24 @@ class LoginAPIView(ErrorResponseMixin, APIView):
 
         if attempts >= settings.LOGIN_MAX_ATTEMPTS:
             self._lock_user(employee_id)
-            return self.error_response(
-                error_code="ACCOUNT_LOCKED",
-                detail=str(
-                    _(
-                        "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください"
+            return Response(
+                {
+                    "detail": str(
+                        _(
+                            "ログイン試行が%(max_attempts)d回失敗しました。%(lockout_duration)d秒後に再度お試しください"
+                        )
+                        % {
+                            "max_attempts": settings.LOGIN_MAX_ATTEMPTS,
+                            "lockout_duration": settings.LOGIN_LOCKOUT_DURATION,
+                        }
                     )
-                    % {
-                        "max_attempts": settings.LOGIN_MAX_ATTEMPTS,
-                        "lockout_duration": settings.LOGIN_LOCKOUT_DURATION,
-                    }
-                ),
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-        return self.error_response(
-            error_code="INVALID_CREDENTIALS",
-            detail=str(_("社員番号またはパスワードが正しくありません")),
-            status_code=status.HTTP_401_UNAUTHORIZED,
+        return Response(
+            {"detail": str(_("社員番号またはパスワードが正しくありません"))},
+            status=status.HTTP_401_UNAUTHORIZED,
         )
 
 
@@ -141,7 +145,34 @@ class LogoutAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        """
+        ログアウト処理
+
+        Note:
+            logout()実行前にユーザー情報を保存して監査ログに記録
+        """
+        # ログアウト前にユーザー情報を保存
+        user_info = request.user.employee_id
+        request_id = getattr(request, "_request_id", "N/A")
+        ip = get_client_ip(request)
+
+        # ログアウト実行
         logout(request)
+
+        # 監査ログに記録
+        audit_logger.info(
+            "ユーザーがログアウトしました",
+            extra={
+                "request_id": request_id,
+                "user": user_info,
+                "action": "LOGOUT",
+                "model": "Auth",
+                "object_id": None,
+                "ip": ip,
+                "changes": "{}",
+            },
+        )
+
         return Response({"detail": "logged_out"})
 
 

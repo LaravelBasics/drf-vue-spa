@@ -13,9 +13,8 @@ export function useApiError() {
      * エラーメッセージの優先順位:
      * 1. detail（Djangoが翻訳済み）
      * 2. フィールド別エラー（employee_id, usernameなど）
-     * 3. error_codeから翻訳（フォールバック）
-     * 4. fallbackMessageKey（指定された場合）
-     * 5. 汎用エラーメッセージ
+     * 3. fallbackMessageKey（指定された場合）
+     * 4. 汎用エラーメッセージ
      */
     function handleApiError(error, fallbackMessageKey = null, duration = 7000) {
         let errorMessage = null;
@@ -28,18 +27,9 @@ export function useApiError() {
                 errorMessage = errorData.detail;
             }
 
-            // 優先順位2: フィールド別のバリデーションエラー
+            // 優先順位2: serializeフィールド別のバリデーションエラー
             if (!errorMessage) {
                 errorMessage = extractFirstFieldError(errorData);
-            }
-
-            // 優先順位3: error_codeをフロントで翻訳（フォールバック）
-            if (!errorMessage && errorData.error_code) {
-                const backendErrorKey = `backend.errors.${errorData.error_code}`;
-                const translated = t(backendErrorKey);
-                if (translated !== backendErrorKey) {
-                    errorMessage = translated;
-                }
             }
         } else if (error.request) {
             // ネットワークエラー（サーバー到達不可）
@@ -49,7 +39,7 @@ export function useApiError() {
             errorMessage = t('backend.errors.UNKNOWN_ERROR');
         }
 
-        // 最終フォールバック
+        // 最終フォールバック、フロント側でメッセージ設定
         if (!errorMessage && fallbackMessageKey) {
             errorMessage = t(fallbackMessageKey);
         }

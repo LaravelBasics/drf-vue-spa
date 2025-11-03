@@ -1,12 +1,13 @@
 """
 カスタムミドルウェア
+
+Django公式推奨のモダンスタイルに準拠
 """
 
 import logging
 import json
 import uuid
 from django.utils.translation import activate
-from django.utils.deprecation import MiddlewareMixin
 from common.context import set_current_request, get_client_ip
 
 audit_logger = logging.getLogger("audit")
@@ -53,7 +54,7 @@ class LanguageMiddleware:
         Examples:
             'ja,en-US;q=0.9' → 'ja'
             'en-GB,en' → 'en'
-            'fr,de' → None（未対応）
+            'fr,de' → None(未対応)
             'invalid;;data' → None
         """
         try:
@@ -71,88 +72,84 @@ class LanguageMiddleware:
         return None
 
 
-class AuditMiddleware(MiddlewareMixin):
+class AuditMiddleware:
     """
     API監査ミドルウェア
 
     ログイン・ログアウトを監査ログに記録
-    リクエストIDを管理（X-Request-ID or UUID生成）
+    リクエストIDを管理(X-Request-ID or UUID生成)
 
     Note:
         モデルの作成/更新/削除はシグナルで自動記録されるため
         ここでは認証関連のみ記録
     """
 
-    def process_request(self, request):
-        """リクエスト前処理"""
-        # リクエストIDを取得 or 生成
-        request_id = request.META.get("HTTP_X_REQUEST_ID")
-        if not request_id:
-            request_id = str(uuid.uuid4())
+    def __init__(self, get_response):
+        self.get_response = get_response
 
+    def __call__(self, request):
+        """リクエスト処理"""
+        # リクエストIDを取得 or 生成
+        request_id = request.META.get("HTTP_X_REQUEST_ID", str(uuid.uuid4()))
         request._request_id = request_id
 
-        # リクエストをスレッドローカルに保存（シグナルで使用）
+        # リクエストをスレッドローカルに保存(シグナルで使用)
         set_current_request(request)
 
-        return None
+        # レスポンス取得
+        response = self.get_response(request)
 
-    def process_response(self, request, response):
-        """レスポンス後処理"""
         # レスポンスヘッダーにリクエストIDを追加
-        if hasattr(request, "_request_id"):
-            response["X-Request-ID"] = request._request_id
+        response["X-Request-ID"] = request_id
 
-        # ユーザー情報取得
-        user_info = "anonymous"
-        if hasattr(request, "user") and request.user.is_authenticated:
-            user_info = request.user.employee_id
+        # 監査ログ記録
+        self._log_auth_events(request, response)
 
-        ip = get_client_ip(request)
-        request_id = getattr(request, "_request_id", "N/A")
+        return response
 
-        # ログイン（成功・失敗）
+    def _log_auth_events(self, request, response):
+        """
+        認証関連イベントのログ記録
+
+        Args:
+            request: HTTPリクエスト
+            response: HTTPレスポンス
+
+        Note:
+            ログアウトはView内で記録されるため、ここではログインのみ記録
+        """
+        # ログアウトはView内で記録済みなのでスキップ
+        if request.path == "/api/auth/logout/":
+            return
+
+        # 基本情報(DRY原則)
+        user_info = (
+            request.user.employee_id
+            if hasattr(request, "user") and request.user.is_authenticated
+            else "anonymous"
+        )
+
+        base_extra = {
+            "request_id": getattr(request, "_request_id", "N/A"),
+            "user": user_info,
+            "model": "Auth",
+            "object_id": None,
+            "ip": get_client_ip(request),
+        }
+
+        # ログインのみ記録
         if request.path == "/api/auth/login/":
             if response.status_code == 200:
                 audit_logger.info(
                     "ユーザーがログインしました",
-                    extra={
-                        "request_id": request_id,
-                        "user": user_info,
-                        "action": "LOGIN",
-                        "model": "Auth",
-                        "object_id": None,
-                        "ip": ip,
-                        "changes": "{}",
-                    },
+                    extra={**base_extra, "action": "LOGIN", "changes": "{}"},
                 )
             else:
                 audit_logger.warning(
-                    f"ログイン失敗（status: {response.status_code}）",
+                    f"ログイン失敗(status: {response.status_code})",
                     extra={
-                        "request_id": request_id,
-                        "user": user_info,
+                        **base_extra,
                         "action": "LOGIN_FAILED",
-                        "model": "Auth",
-                        "object_id": None,
-                        "ip": ip,
                         "changes": json.dumps({"status_code": response.status_code}),
                     },
                 )
-
-        # ログアウト
-        elif request.path == "/api/auth/logout/" and response.status_code == 200:
-            audit_logger.info(
-                "ユーザーがログアウトしました",
-                extra={
-                    "request_id": request_id,
-                    "user": user_info,
-                    "action": "LOGOUT",
-                    "model": "Auth",
-                    "object_id": None,
-                    "ip": ip,
-                    "changes": "{}",
-                },
-            )
-
-        return response

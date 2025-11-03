@@ -26,7 +26,7 @@ from .exceptions import (
     CannotUpdateDeletedError,
 )
 from .permissions import IsAdminUser
-from common.mixins import ErrorResponseMixin
+from common.response_utils import extract_validation_error
 
 User = get_user_model()
 
@@ -39,7 +39,7 @@ class UserPagination(PageNumberPagination):
     max_page_size = 100
 
 
-class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
+class UserViewSet(viewsets.ModelViewSet):
     """ユーザー管理API"""
 
     queryset = User.objects.all()
@@ -72,7 +72,8 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
             user = UserService.create_user(serializer.validated_data)
             return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
         except ValidationError as e:
-            return self.validation_error_response(e)
+            error_msg = extract_validation_error(e)
+            return Response({"detail": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, *args, **kwargs):
         """ユーザー詳細"""
@@ -94,9 +95,10 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
             user = UserService.update_user(instance, serializer.validated_data)
             return Response(UserSerializer(user).data)
         except ValidationError as e:
-            return self.validation_error_response(e)
+            error_msg = extract_validation_error(e)
+            return Response({"detail": error_msg}, status=status.HTTP_400_BAD_REQUEST)
         except UserServiceException as e:
-            return self.error_response(e.error_code, e.detail, e.status_code)
+            return Response({"detail": e.detail}, status=e.status_code)
 
     def destroy(self, request, *args, **kwargs):
         """ユーザー削除（論理削除）"""
@@ -106,7 +108,7 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
             UserService.delete_user(instance, request_user_id=request.user.id)
             return Response(status=status.HTTP_204_NO_CONTENT)
         except UserServiceException as e:
-            return self.error_response(e.error_code, e.detail, e.status_code)
+            return Response({"detail": e.detail}, status=e.status_code)
 
     @action(detail=False, methods=["get"], url_path="admin-count")
     def admin_count(self, request):
@@ -127,20 +129,20 @@ class UserViewSet(ErrorResponseMixin, viewsets.ModelViewSet):
         # 件数チェック
         count = queryset.count()
         if count > 1100:
-            return self.error_response(
-                error_code="CSV_EXPORT_LIMIT_EXCEEDED",
-                detail=_(
-                    "CSV出力は1100件までです。現在の検索条件では%(count)d件が該当します。"
-                )
-                % {"count": count},
-                status_code=status.HTTP_400_BAD_REQUEST,
+            return Response(
+                {
+                    "detail": _(
+                        "CSV出力は1100件までです。現在の検索条件では%(count)d件が該当します。"
+                    )
+                    % {"count": count}
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         if count == 0:
-            return self.error_response(
-                error_code="CSV_EXPORT_NO_DATA",
-                detail=_("出力対象のデータがありません。"),
-                status_code=status.HTTP_400_BAD_REQUEST,
+            return Response(
+                {"detail": _("出力対象のデータがありません。")},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # ソートを適用

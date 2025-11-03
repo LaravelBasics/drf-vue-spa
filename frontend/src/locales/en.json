@@ -1,22 +1,14 @@
 {
     "app": {
         "tabTitle": "Test Environment",
-        "loading": "Loading...",
-        "ready": "Ready"
+        "loading": "Loading..."
     },
     "auth": {
         "login": "Login",
         "logout": "Logout",
         "loginTitle": "Login",
         "loginSuccess": "Login successful",
-        "loginFailed": "Login failed",
-        "logoutSuccess": "Logout successful",
-        "logoutFailed": "Logout failed",
-        "sessionExpired": "Your session has expired. Please log in again"
-    },
-    "nav": {
-        "dashboard": "Dashboard",
-        "profile": "Profile"
+        "logoutSuccess": "Logout successful"
     },
     "form": {
         "fields": {
@@ -72,6 +64,9 @@
         "viewDetail": "View Details",
         "csv": "CSV",
         "users": {
+            "list": {
+                "create": "Create User"
+            },
             "detail": {
                 "update": "Edit",
                 "delete": "Delete"
@@ -106,8 +101,7 @@
     },
     "notifications": {
         "unauthorized": {
-            "admin": "This feature is only available to administrators",
-            "feature": "You do not have permission to use this feature"
+            "admin": "This feature is only available to administrators"
         },
         "success": {
             "saved": "Saved successfully",
@@ -116,8 +110,6 @@
             "created": "Created successfully"
         },
         "error": {
-            "network": "A network error occurred. Please check your connection.",
-            "server": "A server error occurred. Please try again later.",
             "unknown": "An unexpected error occurred"
         },
         "warning": {
@@ -134,18 +126,12 @@
         },
         "settings": {
             "title": "Settings",
-            "general": "General Settings",
-            "account": "Account Settings",
-            "theme": "Theme Settings",
-            "language": "Language Settings",
-            "selectLanguage": "Select Language",
-            "generalDescription": "General settings are displayed here."
+            "language": "Language Settings"
         },
         "users": {
             "list": {
                 "title": "User Management",
                 "searchPlaceholder": "Username or Employee ID",
-                "createButton": "Create User",
                 "itemCount": "{start} - {end} / {total} items",
                 "noData": "No data available",
                 "csvExportSuccess": "CSV file downloaded successfully"
@@ -183,13 +169,7 @@
     "footer": {
         "copyright": "© {year} {company}. All rights reserved.",
         "company": "Sample Corporation",
-        "version": "Version {version}",
-        "links": {
-            "terms": "Terms of Service",
-            "privacy": "Privacy Policy",
-            "contact": "Contact Us",
-            "help": "Help"
-        }
+        "version": "Version {version}"
     },
     "dataTable": {
         "itemCount": "{start} - {end} of {total} items",
@@ -210,25 +190,8 @@
     },
     "backend": {
         "errors": {
-            "INVALID_CREDENTIALS": "Employee ID or password is incorrect",
-            "ACCOUNT_LOCKED": "Login attempts failed 10 times. Please try again in 1 minute",
-            "LOGOUT_FAILED": "Logout failed",
-            "SESSION_EXPIRED": "Your session has expired. Please log in again",
-            "USERNAME_REQUIRED": "Username is required",
-            "EMPLOYEE_ID_REQUIRED": "Employee ID is required",
-            "EMPLOYEE_ID_EXISTS": "This Employee ID is already in use",
-            "PASSWORD_TOO_SHORT": "Password must be at least 8 characters",
-            "INVALID_EMAIL": "Please enter a valid email address",
-            "ALREADY_DELETED": "This user has already been deleted",
-            "CANNOT_UPDATE_DELETED": "Deleted users cannot be edited",
-            "LAST_ADMIN_CANNOT_REMOVE": "Cannot remove admin privileges from the last administrator",
-            "LAST_ADMIN_CANNOT_DEACTIVATE": "Cannot deactivate the last administrator account",
-            "LAST_ADMIN": "Cannot delete the last administrator",
-            "CANNOT_DELETE_SELF": "You cannot delete yourself",
             "NETWORK_ERROR": "A network error occurred",
-            "UNKNOWN_ERROR": "An unexpected error occurred",
-            "NOT_FOUND": "User not found",
-            "VALIDATION_ERROR": "There are errors in your input"
+            "UNKNOWN_ERROR": "An unexpected error occurred"
         }
     }
 }

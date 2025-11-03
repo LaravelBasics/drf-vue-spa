@@ -33,7 +33,7 @@ INSTALLED_APPS = [
     "django_filters",
     "accounts",
     "users",
-    "debug_toolbar",  # 開発ツール（最後に追加）
+    # "debug_toolbar",  # 開発ツール（最後に追加）
 ]
 
 # === 認証 ===
@@ -65,7 +65,7 @@ REST_FRAMEWORK = {
 # === ミドルウェア ===
 
 MIDDLEWARE = [
-    "debug_toolbar.middleware.DebugToolbarMiddleware",  # ← 先頭付近に追加
+    # "debug_toolbar.middleware.DebugToolbarMiddleware",  # ← 先頭付近に追加
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -76,8 +76,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "common.middleware.AuditMiddleware",
-    "querycount.middleware.QueryCountMiddleware",  # ← どこでもOK
+    "common.middleware.AuditMiddleware",  # 監査ミドルウェア
+    # "querycount.middleware.QueryCountMiddleware",  # ← どこでもOK
 ]
 
 # === キャッシュ ===
@@ -250,20 +250,20 @@ LOGGING = {
 }
 
 # Debug Toolbar設定（最後に追加）
-INTERNAL_IPS = [
-    "127.0.0.1",
-]
+# INTERNAL_IPS = [
+#     "127.0.0.1",
+# ]
 
 # querycount設定（最後に追加）
-QUERYCOUNT = {
-    "THRESHOLDS": {
-        "MEDIUM": 50,
-        "HIGH": 200,
-        "MIN_TIME_TO_LOG": 0,
-        "MIN_QUERY_COUNT_TO_LOG": 0,
-    },
-    "IGNORE_REQUEST_PATTERNS": [],
-    "IGNORE_SQL_PATTERNS": [],
-    "DISPLAY_DUPLICATES": 10,
-    "RESPONSE_HEADER": "X-DjangoQueryCount-Count",
-}
+# QUERYCOUNT = {
+#     "THRESHOLDS": {
+#         "MEDIUM": 50,
+#         "HIGH": 200,
+#         "MIN_TIME_TO_LOG": 0,
+#         "MIN_QUERY_COUNT_TO_LOG": 0,
+#     },
+#     "IGNORE_REQUEST_PATTERNS": [],
+#     "IGNORE_SQL_PATTERNS": [],
+#     "DISPLAY_DUPLICATES": 10,
+#     "RESPONSE_HEADER": "X-DjangoQueryCount-Count",
+# }

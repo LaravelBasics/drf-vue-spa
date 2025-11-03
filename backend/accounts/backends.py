@@ -1,7 +1,8 @@
 """
 カスタム認証バックエンド
 
-社員番号（employee_id）でログインを行う認証バックエンド。
+社員番号(employee_id)でログインを行う認証バックエンド。
+タイミング攻撃対策を実装。
 """
 
 from django.contrib.auth.backends import BaseBackend
@@ -19,13 +20,14 @@ class EmployeeIdBackend(BaseBackend):
 
         Args:
             request: HTTPリクエスト
-            username: 社員番号（employee_id）
+            username: 社員番号(employee_id) ※DRF規約でusernameだが実際はemployee_id
             password: パスワード
 
         Returns:
             User: 認証成功時
             None: 認証失敗時
         """
+        # 明示的に変数名を変更して意図を明確化
         employee_id = username
 
         if not employee_id or not password:
@@ -33,18 +35,19 @@ class EmployeeIdBackend(BaseBackend):
 
         try:
             user = User.objects.filter(employee_id=employee_id).first()
-
-            if not user:
-                # タイミング攻撃対策
-                User().set_password(password)
-                return None
-
-            if user.check_password(password):
-                return user
-
         except Exception:
-            # タイミング攻撃対策
+            # DB例外時もタイミング攻撃対策
             User().set_password(password)
+            return None
+
+        if user is None:
+            # ユーザー不在時のタイミング攻撃対策
+            User().set_password(password)
+            return None
+
+        # パスワード検証
+        if user.check_password(password):
+            return user
 
         return None
 

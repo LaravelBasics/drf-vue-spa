@@ -368,7 +368,7 @@ onBeforeUnmount(() => {
                         :prepend-icon="ICONS.buttons.arrowForward"
                         @click="goToCreate"
                     >
-                        {{ t('pages.users.list.createButton') }}
+                        {{ t('buttons.users.list.create') }}
                     </v-btn>
                 </v-col>
             </v-row>
