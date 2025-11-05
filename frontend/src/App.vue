@@ -1,33 +1,13 @@
 <script setup>
-import {
-    ref,
-    onMounted,
-    nextTick,
-    computed,
-    onBeforeUnmount,
-    watch,
-} from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { useRoute, useRouter } from 'vue-router';
 import NavBar from '@/components/NavBar.vue';
 import SideBar from '@/components/SideBar.vue';
 import Footer from '@/components/Footer.vue';
 import Notification from '@/components/Notification.vue';
-import { routes } from '@/constants/routes';
-import { BREAKPOINTS } from '@/constants/breakpoints';
 
 const auth = useAuthStore();
-const route = useRoute();
-const router = useRouter();
 const appReady = ref(false);
-
-// リサイズ監視用
-const windowWidth = ref(window.innerWidth);
-let resizeTimer = null;
-
-const isUnsupportedRoute = computed(() => {
-    return route.path === routes.UNSUPPORTED_DEVICE;
-});
 
 // フォント・アイコン読み込み待機
 const waitForFontsAndIcons = () => {
@@ -40,35 +20,6 @@ const waitForFontsAndIcons = () => {
     });
 };
 
-// デバウンス付きリサイズハンドラー（250ms待機）
-function handleResize() {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-        windowWidth.value = window.innerWidth;
-    }, 250);
-}
-
-// 画面サイズ変更時の自動遷移処理
-watch(windowWidth, (newWidth) => {
-    const isLarge = newWidth >= BREAKPOINTS.LARGE_SCREEN;
-
-    // パターン1: 大画面必須ページで画面が小さくなった → UNSUPPORTED_DEVICEへ
-    if (
-        route.meta?.requiresLargeScreen &&
-        !isLarge &&
-        route.path !== routes.UNSUPPORTED_DEVICE
-    ) {
-        router.push({ path: routes.UNSUPPORTED_DEVICE, replace: true });
-        return;
-    }
-
-    // パターン2: UNSUPPORTED_DEVICEで画面が大きくなった → 適切なページへ
-    if (route.path === routes.UNSUPPORTED_DEVICE && isLarge) {
-        const targetRoute = auth.isAuthenticated ? routes.HOME : routes.LOGIN;
-        router.push({ path: targetRoute, replace: true });
-    }
-});
-
 onMounted(async () => {
     try {
         await Promise.all([
@@ -78,23 +29,9 @@ onMounted(async () => {
 
         await nextTick();
         appReady.value = true;
-
-        // リサイズイベントリスナー登録
-        window.addEventListener('resize', handleResize);
-
-        // 初回チェック
-        windowWidth.value = window.innerWidth;
     } catch (error) {
+        console.error('App initialization error:', error);
         appReady.value = true;
-    }
-});
-
-// クリーンアップ
-onBeforeUnmount(() => {
-    window.removeEventListener('resize', handleResize);
-    if (resizeTimer) {
-        clearTimeout(resizeTimer);
-        resizeTimer = null;
     }
 });
 </script>
@@ -109,15 +46,15 @@ onBeforeUnmount(() => {
             v-show="appReady"
             :class="['app-content', { 'fade-in': appReady }]"
         >
-            <!-- ログイン済み & UNSUPPORTED_DEVICE以外でナビゲーションを表示 -->
-            <NavBar v-if="auth.user && !isUnsupportedRoute" />
-            <SideBar v-if="auth.user && !isUnsupportedRoute" />
+            <!-- ログイン済みでナビゲーションを表示 -->
+            <NavBar v-if="auth.user" />
+            <SideBar v-if="auth.user" />
 
             <v-main>
                 <router-view />
             </v-main>
 
-            <Footer v-if="auth.user && !isUnsupportedRoute" />
+            <Footer v-if="auth.user" />
         </div>
 
         <!-- ローディング画面 -->

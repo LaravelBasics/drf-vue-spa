@@ -179,15 +179,6 @@
     "tooltips": {
         "viewDetails": "View Details"
     },
-    "errors": {
-        "unsupportedDevice": {
-            "home": "Home",
-            "title": "Device Not Supported",
-            "message": "This application is intended for use on PCs and tablets.",
-            "currentSize": "Current Screen Size",
-            "requiresSize": "Recommended Size"
-        }
-    },
     "backend": {
         "errors": {
             "NETWORK_ERROR": "A network error occurred",

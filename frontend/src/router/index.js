@@ -3,7 +3,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { authGuard } from './auth-guard.js';
 import { adminGuard } from './admin-guard.js';
-import { screenSizeGuard } from './screen-size-guard.js';
 import { routes } from '@/constants/routes';
 import i18n from '@/plugins/i18n';
 
@@ -18,7 +17,6 @@ const router = createRouter({
             component: () => import('@/views/Home.vue'),
             meta: {
                 requiresAuth: true,
-                requiresLargeScreen: true,
                 transition: 'slide-left',
                 breadcrumb: 'breadcrumbs.home',
             },
@@ -29,7 +27,6 @@ const router = createRouter({
             component: () => import('@/views/Settings.vue'),
             meta: {
                 requiresAuth: true,
-                requiresLargeScreen: true,
                 breadcrumb: 'breadcrumbs.settings',
             },
         },
@@ -50,7 +47,6 @@ const router = createRouter({
             meta: {
                 requiresAuth: true,
                 requiresAdmin: true,
-                requiresLargeScreen: true,
                 breadcrumb: 'breadcrumbs.admin',
             },
             children: [
@@ -117,17 +113,6 @@ const router = createRouter({
             ],
         },
 
-        // エラーページ
-        {
-            path: routes.UNSUPPORTED_DEVICE,
-            name: 'UnsupportedDevice',
-            component: () => import('@/views/errors/UnsupportedDevice.vue'),
-            meta: {
-                requiresAuth: false,
-                breadcrumb: false,
-            },
-        },
-
         // 404ページはホームにリダイレクト
         {
             path: '/:pathMatch(.*)*',
@@ -158,15 +143,7 @@ router.beforeEach(async (to, from, next) => {
         return;
     }
 
-    // 2. 画面サイズチェック（認証後に実行）
-    const screenResult = screenSizeGuard(to, from);
-    if (screenResult !== true) {
-        document.body.style.cursor = '';
-        next(screenResult);
-        return;
-    }
-
-    // 3. 管理者権限チェック
+    // 2. 管理者権限チェック
     const adminResult = await adminGuard(to, from);
     if (adminResult !== true) {
         document.body.style.cursor = '';

@@ -29,9 +29,6 @@ export const routes = Object.freeze({
             DELETE: ':id/delete', // /admin/users/:id/delete
         },
     },
-
-    // エラーページ
-    UNSUPPORTED_DEVICE: '/unsupported-device',
 });
 
 // ✅ 汎用化したヘルパー関数
@@ -60,7 +57,6 @@ export const ROUTE_NAMES = Object.freeze({
     LOGIN: 'Login',
     LOGOUT: 'Logout',
     SETTINGS: 'Settings',
-    UNSUPPORTED_DEVICE: 'UnsupportedDevice',
     NOT_FOUND: 'NotFound',
 
     ADMIN: {
