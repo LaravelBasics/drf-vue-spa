@@ -14,7 +14,7 @@ defineProps({
 <template>
     <!-- ✅ pa-4 でシンプルに -->
     <v-container fluid class="pa-4">
-        <v-row class="ga-4">
+        <v-row class="ga-0">
             <v-col
                 v-for="item in items"
                 :key="item.id"
