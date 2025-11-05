@@ -1,4 +1,4 @@
-<!-- src/components/Header.vue - Vuetifyネイティブプロパティ版 -->
+<!-- src/components/Header.vue -->
 <script setup>
 import { computed } from 'vue';
 import { useTheme } from 'vuetify';
@@ -16,11 +16,11 @@ const props = defineProps({
     },
     headerHeight: {
         type: [String, Number],
-        default: 64, // 直接指定
+        default: 64,
     },
     headerElevation: {
         type: [String, Number],
-        default: 2, // Vuetifyのデフォルト値
+        default: 2,
     },
     pageButtons: {
         type: Array,
@@ -67,11 +67,8 @@ function getButtonColor(type = 'primary') {
         :height="props.headerHeight"
         app
     >
-        <!-- アプリタイトル（PC以上で表示） -->
-        <div
-            class="ml-5 d-none d-sm-inline align-center"
-            style="min-width: 0; flex-shrink: 1"
-        >
+        <!-- アプリタイトル -->
+        <div class="d-none d-md-flex align-center flex-shrink-1 ml-4">
             <span class="text-h6 font-weight-bold text-truncate">
                 {{ props.appTitle }}
             </span>
@@ -111,18 +108,16 @@ function getButtonColor(type = 'primary') {
 
         <v-spacer v-else></v-spacer>
 
-        <!-- ページ固有のアクションボタン群 -->
-        <div class="d-flex align-center" style="flex-shrink: 0">
+        <div class="d-flex align-center ga-1 mr-4" style="flex-shrink: 0">
             <v-btn
                 v-for="(button, index) in props.pageButtons"
                 :key="index"
                 variant="outlined"
                 :color="getButtonColor(button.type)"
-                class="mr-4 px-2 text-subtitle-2"
-                @click="button.action"
+                :prepend-icon="button.icon"
+                :loading="button.loading"
             >
-                <v-icon :icon="button.icon" :size="ICON_SIZES.sm"></v-icon>
-                <span>{{ button.name }}</span>
+                {{ button.name }}
             </v-btn>
         </div>
     </v-app-bar>

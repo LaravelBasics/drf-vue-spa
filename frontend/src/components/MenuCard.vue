@@ -22,7 +22,7 @@ const props = defineProps({
     },
     iconSize: {
         type: [String, Number],
-        default: 64,
+        default: 64, // ✅ デフォルト値を明確に
     },
 });
 
@@ -43,18 +43,14 @@ const handleClick = (event) => {
         class="menu-card"
         elevation="2"
         hover
-        tabindex="0"
         @click="handleClick"
         @keydown.enter.prevent="handleClick"
         @keydown.space.prevent.stop="handleClick"
     >
-        <v-card-text class="d-flex flex-column align-center justify-center">
-            <v-icon
-                :icon="icon"
-                :color="color"
-                :size="iconSize"
-                class="mt-2 mb-5"
-            ></v-icon>
+        <v-card-text
+            class="py-6 d-flex flex-column align-center justify-center ga-3"
+        >
+            <v-icon :icon="icon" :color="color" :size="iconSize" />
             <div class="text-h6 font-weight-medium text-center">
                 {{ title }}
             </div>
@@ -64,19 +60,15 @@ const handleClick = (event) => {
 
 <style scoped>
 .menu-card {
-    min-width: 260px;
-    max-width: 260px;
-    aspect-ratio: 4/3;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: pointer;
+    min-height: 160px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .menu-card:hover {
     transform: translateY(-4px);
 }
 
-/* キーボードフォーカス時のアウトライン表示 */
-.menu-card:focus {
+.menu-card:focus-visible {
     outline: 2px solid rgb(var(--v-theme-primary));
     outline-offset: 2px;
 }

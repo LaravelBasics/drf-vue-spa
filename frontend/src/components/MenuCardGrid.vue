@@ -12,17 +12,17 @@ defineProps({
 </script>
 
 <template>
-    <v-container fluid class="pa-6">
-        <v-row>
+    <!-- ✅ pa-4 でシンプルに -->
+    <v-container fluid class="pa-4">
+        <v-row class="ga-4">
             <v-col
                 v-for="item in items"
                 :key="item.id"
-                cols="9"
-                sm="4"
-                md="3"
-                lg="2"
+                cols="12"
+                sm="6"
+                md="4"
+                lg="3"
                 xl="2"
-                class="mr-5"
             >
                 <MenuCard
                     :icon="item.icon"
@@ -30,7 +30,7 @@ defineProps({
                     :to="item.to"
                     :href="item.href"
                     :color="item.color || 'primary'"
-                    :icon-size="item.iconSize || 100"
+                    :icon-size="item.iconSize"
                     @click="item.onClick && item.onClick()"
                 />
             </v-col>

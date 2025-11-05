@@ -95,8 +95,12 @@ async function onSubmit() {
                         </div>
                     </v-toolbar>
 
-                    <v-card-text class="py-6 px-6">
-                        <v-form @submit.prevent="onSubmit" ref="form">
+                    <v-card-text class="pa-6">
+                        <v-form
+                            @submit.prevent="onSubmit"
+                            ref="form"
+                            class="d-flex flex-column ga-4"
+                        >
                             <v-text-field
                                 v-model="employeeId"
                                 :label="
@@ -106,13 +110,13 @@ async function onSubmit() {
                                 "
                                 :prepend-inner-icon="ICONS.form.user"
                                 variant="outlined"
-                                class="mt-1 mb-2"
                                 type="text"
                                 inputmode="numeric"
                                 :rules="employeeIdRules"
                                 :hint="t('form.hint.testEmployeeId')"
                                 persistent-hint
                             />
+
                             <v-text-field
                                 v-model="password"
                                 :label="
@@ -123,7 +127,6 @@ async function onSubmit() {
                                 type="password"
                                 :prepend-inner-icon="ICONS.form.password"
                                 variant="outlined"
-                                class="mb-3"
                                 :rules="passwordRules"
                                 :hint="t('form.hint.testPassword')"
                                 persistent-hint
@@ -164,7 +167,8 @@ async function onSubmit() {
     left: 50%;
     transform: translate(-50%, -50%);
     width: 100%;
-    max-width: 425px;
+    max-width: 30rem;
+    padding: 0 1rem; /* ✅ モバイル用の左右余白追加 */
 }
 
 .login-card {

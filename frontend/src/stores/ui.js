@@ -5,23 +5,23 @@ import { ref, computed, watch } from 'vue';
 import { useDisplay } from 'vuetify';
 
 export const useUiStore = defineStore('ui', () => {
-    const { mdAndUp } = useDisplay();
+    const { lgAndUp } = useDisplay();
 
     // サイドバーの開閉状態（初期値は画面サイズに応じて決定）
-    const drawer = ref(mdAndUp.value);
+    const drawer = ref(lgAndUp.value);
 
     // レールモード（ミニモード: アイコンのみ表示）
     const rail = ref(true);
 
     // レスポンシブ判定
-    const isDesktop = computed(() => mdAndUp.value);
+    const isDesktop = computed(() => lgAndUp.value);
 
     const sidebarMode = computed(() => {
         return isDesktop.value ? 'permanent' : 'temporary';
     });
 
     // 画面サイズ変更時の自動調整
-    watch(mdAndUp, (newValue) => {
+    watch(lgAndUp, (newValue) => {
         drawer.value = newValue;
     });
 

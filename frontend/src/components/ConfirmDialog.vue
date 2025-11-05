@@ -28,7 +28,7 @@ const props = defineProps({
     },
     icon: {
         type: String,
-        default: 'alert-circle',
+        default: 'info',
     },
     confirmIcon: {
         type: String,
