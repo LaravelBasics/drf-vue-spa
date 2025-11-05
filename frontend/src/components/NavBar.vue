@@ -54,15 +54,16 @@ function goToHome() {
 
 <template>
     <v-app-bar app>
-        <v-app-bar-nav-icon @click="ui.toggleRail">
-            <v-icon>{{ ICONS.nav.menu }}</v-icon>
-        </v-app-bar-nav-icon>
-
+        <v-app-bar-nav-icon @click="ui.toggleRail" :icon="ICONS.nav.menu" />
         <v-toolbar-title>
-            <div class="d-flex align-center" style="height: 100%">
+            <div class="d-flex align-center h-100">
                 <span
-                    class="d-flex align-center cursor-pointer"
+                    class="d-flex align-center"
+                    role="button"
+                    tabindex="0"
                     @click="goToHome"
+                    @keydown.enter="goToHome"
+                    @keydown.space.prevent="goToHome"
                 >
                     <v-icon :size="ICON_SIZES.lg">
                         {{ ICONS.app.title }}
@@ -76,7 +77,7 @@ function goToHome() {
 
         <!-- ユーザーメニュー：Vuetify 3ではoffset-yは不要 -->
         <v-menu location="bottom end">
-            <template v-slot:activator="{ props }">
+            <template #activator="{ props }">
                 <v-chip v-bind="props" :color="primaryColor" class="me-2">
                     <v-icon :size="ICON_SIZES.sm" class="me-2">
                         {{ ICONS.nav.profile }}
@@ -85,6 +86,7 @@ function goToHome() {
                 </v-chip>
             </template>
 
+            <!-- Vuetify 3.xのバグ対応：tabindex本来は不要、バグ対応で明示的指定が必要 -->
             <v-list density="compact" min-width="200">
                 <v-list-item tabindex="-1">
                     <v-list-item-title class="text-caption">
@@ -116,8 +118,9 @@ function goToHome() {
                     @keydown.enter="handleLogout"
                     @keydown.space.prevent="handleLogout"
                 >
-                    <template v-slot:append v-if="loggingOut">
+                    <template #append>
                         <v-progress-circular
+                            v-if="loggingOut"
                             indeterminate
                             size="20"
                             width="2"
@@ -130,7 +133,7 @@ function goToHome() {
 </template>
 
 <style scoped>
-.user-menu :deep(.v-list-item[disabled]) {
+:deep(.v-list-item[disabled]) {
     cursor: not-allowed;
 }
 </style>

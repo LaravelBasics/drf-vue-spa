@@ -62,14 +62,16 @@ function toggleLanguage() {
         v-model="ui.drawer"
         :rail="ui.isDesktop && ui.rail"
         :temporary="!ui.isDesktop"
+        :permanent="ui.isDesktop"
+        mobile-breakpoint="md"
     >
+        <!-- Vuetify 3.xのバグ対応：tabindex本来は不要、バグ対応で明示的指定が必要 -->
         <v-list nav>
             <v-list-item
                 v-for="(item, i) in filteredNavItems"
                 :key="i"
                 :to="item.to"
                 :value="item.title"
-                link
                 tabindex="0"
                 @click="handleNavItemClick"
                 color="grey-darken-2"
@@ -116,8 +118,8 @@ function toggleLanguage() {
 </template>
 
 <style scoped>
-/* アクティブ状態の透明度調整を無効化 */
-.v-list-item--active {
-    --v-activated-opacity: 0 !important;
+:deep(.v-list-item--active) {
+    /* アクティブ時の背景色を無効化（カスタムcolorプロパティを優先） */
+    --v-activated-opacity: 0;
 }
 </style>

@@ -25,28 +25,10 @@ const props = defineProps({
         default: 64, // ✅ デフォルト値を明確に
     },
 });
-
-const emit = defineEmits(['click']);
-
-// toやhrefが設定されていない場合のみカスタムイベントを発火
-const handleClick = (event) => {
-    if (!props.to && !props.href) {
-        emit('click', event);
-    }
-};
 </script>
 
 <template>
-    <v-card
-        :to="to"
-        :href="href"
-        class="menu-card"
-        elevation="2"
-        hover
-        @click="handleClick"
-        @keydown.enter.prevent="handleClick"
-        @keydown.space.prevent.stop="handleClick"
-    >
+    <v-card :to="to" :href="href" class="menu-card" elevation="2" hover>
         <v-card-text
             class="py-6 d-flex flex-column align-center justify-center ga-3"
         >

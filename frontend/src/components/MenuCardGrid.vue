@@ -31,7 +31,6 @@ defineProps({
                     :href="item.href"
                     :color="item.color || 'primary'"
                     :icon-size="item.iconSize"
-                    @click="item.onClick && item.onClick()"
                 />
             </v-col>
         </v-row>
