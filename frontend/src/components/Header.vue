@@ -44,20 +44,6 @@ const displayBreadcrumbs = computed(() => {
     }
     return autoBreadcrumbs.value;
 });
-
-function getButtonColor(type = 'primary') {
-    const colors = theme.global.current.value?.colors;
-    const colorMap = {
-        primary: colors?.primary || THEME_CONFIG.colors.light.primary,
-        secondary: colors?.secondary || THEME_CONFIG.colors.light.secondary,
-        success: colors?.success || THEME_CONFIG.colors.light.success,
-        error: colors?.error || THEME_CONFIG.colors.light.error,
-        warning: colors?.warning || THEME_CONFIG.colors.light.warning,
-        info: colors?.info || THEME_CONFIG.colors.light.info,
-    };
-
-    return colorMap[type] || colorMap.primary;
-}
 </script>
 
 <template>
@@ -106,16 +92,17 @@ function getButtonColor(type = 'primary') {
             </v-breadcrumbs>
         </div>
 
-        <v-spacer v-else></v-spacer>
+        <v-spacer v-else />
 
-        <div class="d-flex align-center ga-5 mr-4" style="flex-shrink: 0">
+        <div class="d-flex align-center ga-5 mr-4 flex-shrink-0">
             <v-btn
                 v-for="(button, index) in props.pageButtons"
                 :key="index"
                 variant="outlined"
-                :color="getButtonColor(button.type)"
+                :color="button.type || 'primary'"
                 :prepend-icon="button.icon"
                 :loading="button.loading"
+                :disabled="button.disabled"
                 @click="button.action"
             >
                 {{ button.name }}
@@ -125,16 +112,16 @@ function getButtonColor(type = 'primary') {
 </template>
 
 <style scoped>
-.breadcrumb-link {
-    color: #0d6efd !important;
-    text-decoration: underline !important;
-    cursor: pointer !important;
-    transition: color 0.15s ease-in-out;
+/* パンくずリンクのスタイル（テーマ対応） */
+:deep(.v-breadcrumbs-item:not([disabled])) {
+    color: rgb(var(--v-theme-primary));
+    text-decoration: underline;
+    cursor: pointer;
+    transition: opacity 0.15s ease-in-out;
 }
 
-.breadcrumb-link:hover {
+:deep(.breadcrumb-link:hover) {
     color: #0a58ca !important;
-    text-decoration: underline !important;
 }
 
 .breadcrumb-link:active {
@@ -147,8 +134,9 @@ function getButtonColor(type = 'primary') {
     cursor: default !important;
 }
 
+/* 区切り文字の位置調整 */
 .breadcrumb-divider {
-    vertical-align: middle !important;
-    margin-top: -3px !important;
+    vertical-align: middle;
+    margin-top: -3px;
 }
 </style>
