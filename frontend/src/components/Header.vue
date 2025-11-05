@@ -108,7 +108,7 @@ function getButtonColor(type = 'primary') {
 
         <v-spacer v-else></v-spacer>
 
-        <div class="d-flex align-center ga-1 mr-4" style="flex-shrink: 0">
+        <div class="d-flex align-center ga-5 mr-4" style="flex-shrink: 0">
             <v-btn
                 v-for="(button, index) in props.pageButtons"
                 :key="index"
@@ -116,6 +116,7 @@ function getButtonColor(type = 'primary') {
                 :color="getButtonColor(button.type)"
                 :prepend-icon="button.icon"
                 :loading="button.loading"
+                @click="button.action"
             >
                 {{ button.name }}
             </v-btn>
