@@ -8,6 +8,7 @@ const { t } = useI18n();
 
 const headerButtons = computed(() => [
     {
+        id: 'setting.search',
         name: t('buttons.search'),
         action: openOrderSearch,
         icon: ICONS.buttons.search,

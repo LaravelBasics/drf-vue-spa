@@ -29,6 +29,7 @@ let searchTimer = null;
 
 const headerButtons = computed(() => [
     {
+        id: 'userlist.csv',
         name: t('buttons.csv'),
         action: exportCSV,
         icon: ICONS.buttons.csv,

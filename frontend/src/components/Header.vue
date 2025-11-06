@@ -49,14 +49,13 @@ const displayBreadcrumbs = computed(() => {
 <template>
     <v-app-bar
         :color="surfaceColor"
-        :elevation="props.headerElevation"
-        :height="props.headerHeight"
-        app
+        :elevation="headerElevation"
+        :height="headerHeight"
     >
         <!-- アプリタイトル -->
-        <div class="d-none d-md-flex align-center flex-shrink-1 ml-4">
+        <div class="d-flex align-center flex-shrink-1 ml-4">
             <span class="text-h6 font-weight-bold text-truncate">
-                {{ props.appTitle }}
+                {{ appTitle }}
             </span>
         </div>
 
@@ -67,7 +66,7 @@ const displayBreadcrumbs = computed(() => {
         >
             <v-breadcrumbs
                 :items="displayBreadcrumbs"
-                class="pa-0 d-none d-sm-inline"
+                class="pa-0"
                 density="compact"
             >
                 <template v-slot:divider>
@@ -81,10 +80,6 @@ const displayBreadcrumbs = computed(() => {
                         :to="item.to"
                         :disabled="item.disabled"
                         class="text-caption text-sm-subtitle-2"
-                        :class="{
-                            'breadcrumb-link': !item.disabled,
-                            'breadcrumb-current': item.disabled,
-                        }"
                     >
                         {{ item.title }}
                     </v-breadcrumbs-item>
@@ -94,10 +89,10 @@ const displayBreadcrumbs = computed(() => {
 
         <v-spacer v-else />
 
-        <div class="d-flex align-center ga-5 mr-4 flex-shrink-0">
+        <div class="d-flex align-center ga-4 mr-4 flex-shrink-0">
             <v-btn
-                v-for="(button, index) in props.pageButtons"
-                :key="index"
+                v-for="(button, index) in pageButtons"
+                :key="button.id || `btn-${index}`"
                 variant="outlined"
                 :color="button.type || 'primary'"
                 :prepend-icon="button.icon"
@@ -112,31 +107,23 @@ const displayBreadcrumbs = computed(() => {
 </template>
 
 <style scoped>
-/* パンくずリンクのスタイル（テーマ対応） */
-:deep(.v-breadcrumbs-item:not([disabled])) {
+/* パンくずリンクのスタイル */
+:deep(.v-breadcrumbs-item--link) {
     color: rgb(var(--v-theme-primary));
-    text-decoration: underline;
-    cursor: pointer;
-    transition: opacity 0.15s ease-in-out;
+    transition: opacity 0.2s ease;
 }
 
-:deep(.breadcrumb-link:hover) {
-    color: #0a58ca !important;
+:deep(.v-breadcrumbs-item--link:hover) {
+    opacity: 0.7;
 }
 
-.breadcrumb-link:active {
-    color: #084298 !important;
+:deep(.v-breadcrumbs-item[disabled]) {
+    color: rgba(var(--v-theme-on-surface), 0.6);
+    pointer-events: none;
 }
 
-.breadcrumb-current {
-    color: rgba(var(--v-theme-on-surface), 0.87) !important;
-    text-decoration: none !important;
-    cursor: default !important;
-}
-
-/* 区切り文字の位置調整 */
 .breadcrumb-divider {
     vertical-align: middle;
-    margin-top: -3px;
+    margin-top: -2px;
 }
 </style>
