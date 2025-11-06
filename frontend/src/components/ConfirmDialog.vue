@@ -47,17 +47,6 @@ const dialog = computed({
     set: (value) => emit('update:modelValue', value),
 });
 
-// 確認ボタンの色に応じてヘッダー背景を切り替え
-const headerClass = computed(() => {
-    const colorMap = {
-        error: 'bg-error text-white',
-        warning: 'bg-warning text-white',
-        primary: 'bg-primary text-white',
-        success: 'bg-success text-white',
-    };
-    return colorMap[props.confirmColor] || 'bg-grey-lighten-2';
-});
-
 function handleConfirm() {
     emit('confirm');
 }
@@ -69,17 +58,14 @@ function handleCancel() {
 </script>
 
 <template>
-    <v-dialog
-        v-model="dialog"
-        persistent
-        max-width="500"
-        class="dialog-offset-up"
-    >
+    <v-dialog v-model="dialog" persistent max-width="500">
         <v-card>
-            <v-card-title class="text-h5 pa-4" :class="headerClass">
-                <v-icon :icon="icon" class="me-2"></v-icon>
-                {{ title }}
-            </v-card-title>
+            <v-toolbar :color="confirmColor" dark density="comfortable">
+                <v-toolbar-title>
+                    <v-icon :icon="icon" class="mr-2" />
+                    {{ title }}
+                </v-toolbar-title>
+            </v-toolbar>
 
             <v-card-text class="pa-6">
                 <p class="text-body-1">{{ message }}</p>
@@ -88,56 +74,25 @@ function handleCancel() {
                 <slot name="content"></slot>
             </v-card-text>
 
+            <v-divider />
+
             <v-card-actions class="pa-4">
                 <v-btn
+                    :prepend-icon="confirmIcon"
                     :color="confirmColor"
+                    variant="elevated"
                     @click="handleConfirm"
                     :loading="loading"
-                    class="custom-confirm"
                 >
-                    <v-icon class="me-2">{{ confirmIcon }}</v-icon>
                     {{ confirmText }}
                 </v-btn>
 
                 <v-spacer />
 
-                <v-btn
-                    variant="outlined"
-                    @click="handleCancel"
-                    :disabled="loading"
-                >
+                <v-btn variant="text" @click="handleCancel" :disabled="loading">
                     {{ cancelText }}
                 </v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
 </template>
-
-<style scoped>
-.v-btn.custom-confirm {
-    border: 2px solid;
-}
-
-.v-btn.custom-confirm.v-btn--theme-error {
-    border-color: rgb(var(--v-theme-error)) !important;
-}
-
-.v-btn.custom-confirm.v-btn--theme-warning {
-    border-color: rgb(var(--v-theme-warning)) !important;
-}
-
-.v-btn.custom-confirm.v-btn--theme-primary {
-    border-color: rgb(var(--v-theme-primary)) !important;
-}
-
-.v-btn.custom-confirm.v-btn--theme-success {
-    border-color: rgb(var(--v-theme-success)) !important;
-}
-
-/* ダイアログ位置を上方向にオフセット */
-.dialog-offset-up :deep(.v-overlay__content) {
-    top: 50px !important;
-    width: 80%;
-    height: 40%;
-}
-</style>
