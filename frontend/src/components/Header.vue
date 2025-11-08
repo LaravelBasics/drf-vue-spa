@@ -69,13 +69,13 @@ const displayBreadcrumbs = computed(() => {
                 class="pa-0"
                 density="compact"
             >
-                <template v-slot:divider>
+                <template #divider>
                     <v-icon :size="ICON_SIZES.sm" class="breadcrumb-divider">{{
                         ICONS.nav.divider
                     }}</v-icon>
                 </template>
 
-                <template v-slot:item="{ item }">
+                <template #item="{ item }">
                     <v-breadcrumbs-item
                         :to="item.to"
                         :disabled="item.disabled"

@@ -334,7 +334,7 @@ onBeforeUnmount(() => {
                         density="default"
                         hide-details
                     >
-                        <template v-slot:append-inner>
+                        <template #append-inner>
                             <v-progress-circular
                                 v-if="loading"
                                 indeterminate
@@ -393,7 +393,7 @@ onBeforeUnmount(() => {
                 @click:row="handleRowClick"
             >
                 <!-- ✅ IDカラムのリンクもヘルパー関数を使用 -->
-                <template v-slot:item.id="{ item }">
+                <template #item.id="{ item }">
                     <RouterLink
                         :to="userRoutes.detail(item.id)"
                         class="font-weight-medium text-decoration-none text-primary"
@@ -403,7 +403,7 @@ onBeforeUnmount(() => {
                     </RouterLink>
                 </template>
 
-                <template v-slot:item.is_admin="{ item }">
+                <template #item.is_admin="{ item }">
                     <v-icon
                         :color="item.is_admin ? 'success' : 'grey'"
                         :size="item.is_admin ? 'default' : 'small'"
@@ -416,7 +416,7 @@ onBeforeUnmount(() => {
                     </v-icon>
                 </template>
 
-                <template v-slot:item.created_at="{ item }">
+                <template #item.created_at="{ item }">
                     {{ formatDate(item.created_at) }}
                 </template>
             </v-data-table-server>

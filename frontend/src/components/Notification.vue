@@ -1,13 +1,10 @@
 <script setup>
 import { computed } from 'vue';
-import { useAuthStore } from '@/stores/auth';
 import { useNotificationStore } from '@/stores/notification';
 import { ICONS } from '@/constants/icons';
 
 const notification = useNotificationStore();
-const auth = useAuthStore();
 
-// 通知タイプに応じた色を返す
 const getColor = computed(() => {
     const colorMap = {
         success: 'success',
@@ -18,7 +15,6 @@ const getColor = computed(() => {
     return colorMap[notification.type] || 'info';
 });
 
-// 通知タイプに応じたアイコンを返す
 const getIcon = computed(() => {
     const iconMap = {
         success: ICONS.status.success,
@@ -28,11 +24,6 @@ const getIcon = computed(() => {
     };
     return iconMap[notification.type] || ICONS.status.info;
 });
-
-// ログイン前（user未設定時）は画面中央、ログイン後は右上に表示
-const snackbarClass = computed(() => {
-    return auth.user ? '' : 'snackbar-login-center';
-});
 </script>
 
 <template>
@@ -41,16 +32,16 @@ const snackbarClass = computed(() => {
         :timeout="notification.timeout"
         :color="getColor"
         location="top"
-        :content-class="snackbarClass"
-        :multi-line="false"
-        class="custom-snackbar"
+        max-width="600"
+        min-width="300"
+        class="notification-center"
     >
         <div class="d-flex align-center">
             <v-icon :icon="getIcon" class="mr-3" />
             <span class="text-body-1">{{ notification.message }}</span>
         </div>
 
-        <template v-slot:actions>
+        <template #actions>
             <v-btn
                 variant="text"
                 :icon="ICONS.buttons.close"
@@ -62,20 +53,9 @@ const snackbarClass = computed(() => {
 </template>
 
 <style scoped>
-/* ログイン画面では中央寄せ表示 */
-:deep(.snackbar-login-center) {
-    position: fixed !important;
-    top: 60px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    max-width: 600px !important;
-    width: auto !important;
-    margin: 0 !important;
-}
-
-/* ログイン後は右上配置（デフォルト動作） */
-.custom-snackbar :deep(.v-snackbar__wrapper) {
-    max-width: 600px;
-    min-width: 300px;
+.notification-center :deep(.v-overlay__content) {
+    left: 50%;
+    transform: translateX(-50%);
+    top: 60px;
 }
 </style>

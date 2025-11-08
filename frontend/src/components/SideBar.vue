@@ -76,14 +76,14 @@ function toggleLanguage() {
                 @click="handleNavItemClick"
                 color="grey-darken-2"
             >
-                <template v-slot:prepend>
+                <template #prepend>
                     <v-icon :size="ICON_SIZES.md">{{ item.icon }}</v-icon>
                 </template>
                 <v-list-item-title>{{ item.title }}</v-list-item-title>
             </v-list-item>
         </v-list>
 
-        <template v-slot:append>
+        <template #append>
             <div class="pa-2">
                 <!-- 言語切り替えボタン（モバイル/デスクトップ/Railモードで表示切替） -->
                 <v-btn
