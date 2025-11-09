@@ -53,7 +53,7 @@ function goToHome() {
 </script>
 
 <template>
-    <v-app-bar app>
+    <v-app-bar>
         <v-app-bar-nav-icon @click="ui.toggleRail" :icon="ICONS.nav.menu" />
         <v-toolbar-title>
             <div class="d-flex align-center h-100">
@@ -75,7 +75,7 @@ function goToHome() {
 
         <v-spacer />
 
-        <!-- ユーザーメニュー：Vuetify 3ではoffset-yは不要 -->
+        <!-- ユーザーメニュー -->
         <v-menu location="bottom end">
             <template #activator="{ props }">
                 <v-chip v-bind="props" :color="primaryColor" class="me-2">

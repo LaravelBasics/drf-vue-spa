@@ -7,7 +7,7 @@ import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { usersAPI } from '@/api/users';
-import { userRoutes } from '@/constants/routes'; // ✅ userRoutesをインポート
+import { userRoutes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
@@ -44,7 +44,7 @@ async function fetchUser() {
         adminCount.value = adminCountResponse.data.count;
     } catch (error) {
         handleApiError(error);
-        router.push(userRoutes.list()); // ✅ ヘルパー関数を使用
+        router.push(userRoutes.list());
     } finally {
         loading.value = false;
     }
@@ -60,7 +60,7 @@ async function deleteUser() {
             username: user.value.username,
         });
         showConfirmDialog.value = false;
-        router.replace(userRoutes.list()); // ✅ ヘルパー関数を使用
+        router.replace(userRoutes.list());
     } catch (error) {
         handleApiError(error, 'pages.users.delete.error');
     } finally {
@@ -79,9 +79,9 @@ onMounted(() => {
 
         <v-container class="pa-4">
             <v-row justify="center">
-                <v-col cols="12" sm="11" md="7">
+                <v-col cols="12" sm="10" md="6" lg="5" xl="4">
                     <v-card class="elevation-2">
-                        <v-card-text class="pa-6" v-if="!loading">
+                        <v-card-text v-if="!loading" class="pa-6">
                             <v-alert
                                 type="warning"
                                 variant="tonal"
@@ -170,7 +170,7 @@ onMounted(() => {
 
                             <v-divider class="my-4" />
 
-                            <div class="d-flex gap-2">
+                            <div class="d-flex ga-2">
                                 <v-btn
                                     color="error"
                                     size="large"

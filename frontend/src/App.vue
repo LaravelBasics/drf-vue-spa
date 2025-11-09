@@ -9,12 +9,16 @@ import Notification from '@/components/Notification.vue';
 const auth = useAuthStore();
 const appReady = ref(false);
 
-// フォント・アイコン読み込み待機
+/**
+ * フォント・アイコンの読み込み待機
+ * ✅ Cumulative Layout Shift (CLS) 対策
+ */
 const waitForFontsAndIcons = () => {
     return new Promise((resolve) => {
         if (document.fonts) {
             document.fonts.ready.then(resolve);
         } else {
+            // フォールバック: 200ms待機
             setTimeout(resolve, 200);
         }
     });
@@ -22,15 +26,14 @@ const waitForFontsAndIcons = () => {
 
 onMounted(async () => {
     try {
-        await Promise.all([
-            auth.initialized ? Promise.resolve() : auth.initialize(),
-            waitForFontsAndIcons(),
-        ]);
-
-        await nextTick();
-        appReady.value = true;
+        // ✅ フォント読み込み待機（main.jsで認証初期化済み）
+        await waitForFontsAndIcons();
     } catch (error) {
-        console.error('App initialization error:', error);
+        // フォント読み込み失敗は無視（アプリは動く）
+        console.warn('Font loading failed:', error);
+    } finally {
+        // ✅ フォントの成否に関わらずアプリ起動
+        await nextTick();
         appReady.value = true;
     }
 });
@@ -41,47 +44,35 @@ onMounted(async () => {
         <!-- 通知コンポーネント（全画面共通） -->
         <Notification />
 
-        <!-- メインコンテンツ（フェードインアニメーション付き） -->
-        <div
-            v-show="appReady"
-            :class="['app-content', { 'fade-in': appReady }]"
-        >
-            <!-- ログイン済みでナビゲーションを表示 -->
-            <NavBar v-if="auth.user" />
-            <SideBar v-if="auth.user" />
+        <!-- メインコンテンツ（フェードイン） -->
+        <v-fade-transition>
+            <div v-if="appReady" class="app-content">
+                <NavBar v-if="auth.user" />
+                <SideBar v-if="auth.user" />
 
-            <v-main>
-                <router-view />
-            </v-main>
+                <v-main>
+                    <router-view />
+                </v-main>
 
-            <Footer v-if="auth.user" />
-        </div>
+                <Footer v-if="auth.user" />
+            </div>
+        </v-fade-transition>
 
         <!-- ローディング画面 -->
-        <div v-show="!appReady" class="loading-screen"></div>
+        <v-overlay
+            :model-value="!appReady"
+            persistent
+            class="align-center justify-center"
+        >
+            <v-progress-circular indeterminate size="64" color="primary" />
+        </v-overlay>
     </v-app>
 </template>
 
 <style scoped>
 .app-content {
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-}
-
-.app-content.fade-in {
-    opacity: 1;
-}
-
-.loading-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: #ffffff;
-    z-index: 9999;
 }
 </style>

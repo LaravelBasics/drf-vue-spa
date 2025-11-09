@@ -1,13 +1,13 @@
 <!-- src/views/users/UserUpdate.vue - ユーザー更新画面 -->
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useValidation } from '@/composables/useValidation';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { userRoutes } from '@/constants/routes'; // ✅ userRoutesをインポート
+import { userRoutes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons.js';
 
 const router = useRouter();
@@ -64,7 +64,7 @@ async function fetchUser() {
         };
     } catch (error) {
         handleApiError(error, 'pages.users.detail.error');
-        router.push(userRoutes.list()); // ✅ ヘルパー関数を使用
+        router.push(userRoutes.list());
     } finally {
         loading.value = false;
     }
@@ -76,15 +76,7 @@ async function submitForm() {
 
     const { valid } = await form.value.validate();
 
-    if (!valid) {
-        // バリデーションエラー時は最初のエラーフィールドにフォーカス
-        await nextTick();
-        const firstErrorInput = document.querySelector('.v-input--error input');
-        if (firstErrorInput) {
-            firstErrorInput.focus();
-        }
-        return;
-    }
+    if (!valid) return;
 
     submitting.value = true;
     try {
@@ -106,7 +98,7 @@ async function submitForm() {
             username: formData.value.username,
         });
 
-        router.replace(userRoutes.list()); // ✅ ヘルパー関数を使用
+        router.replace(userRoutes.list());
     } catch (error) {
         handleApiError(error);
     } finally {
@@ -125,8 +117,8 @@ onMounted(() => {
 
         <v-container class="pa-4">
             <v-row justify="center">
-                <v-col cols="12" sm="12" md="10">
-                    <v-card elevation="2" v-if="loading">
+                <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+                    <v-card v-if="loading" elevation="2">
                         <v-card-text class="pa-6 text-center">
                             <v-progress-circular
                                 indeterminate
@@ -136,7 +128,7 @@ onMounted(() => {
                         </v-card-text>
                     </v-card>
 
-                    <v-card elevation="2" v-else>
+                    <v-card v-else elevation="2">
                         <v-card-text class="pa-6">
                             <v-form ref="form" @submit.prevent="submitForm">
                                 <v-row>
@@ -150,7 +142,6 @@ onMounted(() => {
                                             :rules="usernameRules"
                                             variant="outlined"
                                             class="mb-2"
-                                            required
                                             :hint="
                                                 t('form.hint.min', { min: 3 })
                                             "
@@ -167,10 +158,8 @@ onMounted(() => {
                                             "
                                             :rules="employeeIdRules"
                                             variant="outlined"
-                                            type="text"
                                             inputmode="numeric"
                                             class="mb-4"
-                                            required
                                             :hint="
                                                 t('form.hint.employeeIdFormat')
                                             "
@@ -289,7 +278,7 @@ onMounted(() => {
 
                                 <v-divider class="my-4" />
 
-                                <div class="d-flex gap-2">
+                                <div class="d-flex ga-2">
                                     <v-btn
                                         type="submit"
                                         color="primary"

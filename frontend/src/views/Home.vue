@@ -7,7 +7,7 @@ import { usePermissions } from '@/composables/usePermissions';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import MenuCardGrid from '@/components/MenuCardGrid.vue';
-import { routes } from '@/constants/routes'; // ✅ routesだけインポート
+import { routes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 import { COLORS } from '@/constants/theme';
 
@@ -30,7 +30,7 @@ const menuItems = computed(() => [
         id: 'admin',
         icon: ICONS.nav.management,
         title: t('pages.admin.title'),
-        to: routes.ADMIN.ROOT, // ✅ そのまま使える
+        to: routes.ADMIN.ROOT,
         color: 'secondary',
         requiresAdmin: true,
     },
@@ -38,7 +38,7 @@ const menuItems = computed(() => [
         id: 'settings',
         icon: ICONS.nav.settings,
         title: t('pages.settings.title'),
-        to: routes.SETTINGS, // ✅ そのまま使える
+        to: routes.SETTINGS,
         color: COLORS.neutral.medium,
     },
 ]);

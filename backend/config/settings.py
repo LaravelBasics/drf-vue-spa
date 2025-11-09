@@ -95,6 +95,12 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
 ]
+
+# ✅ Content-Dispositionを公開
+CORS_EXPOSE_HEADERS = [
+    "Content-Disposition",
+]
+
 CORS_ALLOW_CREDENTIALS = True
 
 # === セッション ===

@@ -16,11 +16,29 @@ export function useApiError() {
      * 3. fallbackMessageKey（指定された場合）
      * 4. 汎用エラーメッセージ
      */
-    function handleApiError(error, fallbackMessageKey = null, duration = 7000) {
+    async function handleApiError(
+        error,
+        fallbackMessageKey = null,
+        duration = 7000,
+    ) {
         let errorMessage = null;
 
         if (error.response?.data) {
-            const errorData = error.response.data;
+            let errorData = error.response.data;
+
+            // 🔧 Blobエラーレスポンスの場合はJSONに変換
+            if (errorData instanceof Blob) {
+                try {
+                    const text = await errorData.text();
+                    errorData = JSON.parse(text);
+                } catch (blobError) {
+                    console.error('Blob変換エラー:', blobError);
+                    // Blob変換失敗時は汎用エラー
+                    errorMessage = t('backend.errors.UNKNOWN_ERROR');
+                    notification.error(errorMessage, duration);
+                    return errorMessage;
+                }
+            }
 
             // 優先順位1: Djangoが翻訳済みのdetail
             if (errorData.detail) {

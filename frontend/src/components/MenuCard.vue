@@ -22,7 +22,7 @@ const props = defineProps({
     },
     iconSize: {
         type: [String, Number],
-        default: 64, // ✅ デフォルト値を明確に
+        default: 64,
     },
 });
 </script>

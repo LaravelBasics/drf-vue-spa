@@ -57,7 +57,6 @@ function toggleLanguage() {
 </script>
 
 <template>
-    <!-- Vuetify 3.9+: appプロパティ不要（自動レイアウト管理） -->
     <v-navigation-drawer
         v-model="ui.drawer"
         :rail="ui.isDesktop && ui.rail"

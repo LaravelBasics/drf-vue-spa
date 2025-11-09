@@ -1,4 +1,4 @@
-// src/main.js - アプリケーションのエントリーポイント
+// src/main.js
 import { createApp, nextTick } from 'vue';
 import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
@@ -16,7 +16,8 @@ import { useLocaleStore } from '@/stores/locale';
 
 const app = createApp(App);
 
-// Piniaセットアップ（永続化プラグイン有効化）
+// ==================== プラグイン登録 ====================
+// 順序重要: Pinia → Router → Vuetify → i18n
 const pinia = createPinia();
 pinia.use(piniaPluginPersistedstate);
 
@@ -25,14 +26,25 @@ app.use(router);
 app.use(vuetify);
 app.use(i18n);
 
-// Vuetifyインスタンスをグローバルに登録（locale.jsで使用）
-window.$vuetify = vuetify;
+// ==================== アプリ状態管理 ====================
+// ✅ マウント状態を管理（app._container の代替）
+let isAppMounted = false;
 
-/**
- * グローバルエラーハンドラー
- * - 開発環境: 詳細なログを出力
- * - 本番環境: 簡潔なログのみ出力し、ユーザーに通知を表示
- */
+// エラー通知を安全に表示するヘルパー関数
+const showErrorNotification = (messageKey) => {
+    if (!isAppMounted) return;
+
+    try {
+        const notificationStore = useNotificationStore();
+        const errorMessage = i18n.global.t(messageKey);
+        notificationStore.error(errorMessage, 7000);
+    } catch (error) {
+        console.error('Failed to show notification:', error);
+    }
+};
+
+// ==================== エラーハンドリング ====================
+// グローバルエラーハンドラー
 app.config.errorHandler = (err, instance, info) => {
     if (import.meta.env.DEV) {
         console.error('Global error:', err);
@@ -42,22 +54,11 @@ app.config.errorHandler = (err, instance, info) => {
         console.error('Error:', err.message);
     }
 
-    // アプリがマウント済みの場合のみ通知表示
-    if (app._container) {
-        try {
-            const notificationStore = useNotificationStore();
-            const errorMessage = i18n.global.t('notifications.error.unknown');
-            notificationStore.error(errorMessage, 7000);
-        } catch (notificationError) {
-            console.error('Failed to show notification:', notificationError);
-        }
-    }
+    // ✅ マウント後のみ通知表示
+    showErrorNotification('notifications.error.unknown');
 };
 
-/**
- * 未処理のPromise拒否をキャッチ
- * async/awaitやPromiseチェーンで捕捉されなかったエラーを処理
- */
+// 未処理のPromise拒否をキャッチ
 window.addEventListener('unhandledrejection', (event) => {
     if (import.meta.env.DEV) {
         console.error('Unhandled promise rejection:', event.reason);
@@ -65,26 +66,18 @@ window.addEventListener('unhandledrejection', (event) => {
         console.error('Promise rejection:', event.reason?.message);
     }
 
-    // アプリがマウント済みの場合のみ通知表示
-    if (app._container) {
-        try {
-            const notificationStore = useNotificationStore();
-            const errorMessage = i18n.global.t('notifications.error.unknown');
-            notificationStore.error(errorMessage, 7000);
-        } catch (error) {
-            console.error('Failed to show rejection notification:', error);
-        }
-    }
+    // ✅ マウント後のみ通知表示
+    showErrorNotification('notifications.error.unknown');
 
     event.preventDefault();
 });
 
-/**
- * アプリケーション初期化
- * - 認証状態の復元
- * - 言語設定の適用
- * - 初期化失敗時もアプリを起動（部分的な機能提供）
- */
+// ==================== アプリケーション初期化 ====================
+// 初期化処理
+// 1. 認証状態の復元
+// 2. 言語設定の適用
+// 3. アプリのマウント
+// 初期化失敗時もアプリを起動（Graceful degradation）
 const initializeApp = async () => {
     let initializationError = null;
 
@@ -95,13 +88,15 @@ const initializeApp = async () => {
         // 認証状態を初期化（セッション復元）
         await authStore.initialize();
 
-        // Vuetifyの初期言語を設定
+        // Vuetifyの初期言語を設定（locale.jsのwatchで自動同期）
         vuetify.locale.current = localeStore.locale;
     } catch (error) {
+        console.error('Initialization error:', error);
         initializationError = error;
     } finally {
         // 初期化の成否に関わらずアプリを起動
         app.mount('#app');
+        isAppMounted = true; // ✅ マウント完了フラグ
 
         // マウント後に初期化エラーを通知
         if (initializationError) {
@@ -119,4 +114,5 @@ const initializeApp = async () => {
     }
 };
 
+// アプリ起動
 initializeApp();

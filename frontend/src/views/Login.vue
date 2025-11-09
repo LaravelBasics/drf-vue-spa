@@ -37,7 +37,6 @@ onMounted(async () => {
     await nextTick();
     isVisible.value = true;
 
-    // ログアウト成功メッセージ表示
     if (route.query.logout === 'success') {
         showInfo('auth.logoutSuccess', {}, 3000);
         router.replace({ path: routes.LOGIN, query: {} });
@@ -45,31 +44,19 @@ onMounted(async () => {
 });
 
 async function onSubmit() {
-    // 重複送信防止
     if (loading.value) return;
 
     const { valid } = await form.value.validate();
 
-    if (!valid) {
-        // バリデーションエラー時は最初のエラーフィールドにフォーカス
-        await nextTick();
-        const firstErrorInput = document.querySelector('.v-input--error input');
-        if (firstErrorInput) {
-            firstErrorInput.focus();
-        }
-        return;
-    }
+    if (!valid) return;
 
     loading.value = true;
 
     try {
         await auth.loginSession(employeeId.value, password.value);
-
         showInfo('auth.loginSuccess', {}, 3000);
-
         isVisible.value = false;
 
-        // アニメーション完了後に遷移
         setTimeout(async () => {
             const redirect = route.query.next || routes.HOME;
             await router.push(redirect);
@@ -83,111 +70,120 @@ async function onSubmit() {
 </script>
 
 <template>
-    <div class="login-page">
-        <transition name="login-fade" appear>
-            <div v-show="isVisible" class="login-center">
-                <v-card rounded="lg" :elevation="12" class="login-card">
-                    <v-toolbar :color="primaryColor" dark flat>
-                        <div class="d-flex w-100 justify-center align-center">
-                            <span class="text-h5 font-weight-bold text-white">
-                                {{ t('auth.loginTitle') }}
-                            </span>
-                        </div>
-                    </v-toolbar>
-
-                    <v-card-text class="pa-6">
-                        <v-form
-                            @submit.prevent="onSubmit"
-                            ref="form"
-                            class="d-flex flex-column ga-4"
-                        >
-                            <v-text-field
-                                v-model="employeeId"
-                                :label="
-                                    t('form.placeholders.employeeId', {
-                                        field: t('form.fields.employeeId'),
-                                    })
-                                "
-                                :prepend-inner-icon="ICONS.form.user"
-                                variant="outlined"
-                                type="text"
-                                inputmode="numeric"
-                                :rules="employeeIdRules"
-                                :hint="t('form.hint.testEmployeeId')"
-                                persistent-hint
-                            />
-
-                            <v-text-field
-                                v-model="password"
-                                :label="
-                                    t('form.placeholders.enterPassword', {
-                                        field: t('form.fields.password'),
-                                    })
-                                "
-                                type="password"
-                                :prepend-inner-icon="ICONS.form.password"
-                                variant="outlined"
-                                :rules="passwordRules"
-                                :hint="t('form.hint.testPassword')"
-                                persistent-hint
-                            />
-
-                            <v-btn
-                                type="submit"
-                                :loading="loading"
-                                :color="primaryColor"
-                                block
-                                size="large"
-                                rounded
-                                class="text-none"
+    <v-container fluid class="fill-height login-page">
+        <v-row align="center" justify="center">
+            <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+                <transition name="login-fade" appear>
+                    <v-card
+                        v-show="isVisible"
+                        rounded="lg"
+                        :elevation="12"
+                        class="login-card"
+                        max-width="480"
+                    >
+                        <v-toolbar :color="primaryColor" flat>
+                            <div
+                                class="d-flex w-100 justify-center align-center"
                             >
-                                {{ t('auth.login') }}
-                            </v-btn>
-                        </v-form>
-                    </v-card-text>
-                </v-card>
-            </div>
-        </transition>
-    </div>
+                                <span class="text-h5 font-weight-bold">
+                                    {{ t('auth.loginTitle') }}
+                                </span>
+                            </div>
+                        </v-toolbar>
+
+                        <v-card-text class="pa-6">
+                            <v-form
+                                @submit.prevent="onSubmit"
+                                ref="form"
+                                class="d-flex flex-column ga-4"
+                            >
+                                <v-text-field
+                                    v-model="employeeId"
+                                    :label="
+                                        t('form.placeholders.employeeId', {
+                                            field: t('form.fields.employeeId'),
+                                        })
+                                    "
+                                    :prepend-inner-icon="ICONS.form.user"
+                                    variant="outlined"
+                                    inputmode="numeric"
+                                    :rules="employeeIdRules"
+                                    :hint="t('form.hint.testEmployeeId')"
+                                    persistent-hint
+                                    :disabled="loading"
+                                />
+
+                                <v-text-field
+                                    v-model="password"
+                                    :label="
+                                        t('form.placeholders.enterPassword', {
+                                            field: t('form.fields.password'),
+                                        })
+                                    "
+                                    type="password"
+                                    :prepend-inner-icon="ICONS.form.password"
+                                    variant="outlined"
+                                    :rules="passwordRules"
+                                    :hint="t('form.hint.testPassword')"
+                                    persistent-hint
+                                    :disabled="loading"
+                                />
+
+                                <v-btn
+                                    type="submit"
+                                    :loading="loading"
+                                    :color="primaryColor"
+                                    block
+                                    size="large"
+                                    rounded
+                                    class="text-none"
+                                >
+                                    {{ t('auth.login') }}
+                                </v-btn>
+                            </v-form>
+                        </v-card-text>
+                    </v-card>
+                </transition>
+            </v-col>
+        </v-row>
+    </v-container>
 </template>
 
 <style scoped>
+/* ==================== ログインページ全体のレイアウト ==================== */
 .login-page {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    z-index: 1000;
 }
 
-.login-center {
-    position: absolute;
-    top: 45%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 100%;
-    max-width: 30rem;
-    padding: 0 1rem; /* ✅ モバイル用の左右余白追加 */
-}
-
+/* ==================== ログインカードのスタイル ==================== */
 .login-card {
+    /* 半透明の白背景（背景が透ける演出） */
     background-color: rgba(255, 255, 255, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    /* 中央配置（v-colと組み合わせて使用） */
+    margin: 0 auto;
 }
 
+/* ==================== フェードインアニメーション ==================== */
+/* Material Design Easing を使用 */
 .login-fade-enter-active,
 .login-fade-leave-active {
+    /* 0.4秒のスムーズなトランジション（Material Design推奨） */
     transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
+/* 登場時: 下から上にフェードイン + 縮小から通常サイズ */
 .login-fade-enter-from {
     opacity: 0;
-    transform: translate(-50%, -50%) translateY(20px) scale(0.9);
+    transform: translateY(20px) scale(0.9);
 }
 
+/* 退場時: 上に移動しながらフェードアウト + 拡大 */
 .login-fade-leave-to {
     opacity: 0;
-    transform: translate(-50%, -50%) translateY(-20px) scale(1.1);
+    transform: translateY(-20px) scale(1.1);
 }
 </style>

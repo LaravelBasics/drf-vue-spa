@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { userRoutes } from '@/constants/routes'; // ✅ userRoutesをインポート
+import { userRoutes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
@@ -41,7 +41,7 @@ async function fetchUser() {
         adminCount.value = adminCountResponse.data.count;
     } catch (error) {
         handleApiError(error);
-        router.push(userRoutes.list()); // ✅ ヘルパー関数を使用
+        router.push(userRoutes.list());
     } finally {
         loading.value = false;
     }
@@ -57,15 +57,15 @@ function formatDate(dateString) {
 }
 
 function goToUpdate() {
-    router.push(userRoutes.update(userId.value)); // ✅ ヘルパー関数を使用
+    router.push(userRoutes.update(userId.value));
 }
 
 function goToDelete() {
-    router.push(userRoutes.delete(userId.value)); // ✅ ヘルパー関数を使用
+    router.push(userRoutes.delete(userId.value));
 }
 
 function goBack() {
-    router.push(userRoutes.list()); // ✅ ヘルパー関数を使用
+    router.push(userRoutes.list());
 }
 
 onMounted(() => {
@@ -79,8 +79,8 @@ onMounted(() => {
 
         <v-container class="pa-4">
             <v-row justify="center">
-                <v-col cols="12" sm="10" md="6">
-                    <v-card elevation="2" v-if="!loading">
+                <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+                    <v-card v-if="!loading" elevation="2">
                         <v-card-text class="pa-6">
                             <v-row class="mb-3">
                                 <v-col cols="4" class="font-weight-bold"
@@ -166,7 +166,7 @@ onMounted(() => {
 
                             <v-divider class="my-4" />
 
-                            <div class="d-flex gap-2">
+                            <div class="d-flex ga-2">
                                 <v-btn
                                     color="primary"
                                     size="large"
@@ -204,7 +204,7 @@ onMounted(() => {
                         </v-card-text>
                     </v-card>
 
-                    <v-card elevation="2" v-else>
+                    <v-card v-else elevation="2">
                         <v-card-text class="pa-6 text-center">
                             <v-progress-circular
                                 indeterminate

@@ -1,13 +1,12 @@
-<!-- src/views/users/UserCreate.vue - ユーザー作成画面 -->
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useValidation } from '@/composables/useValidation';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { userRoutes } from '@/constants/routes'; // ✅ userRoutesをインポート
+import { userRoutes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
@@ -30,27 +29,17 @@ const usernameRules = createRules.username();
 const employeeIdRules = createRules.employeeId();
 const passwordRules = createRules.newPassword();
 
-// 画面表示時にユーザー名フィールドにフォーカス
 onMounted(async () => {
     await nextTick();
     usernameField.value?.focus();
 });
 
 async function submitForm() {
-    // 重複送信防止
     if (submitting.value) return;
 
     const { valid } = await form.value.validate();
 
-    if (!valid) {
-        // バリデーションエラー時は最初のエラーフィールドにフォーカス
-        await nextTick();
-        const firstErrorInput = document.querySelector('.v-input--error input');
-        if (firstErrorInput) {
-            firstErrorInput.focus();
-        }
-        return;
-    }
+    if (!valid) return;
 
     submitting.value = true;
     try {
@@ -58,7 +47,7 @@ async function submitForm() {
         showSuccess('pages.users.create.success', {
             username: formData.value.username,
         });
-        router.replace(userRoutes.list()); // ✅ ヘルパー関数を使用
+        router.replace(userRoutes.list());
     } catch (error) {
         handleApiError(error);
     } finally {
@@ -67,7 +56,7 @@ async function submitForm() {
 }
 
 function goBack() {
-    router.replace(userRoutes.list()); // ✅ ヘルパー関数を使用
+    router.replace(userRoutes.list());
 }
 </script>
 
@@ -77,7 +66,7 @@ function goBack() {
 
         <v-container class="pa-4">
             <v-row justify="center">
-                <v-col cols="12" sm="10" md="6">
+                <v-col cols="12" sm="10" md="6" lg="5" xl="4">
                     <v-card elevation="2">
                         <v-card-text class="pa-6">
                             <v-form ref="form" @submit.prevent="submitForm">
@@ -88,7 +77,6 @@ function goBack() {
                                     :rules="usernameRules"
                                     variant="outlined"
                                     class="mb-4"
-                                    required
                                     :hint="t('form.hint.min', { min: 3 })"
                                     persistent-hint
                                 />
@@ -98,10 +86,8 @@ function goBack() {
                                     :label="$t('form.fields.employeeId') + ' *'"
                                     :rules="employeeIdRules"
                                     variant="outlined"
-                                    type="text"
                                     inputmode="numeric"
                                     class="mb-4"
-                                    required
                                     :hint="t('form.hint.employeeIdFormat')"
                                     persistent-hint
                                 />
@@ -113,7 +99,6 @@ function goBack() {
                                     variant="outlined"
                                     type="password"
                                     class="mb-4"
-                                    required
                                     :hint="t('form.hint.passwordStrength')"
                                     persistent-hint
                                 />
@@ -127,7 +112,7 @@ function goBack() {
 
                                 <v-divider class="my-4" />
 
-                                <div class="d-flex gap-2">
+                                <div class="d-flex">
                                     <v-btn
                                         type="submit"
                                         color="primary"

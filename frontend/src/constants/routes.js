@@ -44,7 +44,7 @@ function createResourceRoutes(basePath) {
 
 export const userRoutes = createResourceRoutes('/admin/users');
 
-// 将来的に追加する場合
+// 将来的に追加する場合（例）
 // export const productRoutes = createResourceRoutes('/admin/products');
 // export const orderRoutes = createResourceRoutes('/admin/orders');
 

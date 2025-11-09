@@ -5,10 +5,11 @@ import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { userRoutes } from '@/constants/routes'; // ✅ userRoutesをインポート
+import { userRoutes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons.js';
 import { useDisplay } from 'vuetify';
 import { useApiError } from '@/composables/useApiError';
+import { downloadCSVFromResponse } from '@/utils/file';
 
 const { mdAndUp } = useDisplay();
 const router = useRouter();
@@ -141,9 +142,7 @@ async function loadItems({ page, itemsPerPage, sortBy }) {
 
 // CSV出力処理
 async function exportCSV() {
-    if (csvExporting.value) {
-        return;
-    }
+    if (csvExporting.value) return;
 
     csvExporting.value = true;
 
@@ -161,55 +160,14 @@ async function exportCSV() {
             params.ordering = `${orderPrefix}${sort.key}`;
         }
 
+        // CSV取得
         const response = await usersAPI.exportCSV(params);
 
-        // Blobを作成してダウンロード
-        const blob = new Blob([response.data], {
-            type: 'text/csv; charset=utf-8-sig',
-        });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-
-        // ファイル名に日時を含める
-        const now = new Date();
-        const dateStr = now
-            .toLocaleDateString('ja-JP', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-            })
-            .replace(/\//g, '');
-        const timeStr = now
-            .toLocaleTimeString('ja-JP', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false,
-            })
-            .replace(/:/g, '');
-
-        link.download = `users_${dateStr}_${timeStr}.csv`;
-
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        // ダウンロード
+        downloadCSVFromResponse(response, 'users.csv');
 
         showSuccess('pages.users.list.csvExportSuccess');
     } catch (error) {
-        // Blobエラーレスポンスの場合はJSONに変換
-        if (error.response && error.response.data instanceof Blob) {
-            try {
-                const text = await error.response.data.text();
-                const jsonError = JSON.parse(text);
-                // エラーオブジェクトを更新
-                error.response.data = jsonError;
-            } catch (e) {
-                console.error('Failed to parse error response:', e);
-            }
-        }
-
         handleApiError(error);
     } finally {
         csvExporting.value = false;
@@ -290,11 +248,11 @@ function formatDate(dateString) {
 }
 
 function goToCreate() {
-    router.push(userRoutes.create()); // ✅ ヘルパー関数を使用
+    router.push(userRoutes.create());
 }
 
 function handleRowClick(event, { item }) {
-    router.push(userRoutes.detail(item.id)); // ✅ ヘルパー関数を使用
+    router.push(userRoutes.detail(item.id));
 }
 
 onMounted(() => {
@@ -317,120 +275,118 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div>
-        <Header
-            :app-title="t('pages.users.list.title')"
-            :page-buttons="headerButtons"
-        />
+    <Header
+        :app-title="t('pages.users.list.title')"
+        :page-buttons="headerButtons"
+    />
 
-        <v-container fluid class="pa-4">
-            <v-row class="mb-1 align-center">
-                <v-col cols="12" sm="5" md="3">
-                    <v-text-field
-                        v-model="searchQuery"
-                        :label="t('pages.users.list.searchPlaceholder')"
-                        :prepend-inner-icon="ICONS.buttons.search"
-                        variant="outlined"
-                        density="default"
-                        hide-details
-                    >
-                        <template #append-inner>
-                            <v-progress-circular
-                                v-if="loading"
-                                indeterminate
-                                size="20"
-                                width="2"
-                                color="primary"
-                            />
-                            <v-icon
-                                v-else-if="searchQuery"
-                                icon="close"
-                                size="small"
-                                class="cursor-pointer"
-                                @click="searchQuery = ''"
-                            />
-                        </template>
-                    </v-text-field>
-                </v-col>
+    <v-container fluid class="pa-4">
+        <v-row class="mb-1 align-center">
+            <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+                <v-text-field
+                    v-model="searchQuery"
+                    :label="t('pages.users.list.searchPlaceholder')"
+                    :prepend-inner-icon="ICONS.buttons.search"
+                    variant="outlined"
+                    density="default"
+                    hide-details
+                >
+                    <template #append-inner>
+                        <v-progress-circular
+                            v-if="loading"
+                            indeterminate
+                            size="20"
+                            width="2"
+                            color="primary"
+                        />
+                        <v-icon
+                            v-else-if="searchQuery"
+                            icon="close"
+                            size="small"
+                            class="cursor-pointer"
+                            @click="searchQuery = ''"
+                        />
+                    </template>
+                </v-text-field>
+            </v-col>
 
-                <v-col cols="12" sm="4" md="3">
-                    <div class="text-body-2 text-grey-darken-1">
-                        {{ itemCountText }}
-                    </div>
-                </v-col>
+            <v-col cols="12" sm="4" md="3">
+                <div class="text-body-2 text-grey-darken-1">
+                    {{ itemCountText }}
+                </div>
+            </v-col>
 
-                <v-spacer />
+            <v-spacer />
 
-                <v-col cols="12" sm="3" md="3" class="d-flex justify-end">
-                    <v-btn
-                        variant="outlined"
-                        color="primary"
-                        size="default"
-                        :prepend-icon="ICONS.buttons.arrowForward"
-                        @click="goToCreate"
-                    >
-                        {{ t('buttons.users.list.create') }}
-                    </v-btn>
-                </v-col>
-            </v-row>
+            <v-col cols="12" sm="3" md="3" class="d-flex justify-end">
+                <v-btn
+                    variant="outlined"
+                    color="primary"
+                    size="default"
+                    :prepend-icon="ICONS.buttons.arrowForward"
+                    @click="goToCreate"
+                >
+                    {{ t('buttons.users.list.create') }}
+                </v-btn>
+            </v-col>
+        </v-row>
 
-            <v-data-table-server
-                :headers="headers"
-                :items="users"
-                :items-length="totalItems"
-                :loading="loading"
-                :no-data-text="noDataText"
-                :loading-text="loadingText"
-                :items-per-page-options="[10, 25, 50, 100]"
-                v-model:page="currentPage"
-                v-model:items-per-page="itemsPerPage"
-                v-model:sort-by="sortBy"
-                class="elevation-2 clickable-table"
-                density="default"
-                hover
-                hide-default-footer
-                @update:options="loadItems"
-                @click:row="handleRowClick"
-            >
-                <!-- ✅ IDカラムのリンクもヘルパー関数を使用 -->
-                <template #item.id="{ item }">
-                    <RouterLink
-                        :to="userRoutes.detail(item.id)"
-                        class="font-weight-medium text-decoration-none text-primary"
-                        @click.stop
-                    >
-                        {{ item.id }}
-                    </RouterLink>
-                </template>
+        <v-data-table-server
+            :headers="headers"
+            :items="users"
+            :items-length="totalItems"
+            :loading="loading"
+            :no-data-text="noDataText"
+            :loading-text="loadingText"
+            :items-per-page-options="[10, 25, 50, 100]"
+            v-model:page="currentPage"
+            v-model:items-per-page="itemsPerPage"
+            v-model:sort-by="sortBy"
+            class="elevation-2 clickable-table"
+            density="default"
+            hover
+            hide-default-footer
+            @update:options="loadItems"
+            @click:row="handleRowClick"
+        >
+            <!-- ✅ IDカラムのリンクもヘルパー関数を使用 -->
+            <template #item.id="{ item }">
+                <RouterLink
+                    :to="userRoutes.detail(item.id)"
+                    class="font-weight-medium text-decoration-none text-primary"
+                    @click.stop
+                >
+                    {{ item.id }}
+                </RouterLink>
+            </template>
 
-                <template #item.is_admin="{ item }">
-                    <v-icon
-                        :color="item.is_admin ? 'success' : 'grey'"
-                        :size="item.is_admin ? 'default' : 'small'"
-                    >
-                        {{
-                            item.is_admin
-                                ? ICONS.status.check
-                                : ICONS.status.minus
-                        }}
-                    </v-icon>
-                </template>
+            <template #item.is_admin="{ item }">
+                <v-icon
+                    :color="item.is_admin ? 'success' : 'grey'"
+                    :size="item.is_admin ? 'default' : 'small'"
+                >
+                    {{
+                        item.is_admin ? ICONS.status.check : ICONS.status.minus
+                    }}
+                </v-icon>
+            </template>
 
-                <template #item.created_at="{ item }">
-                    {{ formatDate(item.created_at) }}
-                </template>
-            </v-data-table-server>
-        </v-container>
+            <template #item.created_at="{ item }">
+                {{ formatDate(item.created_at) }}
+            </template>
+        </v-data-table-server>
         <!-- 外部ページネーション -->
-        <div class="d-flex justify-center">
-            <v-pagination
-                v-model="currentPage"
-                :length="totalPages"
-                :total-visible="3"
-                density="default"
-            />
-        </div>
-    </div>
+        <v-row class="mt-1">
+            <v-col cols="12" class="d-flex justify-center">
+                <v-pagination
+                    v-model="currentPage"
+                    :length="totalPages"
+                    :total-visible="3"
+                    density="default"
+                />
+            </v-col>
+        </v-row>
+    </v-container>
 </template>
 
 <style scoped>

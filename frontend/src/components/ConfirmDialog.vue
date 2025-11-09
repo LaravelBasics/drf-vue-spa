@@ -60,7 +60,7 @@ function handleCancel() {
 <template>
     <v-dialog v-model="dialog" persistent max-width="500">
         <v-card>
-            <v-toolbar :color="confirmColor" dark density="comfortable">
+            <v-toolbar :color="confirmColor" density="comfortable">
                 <v-toolbar-title>
                     <v-icon :icon="icon" class="mr-2" />
                     {{ title }}
@@ -69,8 +69,6 @@ function handleCancel() {
 
             <v-card-text class="pa-6">
                 <p class="text-body-1">{{ message }}</p>
-
-                <!-- スロットで追加情報を差し込み可能 -->
                 <slot name="content"></slot>
             </v-card-text>
 

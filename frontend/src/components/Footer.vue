@@ -21,7 +21,6 @@ const versionText = computed(() => {
 <template>
     <v-footer app class="bg-grey-lighten-4 py-1 px-4">
         <v-container fluid class="pa-0">
-            <!-- Vuetifyユーティリティクラスでレスポンシブ対応 -->
             <div
                 class="d-flex flex-column flex-sm-row justify-space-between align-center ga-0"
             >

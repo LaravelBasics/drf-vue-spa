@@ -12,6 +12,8 @@ from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import HttpResponse
 from django.utils.translation import gettext as _
+from datetime import datetime
+import re
 import csv
 from io import StringIO
 
@@ -193,11 +195,25 @@ class UserViewSet(viewsets.ModelViewSet):
                 ]
             )
 
+        # ファイル名生成
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+
+        # オプション：検索条件をファイル名に含める
+        search_term = request.query_params.get("search", "")
+        if search_term:
+            # サニタイズ
+            safe_search = re.sub(r"[^\w\s-]", "", search_term)[:20]
+            filename = f"users_{safe_search}_{timestamp}.csv"
+        else:
+            filename = f"users_{timestamp}.csv"
+
         # レスポンス生成
         response = HttpResponse(
             output.getvalue().encode("utf-8-sig"),  # BOM付きUTF-8でExcel対応
             content_type="text/csv; charset=utf-8-sig",
         )
-        response["Content-Disposition"] = 'attachment; filename="users.csv"'
+
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
         return response
