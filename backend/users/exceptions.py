@@ -3,24 +3,34 @@
 """
 
 from django.utils.translation import gettext_lazy as _
+from rest_framework.exceptions import APIException
 
 
-class UserServiceException(Exception):
-    """ユーザーサービスエラー基底クラス"""
+class UserServiceException(APIException):
+    """
+    ユーザーサービスエラー基底クラス
 
-    def __init__(self, detail, status_code=400):
-        """
-        Args:
-            detail: エラーメッセージ
-            status_code: HTTPステータスコード
-        """
-        self.detail = detail
-        self.status_code = status_code
+    Note:
+        rest_framework.exceptions.APIExceptionを継承することで、
+        DRFのエラーハンドラーが自動的に{"detail": "..."} 形式で返す
+    """
+
+    status_code = 400
+    default_detail = "ユーザーサービスでエラーが発生しました。"
+    default_code = "user_service_error"
+
+    def __init__(self, detail=None, status_code=None):
+        if detail is not None:
+            self.detail = detail
+        if status_code is not None:
+            self.status_code = status_code
         super().__init__(detail)
 
 
 class LastAdminError(UserServiceException):
     """最後の管理者削除エラー"""
+
+    status_code = 400
 
     def __init__(self, action="delete"):
         # アクションごとに翻訳可能なメッセージを定義
@@ -37,34 +47,31 @@ class LastAdminError(UserServiceException):
         }
 
         message = messages.get(action, messages["delete"])
-        super().__init__(detail=str(message), status_code=400)
+        super().__init__(detail=str(message))
 
 
 class UserNotFoundError(UserServiceException):
     """ユーザー不在エラー"""
 
+    status_code = 404
+
     def __init__(self):
-        super().__init__(
-            detail=str(_("ユーザーが見つかりません。")),
-            status_code=404,
-        )
+        super().__init__(detail=str(_("ユーザーが見つかりません。")))
 
 
 class CannotDeleteSelfError(UserServiceException):
     """自己削除エラー"""
 
-    def __init__(self):
-        super().__init__(
-            detail=str(_("自分自身を削除することはできません。")),
-            status_code=400,
-        )
-
-
-class CannotUpdateDeletedError(UserServiceException):
-    """削除済み編集エラー"""
+    status_code = 400
 
     def __init__(self):
-        super().__init__(
-            detail=str(_("削除済みユーザーは編集できません。")),
-            status_code=400,
-        )
+        super().__init__(detail=str(_("自分自身を削除することはできません。")))
+
+
+class DeletedUserAccessError(UserServiceException):
+    """削除済みユーザーアクセスエラー（同時操作対応）"""
+
+    status_code = 404
+
+    def __init__(self):
+        super().__init__(detail=str(_("このユーザーは削除されています。")))

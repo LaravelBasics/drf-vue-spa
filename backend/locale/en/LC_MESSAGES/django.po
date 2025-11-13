@@ -54,6 +54,9 @@ msgstr "Deleted users cannot be edited."
 msgid "ユーザーが見つかりません。"
 msgstr "User not found."
 
+msgid "このユーザーは削除されています。"
+msgstr "This user has been deleted."
+
 # ==================== 認証エラー（accounts/views.py） ====================
 
 msgid "社員番号またはパスワードが正しくありません"

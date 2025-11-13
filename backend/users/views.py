@@ -25,7 +25,8 @@ from .serializers import (
 from .services.user_service import UserService
 from .exceptions import (
     UserServiceException,
-    CannotUpdateDeletedError,
+    UserNotFoundError,
+    DeletedUserAccessError,
 )
 from .permissions import IsAdminUser
 from common.response_utils import extract_validation_error
@@ -58,6 +59,21 @@ class UserViewSet(viewsets.ModelViewSet):
     ordering_fields = ["id", "employee_id", "created_at", "is_admin"]
     ordering = ["id"]
 
+    def get_queryset(self):
+        """
+        アクションに応じてクエリセットを動的に変更
+        - retrieve: 削除済みも含める（明確なエラーメッセージのため）
+        - その他: 削除済みを除外
+        """
+        queryset = super().get_queryset()
+
+        if self.action == "retrieve":
+            # all_objectsマネージャーを使って削除済みも取得
+            return User.all_objects.all()
+
+        # list などは削除済みを除外
+        return queryset
+
     def get_serializer_class(self):
         if self.action == "create":
             return UserCreateSerializer
@@ -78,17 +94,36 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({"detail": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, *args, **kwargs):
-        """ユーザー詳細"""
+        """
+        ユーザー詳細取得
+        削除済みユーザーへのアクセスを防止（ブラウザback対策）
+        """
         instance = self.get_object()
+
+        # 削除済みユーザーのチェック
+        if instance.deleted_at:
+            raise DeletedUserAccessError()
+
         return Response(UserSerializer(instance).data)
 
     def update(self, request, *args, **kwargs):
-        """ユーザー更新"""
-        partial = kwargs.pop("partial", False)
-        instance = self.get_object()
+        """
+        ユーザー更新
 
+        Note:
+            同時操作対応: all_objectsで取得して削除済みを明示的にチェック
+        """
+        partial = kwargs.pop("partial", False)
+
+        # all_objectsを使って削除済みも含めて取得（同時削除対策）
+        try:
+            instance = User.all_objects.get(pk=self.kwargs["pk"])
+        except User.DoesNotExist:
+            raise UserNotFoundError()
+
+        # 削除済みチェック（別タブで削除された場合）
         if instance.deleted_at:
-            raise CannotUpdateDeletedError()
+            raise DeletedUserAccessError()
 
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
 
@@ -103,8 +138,21 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({"detail": e.detail}, status=e.status_code)
 
     def destroy(self, request, *args, **kwargs):
-        """ユーザー削除（論理削除）"""
-        instance = self.get_object()
+        """
+        ユーザー削除（論理削除）
+
+        Note:
+            同時操作対応: all_objectsで取得して削除済みを明示的にチェック
+        """
+        # all_objectsを使って削除済みも含めて取得（同時削除対策）
+        try:
+            instance = User.all_objects.get(pk=self.kwargs["pk"])
+        except User.DoesNotExist:
+            raise UserNotFoundError()
+
+        # 削除済みチェック（別タブで削除された場合）
+        if instance.deleted_at:
+            raise DeletedUserAccessError()
 
         try:
             UserService.delete_user(instance, request_user_id=request.user.id)
