@@ -11,13 +11,19 @@ from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+# ⭐ .env ファイルを読み込み
 load_dotenv(BASE_DIR / ".env")
 
 # === セキュリティ ===
 
-SECRET_KEY = "django-insecure-ycbc+50@xd3u8)6tsw27*q6!uz2l2asg0-$wdgs^j99wokh1w@"
-DEBUG = True
-ALLOWED_HOSTS = []
+# ⭐ 環境変数から読み込む
+SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-fallback-key")
+
+# ⭐ DEBUG も環境変数化
+DEBUG = os.getenv("DEBUG", "False") == "True"
+
+# ⭐ ALLOWED_HOSTS も環境変数化
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 
 # === アプリケーション ===
 
