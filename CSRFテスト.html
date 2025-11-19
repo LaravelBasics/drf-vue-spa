@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>🎁 無料プレゼントキャンペーン 🎁</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: 20px;
+            }
+            .container {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                max-width: 600px;
+                width: 100%;
+                padding: 40px;
+                text-align: center;
+            }
+            h1 {
+                color: #667eea;
+                margin-bottom: 20px;
+                font-size: 2em;
+            }
+            .gift-icon {
+                font-size: 80px;
+                margin: 20px 0;
+            }
+            p {
+                color: #555;
+                line-height: 1.8;
+                margin-bottom: 15px;
+            }
+            .attack-section {
+                margin: 30px 0;
+                padding: 20px;
+                background: #f8f9fa;
+                border-radius: 10px;
+                border-left: 4px solid #dc3545;
+            }
+            .attack-section h2 {
+                color: #dc3545;
+                margin-bottom: 15px;
+                font-size: 1.2em;
+            }
+            button {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 15px 40px;
+                font-size: 1.1em;
+                border-radius: 50px;
+                cursor: pointer;
+                transition: transform 0.2s, box-shadow 0.2s;
+                margin: 10px 5px;
+            }
+            button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+            }
+            button:active {
+                transform: translateY(0);
+            }
+            .danger-btn {
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            }
+            #result {
+                margin-top: 20px;
+                padding: 15px;
+                border-radius: 10px;
+                font-weight: bold;
+                display: none;
+            }
+            .success {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .error {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            .warning {
+                background: #fff3cd;
+                color: #856404;
+                border: 1px solid #ffeaa7;
+                font-size: 0.9em;
+                margin-top: 20px;
+                padding: 15px;
+                border-radius: 10px;
+            }
+            code {
+                background: #f4f4f4;
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-family: 'Courier New', monospace;
+            }
+            .attack-list {
+                text-align: left;
+                margin: 15px 0;
+            }
+            .attack-list li {
+                margin: 8px 0;
+                padding-left: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="gift-icon">🎁</div>
+            <h1>おめでとうございます!</h1>
+            <p>
+                あなたが選ばれました！今すぐ下のボタンをクリックして素敵なプレゼントを受け取りましょう！
+            </p>
+
+            <div class="attack-section">
+                <h2>⚠️ CSRF攻撃テストエリア ⚠️</h2>
+                <p style="font-size: 0.9em; color: #666">
+                    これは教育目的のCSRF攻撃シミュレーションです。<br />
+                    以下のボタンで様々な攻撃パターンをテストできます。
+                </p>
+
+                <div class="attack-list">
+                    <strong>テストパターン:</strong>
+                    <ul>
+                        <li>❌ Pattern 1: CSRFトークンなし</li>
+                        <li>❌ Pattern 2: 不正なCSRFトークン</li>
+                        <li>❌ Pattern 3: 自動送信フォーム</li>
+                        <li>❌ Pattern 4: Fetch API攻撃</li>
+                    </ul>
+                </div>
+
+                <button onclick="attack1()">Pattern 1: トークンなし</button>
+                <button onclick="attack2()">Pattern 2: 偽トークン</button>
+                <button onclick="attack3()" class="danger-btn">
+                    Pattern 3: 自動送信
+                </button>
+                <button onclick="attack4()" class="danger-btn">
+                    Pattern 4: Fetch攻撃
+                </button>
+            </div>
+
+            <div id="result"></div>
+
+            <div class="warning">
+                <strong>🔒 セキュリティメモ:</strong><br />
+                正しく実装されていれば、すべての攻撃が<code>403 Forbidden</code
+                >で拒否されます。
+                Django側でCSRFトークンが正しく検証されていることを確認してください。
+            </div>
+        </div>
+
+        <!-- 隠しフォーム（Pattern 3用） -->
+        <form
+            id="hiddenForm"
+            method="POST"
+            action="http://localhost:8000/api/auth/logout/"
+            style="display: none"
+        >
+            <input type="hidden" name="test" value="csrf_attack" />
+        </form>
+
+        <script>
+            const API_BASE = 'http://localhost:8000/api/';
+
+            function showResult(message, isSuccess) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.textContent = message;
+                resultDiv.className = isSuccess ? 'success' : 'error';
+                resultDiv.style.display = 'block';
+            }
+
+            // Pattern 1: CSRFトークンなしでPOSTリクエスト
+            async function attack1() {
+                try {
+                    const response = await fetch(API_BASE + 'auth/logout/', {
+                        method: 'POST',
+                        credentials: 'include', // Cookieを含める
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({}),
+                    });
+
+                    if (response.ok) {
+                        showResult(
+                            '❌ 攻撃成功! CSRFトークンなしでログアウトできました（脆弱性あり）',
+                            false,
+                        );
+                    } else {
+                        showResult(
+                            `✅ 攻撃失敗! ステータス: ${response.status} - CSRF保護が機能しています`,
+                            true,
+                        );
+                    }
+                } catch (error) {
+                    showResult(
+                        `✅ 攻撃ブロック! エラー: ${error.message}`,
+                        true,
+                    );
+                }
+            }
+
+            // Pattern 2: 偽のCSRFトークンでPOSTリクエスト
+            async function attack2() {
+                try {
+                    const response = await fetch(API_BASE + 'auth/logout/', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': 'fake-csrf-token-12345',
+                        },
+                        body: JSON.stringify({}),
+                    });
+
+                    if (response.ok) {
+                        showResult(
+                            '❌ 攻撃成功! 偽トークンでログアウトできました（脆弱性あり）',
+                            false,
+                        );
+                    } else {
+                        showResult(
+                            `✅ 攻撃失敗! ステータス: ${response.status} - トークン検証が機能しています`,
+                            true,
+                        );
+                    }
+                } catch (error) {
+                    showResult(
+                        `✅ 攻撃ブロック! エラー: ${error.message}`,
+                        true,
+                    );
+                }
+            }
+
+            // Pattern 3: 隠しフォームの自動送信
+            function attack3() {
+                const form = document.getElementById('hiddenForm');
+                form.submit();
+                setTimeout(() => {
+                    showResult(
+                        '⚠️ フォーム送信実行 - ブラウザコンソールとネットワークタブで結果を確認してください',
+                        false,
+                    );
+                }, 100);
+            }
+
+            // Pattern 4: Fetch APIで別のエンドポイントを攻撃
+            async function attack4() {
+                try {
+                    // ユーザー情報変更を試みる攻撃例
+                    const response = await fetch(API_BASE + 'users/me/', {
+                        method: 'PATCH',
+                        credentials: 'include',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            name: 'ハッカー太郎',
+                            email: 'hacked@evil.com',
+                        }),
+                    });
+
+                    if (response.ok) {
+                        showResult(
+                            '❌ 攻撃成功! ユーザー情報を変更できました（脆弱性あり）',
+                            false,
+                        );
+                    } else {
+                        showResult(
+                            `✅ 攻撃失敗! ステータス: ${response.status} - CSRF保護が機能しています`,
+                            true,
+                        );
+                    }
+                } catch (error) {
+                    showResult(
+                        `✅ 攻撃ブロック! エラー: ${error.message}`,
+                        true,
+                    );
+                }
+            }
+
+            // ページ読み込み時の情報表示
+            window.onload = () => {
+                console.log(
+                    '%c⚠️ CSRF攻撃テストページ',
+                    'color: red; font-size: 20px; font-weight: bold;',
+                );
+                console.log(
+                    'このページは教育目的のCSRF攻撃シミュレーションです',
+                );
+                console.log('Target API:', API_BASE);
+                console.log(
+                    'すべての攻撃が403エラーで拒否されることを確認してください',
+                );
+            };
+        </script>
+    </body>
+</html>
