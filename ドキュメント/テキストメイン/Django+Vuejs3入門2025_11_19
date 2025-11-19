@@ -1,0 +1,2315 @@
+# Django + Vue.js 3 入門ガイド（社内向け）
+
+> **対象者**: IT経験はあるが、Django/Vue.js/SPAの経験がない方  
+> **目的**: 概念を理解し、実務で使えるようになる
+
+---
+
+## 📖 目次
+
+1. [この技術スタックとは？](#この技術スタックとは)
+2. [全体像を理解する](#全体像を理解する)
+3. [バックエンド編（Django + DRF）](#バックエンド編)
+4. [フロントエンド編（Vue.js 3）](#フロントエンド編)
+5. [データの流れを追う](#データの流れを追う)
+6. [よくある質問](#よくある質問)
+
+---
+
+## この技術スタックとは？
+
+### 🎯 使用技術の一覧
+
+| 役割 | 技術 | 一言で言うと |
+|------|------|------------|
+| **バックエンド** | Django | Pythonの定番Webフレームワーク |
+| **API** | Django REST Framework | DjangoでREST APIを簡単に作れる |
+| **フロントエンド** | Vue.js 3 | 画面を作るJavaScriptフレームワーク |
+| **UI部品** | Vuetify 3 | 綺麗なボタンやテーブルが使える |
+| **状態管理** | Pinia | アプリ全体でデータを共有する |
+
+### 🤔 なぜこの組み合わせ？
+
+**従来のWebアプリ（テンプレート方式）の問題点:**
+```
+ユーザー操作 → サーバーで HTML 生成 → 画面全体を再読み込み
+↑ページ遷移のたびに画面がチカチカする
+```
+
+**SPA（Single Page Application）の利点:**
+```
+ユーザー操作 → 必要なデータだけ取得 → 画面の一部だけ更新
+↑ スマホアプリのようにスムーズ！
+```
+
+**この構成の特徴:**
+- **Django**: 認証やデータベース操作が得意（枯れた技術で安心）
+- **Vue.js**: 学習コストが低く、日本語情報も豊富
+- **Vuetify**: デザインセンス不要で見栄えの良いUIが作れる
+
+---
+
+## 全体像を理解する
+
+### システムの構成
+
+```
+【ユーザー】
+    ↓ ブラウザでアクセス
+【フロントエンド（Vue.js）】
+    ↓ HTTP通信（JSON）
+【バックエンド（Django）】
+    ↓ SQL
+【データベース（PostgreSQL）】
+```
+
+**重要な概念: フロントエンドとバックエンドは別物**
+
+- **フロントエンド**: ユーザーが見る「画面」を担当
+- **バックエンド**: データの保存や処理を担当
+- **やり取り**: JSON形式でデータを送受信
+
+### 📦 ファイル構成のイメージ
+
+```
+プロジェクト/
+├── backend/          ← Django（サーバー側）
+│   ├── config/       ← 設定ファイル
+│   ├── users/        ← ユーザー管理機能
+│   └── manage.py     ← コマンド実行
+│
+└── frontend/         ← Vue.js（画面側）
+    ├── src/
+    │   ├── views/    ← 画面（ページ）
+    │   ├── components/ ← 部品（ボタンなど）
+    │   └── stores/   ← データ保管庫
+    └── package.json  ← 使うライブラリ一覧
+```
+
+**別々に動かす理由:**
+- 開発中: フロントは `localhost:5173`、バックは `localhost:8000` で別々に起動
+- 本番環境: フロントをビルドしてバックエンドで配信、または別サーバーに分離
+
+---
+
+## バックエンド編
+
+### 1. Django（ジャンゴ）とは？
+
+**一言で**: PythonでWebアプリを作るための「道具箱」
+
+**例え話:**
+```
+家を建てる時、一から釘を作らないですよね？
+既にある材料（フレームワーク）を使って効率的に作る！
+```
+
+**Djangoが提供してくれるもの:**
+- ✅ ユーザー認証（ログイン/ログアウト）
+- ✅ データベース操作（SQL書かなくてOK）
+- ✅ セキュリティ対策（CSRF、SQLインジェクション）
+- ✅ 管理画面（自動生成！）
+
+**📚 参考**: [Django公式 - なぜDjangoか？](https://docs.djangoproject.com/ja/stable/faq/general/#why-does-this-project-exist)
+
+### 2. Django REST Framework（DRF）とは？
+
+**一言で**: DjangoでREST APIを作るための「拡張パック」
+
+**REST APIって何？**
+
+従来のWeb（HTMLを返す）:
+```
+GET /users/list/  → <html><body>...</body></html>
+```
+
+REST API（JSONを返す）:
+```
+GET /api/users/  → {"results": [{"id": 1, "name": "太郎"}]}
+```
+
+**メリット:**
+- フロントエンド（Vue.js）、スマホアプリ、他システムから同じAPIを使える
+- データだけやり取りするので通信量が少ない
+
+**DRFの便利機能:**
+
+```python
+# たった数行でAPIが完成！
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+```
+
+これだけで以下のエンドポイントが自動生成:
+- `GET /api/users/` - 一覧取得
+- `POST /api/users/` - 作成
+- `GET /api/users/1/` - 詳細取得
+- `PUT /api/users/1/` - 更新
+- `DELETE /api/users/1/` - 削除
+
+**📚 参考**: [DRF公式 - クイックスタート](https://www.django-rest-framework.org/tutorial/quickstart/)
+
+### 3. 認証の仕組み（セッション方式）
+
+**よくある誤解**: 「APIだからトークン認証でしょ？」
+
+→ **このシステムはセッション認証を使っています！**
+
+**セッション認証の流れ:**
+
+```
+【ログイン時】
+① ユーザー: 社員番号「1234」とパスワード「pass」を送信
+② サーバー: 認証OK → セッションID「abc123」を発行
+③ サーバー: Cookie に「sessionid=abc123」をセット
+④ ブラウザ: Cookie を自動的に保存
+
+【次回以降のリクエスト】
+① ブラウザ: Cookie（sessionid=abc123）を自動的に送信
+② サーバー: Cookie から「この人はログイン済み」と判断
+```
+
+**なぜトークン認証じゃないの？**
+
+| 方式 | メリット | デメリット |
+|------|---------|----------|
+| **セッション** | ・Cookieで自動管理<br>・XSS攻撃に強い | スマホアプリには不向き |
+| **トークン** | ・スマホアプリ対応<br>・スケーラブル | JavaScriptで管理が必要 |
+
+→ 社内Webアプリなので、セキュリティが高く実装が簡単なセッション方式を選択
+
+**CSRF（シーサーフ）トークンとは？**
+
+**問題**: 悪意あるサイトから勝手にリクエストされる攻撃
+
+```
+悪いサイト: <form action="https://社内システム/delete-user">
+             <input type="hidden" value="管理者">
+           </form>
+           <script>document.forms[0].submit()</script>
+```
+
+**対策**: CSRF トークンで「正規のページからのリクエストか」を確認
+
+```
+① フロントエンド: GET /api/auth/csrf/ でトークン取得
+② サーバー: Cookie に「csrftoken=xyz789」をセット
+③ フロントエンド: POST時にヘッダーに「X-CSRFToken: xyz789」を付与
+④ サーバー: トークンが一致すれば正規リクエストと判断
+```
+
+**📚 参考**: 
+- [Django認証システム](https://docs.djangoproject.com/ja/stable/topics/auth/)
+- [CSRFとは？](https://docs.djangoproject.com/ja/stable/ref/csrf/)
+
+### 4. モデル（Model）- データの設計図
+
+**一言で**: データベースのテーブルをPythonのクラスで定義
+
+```python
+# users/models.py
+class User(AbstractBaseUser):
+    employee_id = models.CharField("社員番号", max_length=50)
+    username = models.CharField("ユーザー名", max_length=50)
+    email = models.EmailField("メールアドレス")
+    is_admin = models.BooleanField("管理者", default=False)
+    created_at = models.DateTimeField("作成日時", auto_now_add=True)
+```
+
+↓ マイグレーション実行すると
+
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    employee_id VARCHAR(50),
+    username VARCHAR(50),
+    email VARCHAR(255),
+    is_admin BOOLEAN DEFAULT false,
+    created_at TIMESTAMP
+);
+```
+
+**便利な点:**
+- SQL を直接書かなくていい
+- Python でデータ操作できる: `User.objects.filter(is_admin=True)`
+- データベース変更時も安全にマイグレーション可能
+
+**📚 参考**: [Djangoモデル](https://docs.djangoproject.com/ja/stable/topics/db/models/)
+
+### 5. シリアライザー（Serializer）- データの変換
+
+**役割**: Python オブジェクト ⇔ JSON の変換
+
+```python
+# users/serializers.py
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'employee_id', 'username', 'email', 'is_admin']
+```
+
+**実際の動き:**
+
+```python
+# Pythonオブジェクト
+user = User.objects.get(id=1)
+
+# JSONに変換（シリアライズ）
+serializer = UserSerializer(user)
+print(serializer.data)
+# → {'id': 1, 'employee_id': '1234', 'username': '太郎', ...}
+
+# APIレスポンス
+return Response(serializer.data)
+# → ブラウザには JSON が返る
+```
+
+**📚 参考**: [DRFシリアライザー](https://www.django-rest-framework.org/api-guide/serializers/)
+
+---
+
+## フロントエンド編
+
+### 1. Vue.js 3（ビュージェイエス）とは？
+
+**一言で**: 画面を作るためのJavaScriptフレームワーク
+
+**jQueryとの違い:**
+
+**jQuery時代（命令的）:**
+```javascript
+// ボタンを押したらテキストを変える
+$('#button').click(function() {
+    $('#text').text('変わった！');
+});
+```
+→ 複雑な画面になると管理が大変...
+
+**Vue.js（宣言的）:**
+```vue
+<script setup>
+import { ref } from 'vue';
+const message = ref('最初のメッセージ');
+
+function change() {
+    message.value = '変わった！';
+}
+</script>
+
+<template>
+    <button @click="change">押す</button>
+    <p>{{ message }}</p>
+</template>
+```
+→ データを変えれば画面が自動で更新される！
+
+**📚 参考**: [Vue.js公式ガイド](https://ja.vuejs.org/guide/introduction.html)
+
+### 2. Composition API（コンポジションAPI）
+
+**Vue.js 2 → Vue.js 3 で変わったこと**
+
+**Options API（旧）:**
+```javascript
+export default {
+    data() {
+        return { count: 0 }
+    },
+    methods: {
+        increment() { this.count++ }
+    },
+    computed: {
+        double() { return this.count * 2 }
+    }
+}
+```
+
+**Composition API（新）:**
+```javascript
+import { ref, computed } from 'vue';
+
+const count = ref(0);
+const double = computed(() => count.value * 2);
+
+function increment() {
+    count.value++;
+}
+```
+
+**なぜ Composition API？**
+
+1. **ロジックの再利用が簡単**
+```javascript
+// composables/useCounter.js
+export function useCounter() {
+    const count = ref(0);
+    function increment() { count.value++; }
+    return { count, increment };
+}
+
+// どのコンポーネントでも使える！
+import { useCounter } from '@/composables/useCounter';
+const { count, increment } = useCounter();
+```
+
+2. **TypeScript との相性が良い**
+3. **関連するコードをまとめやすい**
+
+**📚 参考**: [Composition API入門](https://ja.vuejs.org/guide/extras/composition-api-faq.html)
+
+### 3. ref と reactive - リアクティブなデータ
+
+**リアクティブって何？**
+
+→ データが変わったら画面も自動で変わる仕組み
+
+```vue
+<script setup>
+import { ref } from 'vue';
+
+const count = ref(0);  // リアクティブなデータ
+
+function increment() {
+    count.value++;  // .value で値を変更
+}
+</script>
+
+<template>
+    <!-- count が変わると自動で再レンダリング -->
+    <p>カウント: {{ count }}</p>
+    <button @click="increment">+1</button>
+</template>
+```
+
+**ref と reactive の違い:**
+
+```javascript
+// ref: プリミティブ値（数値、文字列）用
+const count = ref(0);
+console.log(count.value);  // 0
+count.value = 1;
+
+// reactive: オブジェクト用
+const user = reactive({ name: '太郎', age: 30 });
+console.log(user.name);  // '太郎'（.value 不要）
+user.age = 31;
+```
+
+**迷ったら ref を使えばOK！**
+
+**📚 参考**: [リアクティビティの基礎](https://ja.vuejs.org/guide/essentials/reactivity-fundamentals.html)
+
+### 4. Pinia（ピニア）- 状態管理
+
+**なぜ必要？**
+
+**問題**: 複数のコンポーネントで同じデータを使いたい
+
+```
+【ヘッダー】ログイン中のユーザー名を表示
+【サイドバー】ログイン中のユーザー名を表示
+【プロフィール】ログイン中のユーザー情報を表示
+```
+
+→ それぞれでAPIを呼んでたら無駄！
+
+**解決**: Pinia で一箇所にデータを保存
+
+```javascript
+// stores/auth.js
+import { defineStore } from 'pinia';
+import { ref } from 'vue';
+
+export const useAuthStore = defineStore('auth', () => {
+    // State（状態）
+    const user = ref(null);
+    
+    // Actions（操作）
+    async function login(employeeId, password) {
+        const response = await authAPI.login(employeeId, password);
+        user.value = response.data.user;
+    }
+    
+    return { user, login };
+});
+```
+
+**使い方:**
+
+```vue
+<script setup>
+import { useAuthStore } from '@/stores/auth';
+
+const auth = useAuthStore();
+</script>
+
+<template>
+    <p>ようこそ、{{ auth.user?.username }} さん</p>
+</template>
+```
+
+**localStorage との違い:**
+
+| | Pinia | localStorage |
+|---|-------|--------------|
+| 保存場所 | メモリ | ブラウザ |
+| 速度 | 速い | 遅い |
+| リアクティブ | ○ | × |
+| ページリロード | 消える | 残る |
+
+→ **Pinia + 永続化プラグイン** で両方のメリットを活用！
+
+```javascript
+import { createPinia } from 'pinia';
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
+
+const pinia = createPinia();
+pinia.use(piniaPluginPersistedstate);
+```
+
+**📚 参考**: [Pinia公式](https://pinia.vuejs.org/)
+
+### 5. Vuetify 3 - UIコンポーネント
+
+**一言で**: すぐ使える綺麗なUI部品集
+
+**何もないとこうなる:**
+```html
+<button>押して</button>
+<!-- ↑ ブラウザのデフォルトデザイン（ダサい） -->
+```
+
+**Vuetifyを使うと:**
+```vue
+<v-btn color="primary" size="large">押して</v-btn>
+<!-- ↑ Material Design の綺麗なボタン -->
+```
+
+**主な部品:**
+
+| コンポーネント | 用途 | 例 |
+|--------------|------|---|
+| `v-btn` | ボタン | 保存、キャンセル |
+| `v-text-field` | 入力欄 | ユーザー名入力 |
+| `v-data-table` | テーブル | ユーザー一覧 |
+| `v-dialog` | ダイアログ | 削除確認 |
+| `v-card` | カード | 情報のまとまり |
+
+**レスポンシブ対応:**
+```vue
+<v-col cols="12" sm="6" md="4">
+    <!-- スマホ: 全幅、タブレット: 半分、PC: 1/3 -->
+</v-col>
+```
+
+**📚 参考**: [Vuetify 3 コンポーネント](https://vuetifyjs.com/en/components/all/)
+
+### 6. Vue Router - ページ遷移
+
+**一言で**: URLとコンポーネントを紐付ける
+
+```javascript
+// router/index.js
+const routes = [
+    { path: '/', component: Home },
+    { path: '/users', component: UserList },
+    { path: '/users/:id', component: UserDetail },
+];
+```
+
+**ページ遷移の方法:**
+
+```vue
+<!-- リンク -->
+<router-link to="/users">ユーザー一覧</router-link>
+
+<!-- プログラムで遷移 -->
+<script setup>
+import { useRouter } from 'vue-router';
+const router = useRouter();
+
+function goToDetail(id) {
+    router.push(`/users/${id}`);
+}
+</script>
+```
+
+**ナビゲーションガード（認証チェック）:**
+
+```javascript
+router.beforeEach((to, from) => {
+    // 認証が必要なページなのにログインしていない
+    if (to.meta.requiresAuth && !auth.user) {
+        return '/login';  // ログインページへリダイレクト
+    }
+});
+```
+
+**📚 参考**: [Vue Router公式](https://router.vuejs.org/)
+
+---
+
+## データの流れを追う
+
+### 実例: ユーザー一覧画面
+
+**1. ページを開く**
+
+```
+ユーザーが /users にアクセス
+↓
+Vue Router が UserList.vue を表示
+```
+
+**2. データ取得**
+
+```vue
+<!-- UserList.vue -->
+<script setup>
+import { ref, onMounted } from 'vue';
+import { usersAPI } from '@/api/users';
+
+const users = ref([]);
+const loading = ref(false);
+
+onMounted(async () => {
+    loading.value = true;
+    try {
+        const response = await usersAPI.list();
+        users.value = response.data.results;
+    } finally {
+        loading.value = false;
+    }
+});
+</script>
+```
+
+**3. API通信（Axios）**
+
+```javascript
+// api/users.js
+import api from '@/plugins/axios';
+
+export const usersAPI = {
+    list(params) {
+        return api.get('/users/', { params });
+    }
+};
+```
+
+**4. Djangoで処理**
+
+```python
+# users/views.py
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+```
+
+**5. レスポンス**
+
+```
+Django → JSON: {"results": [...], "count": 10}
+↓
+Axios → Promise
+↓
+Vue.js → users.value に代入
+↓
+画面が自動更新（リアクティブ）
+```
+
+**6. 画面表示**
+
+```vue
+<template>
+    <v-data-table
+        :items="users"
+        :loading="loading"
+        :headers="headers"
+    />
+</template>
+```
+
+### 図解: リクエストの流れ
+
+```
+【ブラウザ】
+  ↓ ① GET /api/users/
+【Axios】← Cookie自動送信
+  ↓ ② withCredentials: true
+【Django】
+  ↓ ③ セッション確認
+【DRF ViewSet】
+  ↓ ④ User.objects.all()
+【PostgreSQL】
+  ↓ ⑤ SELECT * FROM users
+【DRF Serializer】
+  ↓ ⑥ JSON変換
+【レスポンス】
+  ↓ ⑦ {"results": [...]}
+【Vue.js】
+  ↓ ⑧ users.value = ...
+【画面更新】
+```
+
+---
+
+## よくある質問
+
+### Q1: なぜ Django のテンプレート機能を使わないの？
+
+**A**: フロントとバックを分離するメリットが大きいから
+
+**メリット:**
+- フロントエンド開発者とバックエンド開発者が並行作業可能
+- APIは他のシステム（スマホアプリなど）からも利用可能
+- フロントエンドを別サーバーに配置してスケール可能
+
+**デメリット:**
+- 学習コストが高い（2つのフレームワークを覚える）
+- 初期セットアップが複雑
+
+→ **小規模なら Django テンプレート、中規模以上なら分離が推奨**
+
+### Q2: セッションはどこに保存されるの？
+
+**A**: デフォルトはデータベース、Redisも使える
+
+```python
+# settings.py
+
+# データベースに保存（デフォルト）
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
+# Redis に保存（高速化）
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+    }
+}
+```
+
+### Q3: なぜ `.value` を付けるの？
+
+**A**: Vue.js が変更を検知するため
+
+```javascript
+const count = ref(0);
+
+// ❌ これだと画面が更新されない
+count = 1;
+
+// ✅ .value で変更すると画面も更新
+count.value = 1;
+```
+
+内部的には `Proxy` というJavaScriptの機能で変更を監視しています。
+
+### Q4: コンポーネントはどう分割すべき？
+
+**基本方針:**
+
+1. **1つの責務 = 1コンポーネント**
+```
+UserList.vue
+├── UserTable.vue  ← テーブル表示
+├── UserFilter.vue ← 検索フォーム
+└── UserActions.vue ← 一括操作ボタン
+```
+
+2. **200行を超えたら分割を検討**
+
+3. **再利用するならコンポーネント化**
+
+```vue
+<!-- ❌ 悪い例: すべて1ファイル -->
+<template>
+    <v-card>...</v-card>
+    <v-card>...</v-card>
+    <v-card>...</v-card>
+</template>
+
+<!-- ✅ 良い例: 共通部品を作る -->
+<template>
+    <UserCard v-for="user in users" :user="user" />
+</template>
+```
+
+### Q5: エラーハンドリングはどうするの？
+
+**推奨パターン:**
+
+```javascript
+// composables/useApiError.js
+export function useApiError() {
+    const notification = useNotificationStore();
+    
+    function handleError(error) {
+        const message = error.response?.data?.detail || '不明なエラー';
+        notification.error(message);
+    }
+    
+    return { handleError };
+}
+```
+
+```vue
+<script setup>
+const { handleError } = useApiError();
+
+async function saveUser() {
+    try {
+        await usersAPI.create(formData.value);
+        notification.success('保存しました');
+    } catch (error) {
+        handleError(error);
+    }
+}
+</script>
+```
+
+---
+
+## まとめ
+
+### 覚えておくべき概念
+
+**バックエンド:**
+1. **Django**: Webアプリの土台
+2. **DRF**: REST APIの拡張
+3. **セッション認証**: Cookieで自動ログイン維持
+4. **モデル**: データベースの設計図
+5. **シリアライザー**: JSON変換
+
+**フロントエンド:**
+1. **Vue.js 3**: 画面を作る
+2. **Composition API**: ロジックを再利用
+3. **ref/reactive**: データの変更を監視
+4. **Pinia**: データを共有
+5. **Vuetify**: 綺麗なUI部品
+
+### 次のステップ
+
+1. **公式ドキュメントを読む**
+   - [Django チュートリアル](https://docs.djangoproject.com/ja/stable/intro/tutorial01/)
+   - [Vue.js ガイド](https://ja.vuejs.org/guide/introduction.html)
+
+2. **小さな機能から作ってみる**
+   - 掲示板の投稿機能
+   - ToDoリスト
+
+3. **既存コードを読む**
+   - なぜこう書いているのか考える
+   - 似たパターンを探す
+
+---
+
+## SQLインジェクション対策
+
+### 🚨 なぜ危険なのか？
+
+**SQLインジェクション = SQL注入攻撃**
+
+攻撃者が悪意あるSQLコードを「注入」して、データベースを不正に操作する攻撃です。
+
+**OWASP Top 10（世界的セキュリティ脆弱性リスト）で常に上位！**
+- 25年以上前から知られているのに、今でも頻繁に発生
+- 2025年現在もOWASP Top 10の筆頭に位置する
+- 実装ミスで簡単に発生してしまう
+
+---
+
+### 攻撃の仕組みを理解する
+
+#### 脆弱なコード例（絶対にやってはいけない！）
+
+```python
+# ❌ 超危険！文字列結合でSQLを作成
+def search_user(request):
+    username = request.GET['username']
+    
+    # ユーザー入力を直接SQL文に埋め込む
+    query = f"SELECT * FROM users WHERE username = '{username}'"
+    cursor.execute(query)
+```
+
+**何が危険？**
+
+普通のユーザーが入力:
+```
+username = "太郎"
+→ SELECT * FROM users WHERE username = '太郎'
+```
+
+**攻撃者が入力:**
+```
+username = "太郎' OR '1'='1"
+→ SELECT * FROM users WHERE username = '太郎' OR '1'='1'
+```
+
+**結果:**
+- `OR '1'='1'` は常に真（TRUE）
+- すべてのユーザー情報が取得される！
+
+---
+
+#### さらに危険な例: データ削除
+
+```python
+# ❌ 危険コード
+employee_id = request.GET['employee_id']
+query = f"DELETE FROM users WHERE employee_id = '{employee_id}'"
+```
+
+**攻撃者の入力:**
+```
+employee_id = "1'; DROP TABLE users; --"
+```
+
+**実行されるSQL:**
+```sql
+DELETE FROM users WHERE employee_id = '1'; 
+DROP TABLE users;  ← テーブル全削除！
+--'
+```
+
+**結果:**
+- ユーザーテーブルが消滅...
+- 全データが失われる
+
+**有名な漫画（XKCD）:**
+```
+母親: 息子の名前は "Robert'); DROP TABLE Students;--" です
+学校: 今年の生徒データが全部消えました...
+```
+
+**📚 参考**: [Bobby Tables（SQLインジェクションの有名なネタ）](https://bobby-tables.com/)
+
+---
+
+### 対策1: プリペアドステートメント（Prepared Statements）
+
+**別名: パラメータ化クエリ（Parameterized Queries）**
+
+プリペアドステートメントは、SQLのテンプレートとユーザーデータを分離して管理する仕組みです。
+
+#### 仕組みを理解する
+
+**通常のSQL実行プロセス:**
+
+```
+① 構文解析（Parsing）
+   "SELECT * FROM users WHERE username = '太郎'"
+   ↓ SQLとして解釈
+   
+② 意味チェック（Semantics Check）
+   テーブル・カラムが存在するか確認
+   
+③ 最適化（Query Optimization）
+   最速の実行方法を決定
+   
+④ 実行
+```
+
+**プリペアドステートメントの場合:**
+
+```
+【準備フェーズ】
+① SQLテンプレートを送信
+   "SELECT * FROM users WHERE username = ?"
+   ↓
+② データベースが解析・最適化・コンパイル
+   ↓
+③ 実行計画をキャッシュに保存
+
+【実行フェーズ】
+④ パラメータ（ユーザー入力）を別途送信
+   パラメータ: "太郎' OR '1'='1"
+   ↓
+⑤ データベースがパラメータを「文字列データ」として扱う
+   → SQLコードとして解釈されない！
+```
+
+**重要なポイント:**
+
+プリペアドステートメントでは、クエリとデータが異なるプロトコルで別々に送信される
+
+```
+通常の危険なSQL:
+┌──────────────────────────────────────┐
+│ SELECT * FROM users                  │
+│ WHERE username = '太郎' OR '1'='1'   │
+│ ↑ すべてがSQLコードとして解釈される  │
+└──────────────────────────────────────┘
+
+プリペアドステートメント:
+┌──────────────────────────────┐
+│ SQLテンプレート（コード）     │
+│ SELECT * FROM users          │
+│ WHERE username = ?           │
+└──────────────────────────────┘
+        ↓（別チャネル）
+┌──────────────────────────────┐
+│ パラメータ（データ）          │
+│ "太郎' OR '1'='1"            │
+│ ↑ 文字列として扱われる       │
+└──────────────────────────────┘
+```
+
+---
+
+### 対策2: Django ORM の自動保護
+
+**Django ORM = 自動的にプリペアドステートメントを使う！**
+
+DjangoのQuerySetは、クエリパラメータ化を使用して構築されるため、SQLインジェクションから保護されています
+
+#### 安全な例（Django ORM）
+
+```python
+# ✅ 安全！Django ORM を使用
+from users.models import User
+
+def search_user(request):
+    username = request.GET['username']
+    
+    # ORM が自動的にパラメータ化
+    users = User.objects.filter(username=username)
+```
+
+**内部で実行されるSQL:**
+```sql
+-- Django が自動生成
+SELECT * FROM users WHERE username = %s
+
+-- パラメータは別途送信
+パラメータ: ['太郎']
+```
+
+**攻撃者が入力しても:**
+```python
+username = "太郎' OR '1'='1"
+users = User.objects.filter(username=username)
+
+# 内部的には:
+# SELECT * FROM users WHERE username = %s
+# パラメータ: ["太郎' OR '1'='1"]
+# → 文字列として扱われるので安全！
+```
+
+**結果:**
+- `username` が完全一致する `"太郎' OR '1'='1"` というユーザーを検索
+- そんなユーザーはいないので結果は空
+- **攻撃失敗！**
+
+---
+
+### 危険なパターン: 生SQL（Raw SQL）
+
+**どうしても生SQLが必要な場合もある**
+
+例: 複雑な集計、ORMで表現できないクエリ
+
+#### ❌ 危険な生SQL
+
+```python
+# 絶対にやってはいけない！
+def search_user(request):
+    username = request.GET['username']
+    
+    # 文字列結合で SQL を構築
+    query = f"SELECT * FROM users WHERE username = '{username}'"
+    
+    from django.db import connection
+    cursor = connection.cursor()
+    cursor.execute(query)  # ← SQLインジェクション脆弱性！
+```
+
+#### ✅ 安全な生SQL
+
+```python
+# パラメータ化を使う
+def search_user(request):
+    username = request.GET['username']
+    
+    from django.db import connection
+    cursor = connection.cursor()
+    
+    # %s がプレースホルダー（PostgreSQL の場合）
+    cursor.execute(
+        "SELECT * FROM users WHERE username = %s",
+        [username]  # パラメータは別途渡す
+    )
+```
+
+**重要:**
+- SQL文とパラメータを**別々の引数**で渡す
+- プレースホルダーは `%s`（データベースにより異なる）
+- **絶対に f-string や + で結合しない！**
+
+**📚 参考**: Django ORMレイヤー内では、クエリパラメータ化を使用してSQLインジェクションから保護されている
+
+---
+
+### Django で注意すべき危険なAPI
+
+Django ORMはどこでもパラメータ化されたステートメントを使用するため、ほとんどのSQLインジェクション脆弱性を防いでいますが、一部のAPIでは生SQLクエリの実行が可能
+
+#### 1. `raw()` メソッド
+
+```python
+# ❌ 危険
+search = request.GET['search']
+User.objects.raw(f"SELECT * FROM users WHERE username = '{search}'")
+
+# ✅ 安全
+User.objects.raw(
+    "SELECT * FROM users WHERE username = %s",
+    [search]
+)
+```
+
+#### 2. `extra()` メソッド（非推奨）
+
+Djangoドキュメントによると、extra()は古いAPIで非推奨です。
+
+```python
+# ❌ 危険
+search = request.GET['search']
+User.objects.extra(
+    where=[f"username = '{search}'"]
+)
+
+# ✅ 安全
+User.objects.extra(
+    where=["username = %s"],
+    params=[search]
+)
+
+# 🎯 もっと良い方法: ORM を使う
+User.objects.filter(username=search)
+```
+
+#### 3. `RawSQL()` 式
+
+```python
+from django.db.models.expressions import RawSQL
+
+# ❌ 危険
+search = request.GET['search']
+User.objects.annotate(
+    custom=RawSQL(f"username = '{search}'", [])
+)
+
+# ✅ 安全
+User.objects.annotate(
+    custom=RawSQL("username = %s", [search])
+)
+```
+
+---
+
+### なぜ文字列結合が危険なのか
+
+**問題の本質:**
+
+```python
+# 危険なコード
+username = "太郎' OR '1'='1"
+query = f"SELECT * FROM users WHERE username = '{username}'"
+
+# 結果:
+# SELECT * FROM users WHERE username = '太郎' OR '1'='1'
+#                                       ↑ SQLとして解釈される
+```
+
+**SQLとして実行されてしまう理由:**
+
+1. **引用符の閉じ**: `'太郎'` で文字列が終了
+2. **OR条件の追加**: `OR '1'='1'` が新しいSQL条件として追加
+3. **データベースはこれを正当なSQLと判断**
+
+**図解:**
+
+```
+意図したSQL:
+┌──────────────────────────────────┐
+│ WHERE username = '太郎'          │
+│               ↑ データ部分       │
+└──────────────────────────────────┘
+
+攻撃後:
+┌──────────────────────────────────┐
+│ WHERE username = '太郎'          │
+│                    ↑ 文字列終了  │
+└──────────────────────────────────┘
+                 OR '1'='1'
+                 ↑ 新しいSQL条件！
+```
+
+---
+
+### プリペアドステートメントが安全な理由
+
+プリペアドステートメントでは、ユーザー提供データは常にシンプルな文字列として解釈され、元のクエリのロジックを変更できない
+
+**内部処理の違い:**
+
+**通常の文字列結合:**
+```python
+query = f"SELECT * FROM users WHERE username = '{username}'"
+# ↓
+# データベースはすべてを「SQL文」として解釈
+```
+
+**プリペアドステートメント:**
+```python
+cursor.execute(
+    "SELECT * FROM users WHERE username = %s",
+    [username]
+)
+# ↓
+# ① "SELECT * FROM users WHERE username = %s" → SQL文として解析
+# ② username の内容 → 「データ」として扱う
+# → どんな文字列でも SQL として実行されない！
+```
+
+**エスケープ処理も自動:**
+
+```
+入力: 太郎' OR '1'='1
+
+プリペアドステートメント内部:
+↓ エスケープ処理
+"太郎'' OR ''1''=''1"  （シングルクォートを2つにする）
+↓ 結果
+WHERE username = '太郎'' OR ''1''=''1'
+                  ↑ ただの文字列データとして扱われる
+```
+
+---
+
+### 実践: 安全なコードと危険なコードの比較
+
+#### ログイン機能
+
+**❌ 脆弱なコード:**
+
+```python
+def login_view(request):
+    employee_id = request.POST['employee_id']
+    password = request.POST['password']
+    
+    # 超危険！
+    query = f"""
+        SELECT * FROM users 
+        WHERE employee_id = '{employee_id}' 
+        AND password = '{password}'
+    """
+    
+    cursor = connection.cursor()
+    cursor.execute(query)
+    user = cursor.fetchone()
+    
+    if user:
+        # ログイン成功
+        return redirect('home')
+```
+
+**攻撃例:**
+```
+employee_id = "9999"
+password = "' OR '1'='1"
+
+実行されるSQL:
+SELECT * FROM users 
+WHERE employee_id = '9999' 
+AND password = '' OR '1'='1'
+
+↑ OR '1'='1' で常に真になる
+→ パスワード不要でログイン成功！
+```
+
+**✅ 安全なコード（Django ORM）:**
+
+```python
+from django.contrib.auth import authenticate, login
+
+def login_view(request):
+    employee_id = request.POST['employee_id']
+    password = request.POST['password']
+    
+    # Django の認証システムを使う（内部で ORM 使用）
+    user = authenticate(
+        request,
+        username=employee_id,
+        password=password
+    )
+    
+    if user:
+        login(request, user)
+        return redirect('home')
+    else:
+        return render(request, 'login.html', {
+            'error': '認証に失敗しました'
+        })
+```
+
+**内部で実行されるSQL（自動生成）:**
+```sql
+SELECT * FROM users 
+WHERE employee_id = %s 
+LIMIT 1
+
+パラメータ: ['9999']
+```
+
+---
+
+### 防御の多層化（Defense in Depth）
+
+**SQLインジェクション対策だけでは不十分！**
+
+適切なプリペアドステートメントの使用が主要な防御だが、複雑で動的なSQL文では、パラメータ化できない部分に注意が必要
+
+#### レイヤー1: 入力バリデーション
+
+```python
+# フロントエンド + バックエンドでバリデーション
+from django import forms
+
+class LoginForm(forms.Form):
+    employee_id = forms.CharField(
+        max_length=50,
+        validators=[
+            # 半角数字のみ許可
+            RegexValidator(r'^\d+
+
+### なぜログを見るのか？
+
+**問題**: 画面が遅い！でも原因がわからない...
+
+**ログを見れば:**
+- ✅ どのSQLが遅いか特定できる
+- ✅ 無駄なクエリを発見できる（N+1問題など）
+- ✅ データベースへのアクセス回数がわかる
+
+**例え話:**
+```
+料理を作る時、レシピを見ずに作ると時間がかかりますよね。
+ログは「この工程に30分かかってる！」と教えてくれる調理記録です。
+```
+
+---
+
+### ログの見方（実例で解説）
+
+#### 1. 基本情報の読み方
+
+```
+http://localhost:8000/api/users/?page=1&page_size=10
+|------|-----------|----------|----------|----------|------------|
+| Type | Database  |   Reads  |  Writes  |  Totals  | Duplicates |
+|------|-----------|----------|----------|----------|------------|
+| RESP |  default  |    4     |    0     |    4     |     0      |
+|------|-----------|----------|----------|----------|------------|
+Total queries: 4 in 0.2164s
+```
+
+**各項目の意味:**
+
+| 項目 | 意味 | 良い/悪い |
+|------|------|----------|
+| **Reads** | SELECT（読み取り）の回数 | 少ないほど良い |
+| **Writes** | INSERT/UPDATE/DELETE の回数 | 操作内容による |
+| **Totals** | 合計クエリ数 | 少ないほど良い |
+| **Duplicates** | 同じクエリの重複実行 | **0が理想！** |
+| **Total time** | 合計実行時間 | 速いほど良い |
+
+**この例の評価:**
+- ✅ 4クエリで0.2秒 → **正常**
+- ✅ Duplicates が 0 → **重複なし、良い！**
+
+---
+
+#### 2. ログイン処理の実例
+
+```
+POST /api/auth/login/
+Total queries: 7 in 0.1966s
+
+① SELECT ... FROM "users" WHERE "employee_id" = '9999'
+   → ユーザーを社員番号で検索
+
+② SELECT 1 FROM "django_session" WHERE "session_key" = '...'
+   → セッションが存在するかチェック
+
+③ INSERT INTO "django_session" (...)
+   → 新しいセッションを作成
+
+④ SELECT ... FROM "users" WHERE "id" = #number#
+   → ユーザー情報を再取得
+
+⑤ UPDATE "users" SET "last_login" = '...'
+   → 最終ログイン日時を更新
+```
+
+**ポイント:**
+- ログイン1回で7クエリ → 実は普通！
+- セッション作成には複数の処理が必要
+
+---
+
+#### 3. 【重要】Duplicates（重複クエリ）を見つける
+
+**悪い例:**
+
+```
+PUT /api/users/1/
+Total queries: 9 in 0.1296s
+Duplicates: 2  ← ⚠️ 2回重複している！
+
+Executed 2 time(s).  ← ここに注目！
+SELECT ... FROM "users" WHERE "id" = #number#
+```
+
+**何が起きている？**
+
+同じユーザー情報を2回取得している = 無駄！
+
+```python
+# 原因の例（コード内で）
+user = User.objects.get(id=1)  # 1回目
+# ... 処理 ...
+user = User.objects.get(id=1)  # 2回目（同じクエリ！）
+```
+
+**修正方法:**
+```python
+# 一度取得したら変数に保存
+user = User.objects.get(id=1)
+# 以降は user 変数を使う
+```
+
+---
+
+#### 4. N+1問題の発見
+
+**N+1問題とは？**
+
+「1回で取れるデータを、N回に分けて取得してしまう」問題
+
+**悪い例:**
+
+```python
+# ユーザー一覧を取得（1回目のクエリ）
+users = User.objects.all()  # 10人
+
+# 各ユーザーの部署を取得（10回のクエリ！）
+for user in users:
+    print(user.department.name)  # 毎回SQLが発行される
+```
+
+**ログに出ると:**
+```
+Total queries: 11 in 1.5s
+Duplicates: 0
+
+SELECT * FROM users         ← 1回
+SELECT * FROM departments WHERE id = 1  ← ユーザー1の部署
+SELECT * FROM departments WHERE id = 2  ← ユーザー2の部署
+...（10回繰り返し）
+```
+
+**修正方法:**
+```python
+# select_related で一度に取得（JOIN）
+users = User.objects.select_related('department').all()
+
+# これで1回のクエリで済む！
+for user in users:
+    print(user.department.name)  # SQLは発行されない
+```
+
+**ログが改善:**
+```
+Total queries: 1 in 0.1s  ← 11回 → 1回に削減！
+```
+
+---
+
+#### 5. セッション認証の動きを追う
+
+**実例: ユーザー一覧取得**
+
+```
+GET /api/users/?page=1&page_size=10
+Total queries: 4
+
+① SELECT ... FROM "django_session" 
+   WHERE "session_key" = 'i27k7ailip...'
+   → Cookie から送られたセッションIDでセッションを取得
+
+② SELECT ... FROM "users" WHERE "id" = #number#
+   → セッションに保存されているユーザーIDからユーザー情報を取得
+   → これで「ログインしているか」を確認
+
+③ SELECT COUNT(*) FROM "users"
+   → 全ユーザー数をカウント（ページネーション用）
+
+④ SELECT * FROM "users" ORDER BY "id" LIMIT 10
+   → 実際のユーザーデータを10件取得
+```
+
+**わかること:**
+- すべてのAPIリクエストで①②が実行される（認証チェック）
+- だから「認証が必要なページ」は最低2クエリ発生
+
+---
+
+#### 6. 論理削除の動きを確認
+
+```
+SELECT ... FROM "users" WHERE "users"."deleted_at" IS NULL
+```
+
+**ポイント:**
+- 常に `deleted_at IS NULL` の条件が付く
+- これがカスタムマネージャー（`objects`）の効果
+
+```python
+# models.py のマネージャー設定により自動追加
+class CustomUserManager(BaseUserManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
+```
+
+---
+
+### パフォーマンスの基準
+
+**目標値（社内Webアプリの場合）:**
+
+| 処理 | クエリ数 | 実行時間 | 評価 |
+|------|---------|---------|------|
+| **一覧取得** | 3〜5回 | 0.1〜0.3秒 | 正常 |
+| **詳細取得** | 2〜3回 | 0.05〜0.15秒 | 正常 |
+| **作成/更新** | 5〜10回 | 0.1〜0.3秒 | 正常 |
+| **削除** | 3〜5回 | 0.05〜0.15秒 | 正常 |
+
+**要改善のサイン:**
+- ❌ 1つの処理で20クエリ以上
+- ❌ 実行時間が1秒以上
+- ❌ Duplicates が多数
+- ❌ 同じSQLが何度も実行されている
+
+---
+
+### よくある問題と対策
+
+#### 問題1: クエリが多すぎる
+
+**症状:**
+```
+Total queries: 25 in 2.5s
+```
+
+**原因:**
+- N+1問題
+- 不要なデータまで取得
+
+**対策:**
+```python
+# ❌ 悪い
+users = User.objects.all()
+for user in users:
+    print(user.department.name)  # N+1問題
+
+# ✅ 良い
+users = User.objects.select_related('department').all()
+```
+
+---
+
+#### 問題2: 同じクエリの重複
+
+**症状:**
+```
+Duplicates: 5
+Executed 5 time(s).
+SELECT ... FROM "users" WHERE "id" = 1
+```
+
+**原因:**
+- 同じデータを何度も取得している
+
+**対策:**
+```python
+# ❌ 悪い
+def process():
+    user = User.objects.get(id=1)  # 1回目
+    # ...
+    user = User.objects.get(id=1)  # 2回目（無駄！）
+
+# ✅ 良い
+def process():
+    user = User.objects.get(id=1)  # 1回だけ
+    # user 変数を使い回す
+```
+
+---
+
+#### 問題3: 認証チェックが重い
+
+**症状:**
+```
+毎回 django_session テーブルを SELECT している
+```
+
+**対策:**
+
+キャッシュを使う（Redis など）
+
+```python
+# settings.py
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+    }
+}
+```
+
+→ データベースではなくメモリから取得（高速化）
+
+---
+
+### デバッグツールの設定方法
+
+**django-debug-toolbar（開発環境のみ）**
+
+```bash
+pip install django-debug-toolbar
+```
+
+```python
+# settings.py
+INSTALLED_APPS = [
+    # ...
+    'debug_toolbar',
+]
+
+MIDDLEWARE = [
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
+    # ...
+]
+
+INTERNAL_IPS = [
+    '127.0.0.1',
+]
+```
+
+```python
+# urls.py
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns += [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ]
+```
+
+**SQLログの有効化**
+
+```python
+# settings.py
+LOGGING = {
+    'version': 1,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'DEBUG',  # SQLを出力
+        },
+    },
+}
+```
+
+---
+
+### 実践: ログから問題を見つける演習
+
+**このログを見て何がわかる？**
+
+```
+POST /api/auth/login/
+Total queries: 7 in 0.1966s
+Duplicates: 0
+
+① SELECT ... WHERE "employee_id" = '9999'  (0.02s)
+② SELECT ... session_key = '...'           (0.01s)
+③ INSERT INTO "django_session" ...         (0.05s)
+④ SELECT ... WHERE "id" = #number#         (0.02s)
+⑤ UPDATE "users" SET "last_login" ...      (0.03s)
+```
+
+**評価:**
+- ✅ 7クエリは標準的（ログイン処理として正常）
+- ✅ 0.2秒は高速
+- ✅ Duplicates なし
+- ✅ 各クエリの処理時間も均等
+
+**結論:** 問題なし！
+
+---
+
+**もう1つ:**
+
+```
+GET /api/users/?page=1&page_size=10
+Total queries: 15 in 1.2s
+Duplicates: 10
+
+Executed 10 time(s).
+SELECT ... FROM "departments" WHERE "id" = ?
+```
+
+**評価:**
+- ❌ 15クエリは多い（目標: 3〜5）
+- ❌ 同じクエリが10回実行（N+1問題！）
+- ❌ 1.2秒は遅い
+
+**原因:**
+```python
+# users/serializers.py
+class UserSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(
+        source='department.name'  # これが N+1 を引き起こす
+    )
+```
+
+**修正:**
+```python
+# users/views.py
+class UserViewSet(viewsets.ModelViewSet):
+    def get_queryset(self):
+        return User.objects.select_related('department')  # JOIN で一度に取得
+```
+
+---
+
+### まとめ: ログチェックリスト
+
+**リリース前に必ず確認:**
+
+- [ ] Duplicates が 0 か？
+- [ ] クエリ数が目標値内か？
+- [ ] 実行時間が0.5秒以内か？
+- [ ] N+1問題が発生していないか？
+- [ ] 同じSQLが繰り返されていないか？
+
+**よくあるパターン:**
+
+| 症状 | 原因 | 対策 |
+|------|------|------|
+| クエリ数が多い | N+1問題 | `select_related` / `prefetch_related` |
+| 同じクエリが重複 | キャッシュ不足 | 変数に保存 / Redis |
+| 処理が遅い | インデックス不足 | `db_index=True` |
+| セッション取得が遅い | DB保存 | Redis に切り替え |
+
+---
+
+**わからないことがあれば遠慮なく質問してください！**  
+この技術スタックは最初は複雑に感じますが、慣れればとても生産性が高いです 💪, '社員番号は数字のみです')
+        ]
+    )
+    
+    password = forms.CharField(
+        min_length=8,
+        widget=forms.PasswordInput()
+    )
+```
+
+#### レイヤー2: ORM の使用（パラメータ化）
+
+```python
+# Django ORM を優先的に使う
+User.objects.filter(employee_id=employee_id)
+```
+
+#### レイヤー3: 権限制御
+
+```python
+# データベースユーザーに最小限の権限のみ付与
+# settings.py の DATABASES 設定
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'mydb',
+        'USER': 'app_user',  # 読み取り・書き込みのみ
+        # DROP TABLE などの権限は持たせない
+    }
+}
+```
+
+#### レイヤー4: WAF（Web Application Firewall）
+
+- 本番環境では WAF を導入
+- 怪しいリクエストを自動ブロック
+
+---
+
+### チェックリスト: コードレビュー時の確認項目
+
+**生 SQL を使っている箇所を見つけたら:**
+
+- [ ] `cursor.execute()` の第1引数に f-string や + を使っていないか？
+- [ ] `User.objects.raw()` にユーザー入力を直接埋め込んでいないか？
+- [ ] `extra()` を使っていないか？（使ってたら ORM に書き換え検討）
+- [ ] `RawSQL()` にパラメータを正しく渡しているか？
+
+**安全な実装のポイント:**
+
+```python
+# ✅ 良い例
+cursor.execute(
+    "SELECT * FROM users WHERE username = %s AND age > %s",
+    [username, age]
+)
+
+# ✅ 良い例（複数パラメータ）
+User.objects.raw(
+    "SELECT * FROM users WHERE username = %s OR email = %s",
+    [username, email]
+)
+
+# ❌ 悪い例
+cursor.execute(
+    f"SELECT * FROM users WHERE username = '{username}'"
+)
+
+# ❌ 悪い例（+ で結合）
+query = "SELECT * FROM users WHERE username = '" + username + "'"
+cursor.execute(query)
+```
+
+---
+
+### 自動検出ツール
+
+BentoなどのコードAnalysisツールは、一般的なSQLインジェクション問題をチェックできる
+
+**推奨ツール:**
+
+1. **Bandit** (Python セキュリティチェッカー)
+```bash
+pip install bandit
+bandit -r . -f json -o report.json
+```
+
+2. **Semgrep** (パターンマッチング)
+```bash
+pip install semgrep
+semgrep --config=auto
+```
+
+3. **django-security** (Django 特化)
+```bash
+pip install django-security
+python manage.py check --deploy
+```
+
+---
+
+### まとめ
+
+**絶対に守るべきルール:**
+
+1. **ORM を最優先で使う**
+   - Django ORM は自動的にパラメータ化される
+   - 生 SQL は最終手段
+
+2. **生 SQL を使う場合は必ずパラメータ化**
+   ```python
+   # ✅ 正しい
+   cursor.execute("SELECT * FROM users WHERE id = %s", [user_id])
+   
+   # ❌ 間違い
+   cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
+   ```
+
+3. **文字列結合・f-string は厳禁**
+   - `+` で SQL を作らない
+   - f-string で SQL を作らない
+   - `.format()` で SQL を作らない
+
+4. **入力バリデーションは必須**
+   - でもバリデーションだけでは不十分
+   - パラメータ化と組み合わせる
+
+**安全性の優先順位:**
+
+```
+最も安全 ← Django ORM
+       ← プリペアドステートメント（パラメータ化）
+       ← ストアドプロシージャ（安全に実装した場合）
+       ← 入力バリデーション + エスケープ
+最も危険 ← 文字列結合
+```
+
+**📚 参考資料:**
+- [Django セキュリティ公式ドキュメント](https://docs.djangoproject.com/ja/stable/topics/security/)
+- [OWASP SQL Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html)
+- [Bobby Tables（各言語のサンプル集）](https://bobby-tables.com/)
+
+---
+
+## デバッグツールの読み方
+
+### なぜログを見るのか？
+
+**問題**: 画面が遅い！でも原因がわからない...
+
+**ログを見れば:**
+- ✅ どのSQLが遅いか特定できる
+- ✅ 無駄なクエリを発見できる（N+1問題など）
+- ✅ データベースへのアクセス回数がわかる
+
+**例え話:**
+```
+料理を作る時、レシピを見ずに作ると時間がかかりますよね。
+ログは「この工程に30分かかってる！」と教えてくれる調理記録です。
+```
+
+---
+
+### ログの見方（実例で解説）
+
+#### 1. 基本情報の読み方
+
+```
+http://localhost:8000/api/users/?page=1&page_size=10
+|------|-----------|----------|----------|----------|------------|
+| Type | Database  |   Reads  |  Writes  |  Totals  | Duplicates |
+|------|-----------|----------|----------|----------|------------|
+| RESP |  default  |    4     |    0     |    4     |     0      |
+|------|-----------|----------|----------|----------|------------|
+Total queries: 4 in 0.2164s
+```
+
+**各項目の意味:**
+
+| 項目 | 意味 | 良い/悪い |
+|------|------|----------|
+| **Reads** | SELECT（読み取り）の回数 | 少ないほど良い |
+| **Writes** | INSERT/UPDATE/DELETE の回数 | 操作内容による |
+| **Totals** | 合計クエリ数 | 少ないほど良い |
+| **Duplicates** | 同じクエリの重複実行 | **0が理想！** |
+| **Total time** | 合計実行時間 | 速いほど良い |
+
+**この例の評価:**
+- ✅ 4クエリで0.2秒 → **正常**
+- ✅ Duplicates が 0 → **重複なし、良い！**
+
+---
+
+#### 2. ログイン処理の実例
+
+```
+POST /api/auth/login/
+Total queries: 7 in 0.1966s
+
+① SELECT ... FROM "users" WHERE "employee_id" = '9999'
+   → ユーザーを社員番号で検索
+
+② SELECT 1 FROM "django_session" WHERE "session_key" = '...'
+   → セッションが存在するかチェック
+
+③ INSERT INTO "django_session" (...)
+   → 新しいセッションを作成
+
+④ SELECT ... FROM "users" WHERE "id" = #number#
+   → ユーザー情報を再取得
+
+⑤ UPDATE "users" SET "last_login" = '...'
+   → 最終ログイン日時を更新
+```
+
+**ポイント:**
+- ログイン1回で7クエリ → 実は普通！
+- セッション作成には複数の処理が必要
+
+---
+
+#### 3. 【重要】Duplicates（重複クエリ）を見つける
+
+**悪い例:**
+
+```
+PUT /api/users/1/
+Total queries: 9 in 0.1296s
+Duplicates: 2  ← ⚠️ 2回重複している！
+
+Executed 2 time(s).  ← ここに注目！
+SELECT ... FROM "users" WHERE "id" = #number#
+```
+
+**何が起きている？**
+
+同じユーザー情報を2回取得している = 無駄！
+
+```python
+# 原因の例（コード内で）
+user = User.objects.get(id=1)  # 1回目
+# ... 処理 ...
+user = User.objects.get(id=1)  # 2回目（同じクエリ！）
+```
+
+**修正方法:**
+```python
+# 一度取得したら変数に保存
+user = User.objects.get(id=1)
+# 以降は user 変数を使う
+```
+
+---
+
+#### 4. N+1問題の発見
+
+**N+1問題とは？**
+
+「1回で取れるデータを、N回に分けて取得してしまう」問題
+
+**悪い例:**
+
+```python
+# ユーザー一覧を取得（1回目のクエリ）
+users = User.objects.all()  # 10人
+
+# 各ユーザーの部署を取得（10回のクエリ！）
+for user in users:
+    print(user.department.name)  # 毎回SQLが発行される
+```
+
+**ログに出ると:**
+```
+Total queries: 11 in 1.5s
+Duplicates: 0
+
+SELECT * FROM users         ← 1回
+SELECT * FROM departments WHERE id = 1  ← ユーザー1の部署
+SELECT * FROM departments WHERE id = 2  ← ユーザー2の部署
+...（10回繰り返し）
+```
+
+**修正方法:**
+```python
+# select_related で一度に取得（JOIN）
+users = User.objects.select_related('department').all()
+
+# これで1回のクエリで済む！
+for user in users:
+    print(user.department.name)  # SQLは発行されない
+```
+
+**ログが改善:**
+```
+Total queries: 1 in 0.1s  ← 11回 → 1回に削減！
+```
+
+---
+
+#### 5. セッション認証の動きを追う
+
+**実例: ユーザー一覧取得**
+
+```
+GET /api/users/?page=1&page_size=10
+Total queries: 4
+
+① SELECT ... FROM "django_session" 
+   WHERE "session_key" = 'i27k7ailip...'
+   → Cookie から送られたセッションIDでセッションを取得
+
+② SELECT ... FROM "users" WHERE "id" = #number#
+   → セッションに保存されているユーザーIDからユーザー情報を取得
+   → これで「ログインしているか」を確認
+
+③ SELECT COUNT(*) FROM "users"
+   → 全ユーザー数をカウント（ページネーション用）
+
+④ SELECT * FROM "users" ORDER BY "id" LIMIT 10
+   → 実際のユーザーデータを10件取得
+```
+
+**わかること:**
+- すべてのAPIリクエストで①②が実行される（認証チェック）
+- だから「認証が必要なページ」は最低2クエリ発生
+
+---
+
+#### 6. 論理削除の動きを確認
+
+```
+SELECT ... FROM "users" WHERE "users"."deleted_at" IS NULL
+```
+
+**ポイント:**
+- 常に `deleted_at IS NULL` の条件が付く
+- これがカスタムマネージャー（`objects`）の効果
+
+```python
+# models.py のマネージャー設定により自動追加
+class CustomUserManager(BaseUserManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
+```
+
+---
+
+### パフォーマンスの基準
+
+**目標値（社内Webアプリの場合）:**
+
+| 処理 | クエリ数 | 実行時間 | 評価 |
+|------|---------|---------|------|
+| **一覧取得** | 3〜5回 | 0.1〜0.3秒 | 正常 |
+| **詳細取得** | 2〜3回 | 0.05〜0.15秒 | 正常 |
+| **作成/更新** | 5〜10回 | 0.1〜0.3秒 | 正常 |
+| **削除** | 3〜5回 | 0.05〜0.15秒 | 正常 |
+
+**要改善のサイン:**
+- ❌ 1つの処理で20クエリ以上
+- ❌ 実行時間が1秒以上
+- ❌ Duplicates が多数
+- ❌ 同じSQLが何度も実行されている
+
+---
+
+### よくある問題と対策
+
+#### 問題1: クエリが多すぎる
+
+**症状:**
+```
+Total queries: 25 in 2.5s
+```
+
+**原因:**
+- N+1問題
+- 不要なデータまで取得
+
+**対策:**
+```python
+# ❌ 悪い
+users = User.objects.all()
+for user in users:
+    print(user.department.name)  # N+1問題
+
+# ✅ 良い
+users = User.objects.select_related('department').all()
+```
+
+---
+
+#### 問題2: 同じクエリの重複
+
+**症状:**
+```
+Duplicates: 5
+Executed 5 time(s).
+SELECT ... FROM "users" WHERE "id" = 1
+```
+
+**原因:**
+- 同じデータを何度も取得している
+
+**対策:**
+```python
+# ❌ 悪い
+def process():
+    user = User.objects.get(id=1)  # 1回目
+    # ...
+    user = User.objects.get(id=1)  # 2回目（無駄！）
+
+# ✅ 良い
+def process():
+    user = User.objects.get(id=1)  # 1回だけ
+    # user 変数を使い回す
+```
+
+---
+
+#### 問題3: 認証チェックが重い
+
+**症状:**
+```
+毎回 django_session テーブルを SELECT している
+```
+
+**対策:**
+
+キャッシュを使う（Redis など）
+
+```python
+# settings.py
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+    }
+}
+```
+
+→ データベースではなくメモリから取得（高速化）
+
+---
+
+### デバッグツールの設定方法
+
+**django-debug-toolbar（開発環境のみ）**
+
+```bash
+pip install django-debug-toolbar
+```
+
+```python
+# settings.py
+INSTALLED_APPS = [
+    # ...
+    'debug_toolbar',
+]
+
+MIDDLEWARE = [
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
+    # ...
+]
+
+INTERNAL_IPS = [
+    '127.0.0.1',
+]
+```
+
+```python
+# urls.py
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns += [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ]
+```
+
+**SQLログの有効化**
+
+```python
+# settings.py
+LOGGING = {
+    'version': 1,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'DEBUG',  # SQLを出力
+        },
+    },
+}
+```
+
+---
+
+### 実践: ログから問題を見つける演習
+
+**このログを見て何がわかる？**
+
+```
+POST /api/auth/login/
+Total queries: 7 in 0.1966s
+Duplicates: 0
+
+① SELECT ... WHERE "employee_id" = '9999'  (0.02s)
+② SELECT ... session_key = '...'           (0.01s)
+③ INSERT INTO "django_session" ...         (0.05s)
+④ SELECT ... WHERE "id" = #number#         (0.02s)
+⑤ UPDATE "users" SET "last_login" ...      (0.03s)
+```
+
+**評価:**
+- ✅ 7クエリは標準的（ログイン処理として正常）
+- ✅ 0.2秒は高速
+- ✅ Duplicates なし
+- ✅ 各クエリの処理時間も均等
+
+**結論:** 問題なし！
+
+---
+
+**もう1つ:**
+
+```
+GET /api/users/?page=1&page_size=10
+Total queries: 15 in 1.2s
+Duplicates: 10
+
+Executed 10 time(s).
+SELECT ... FROM "departments" WHERE "id" = ?
+```
+
+**評価:**
+- ❌ 15クエリは多い（目標: 3〜5）
+- ❌ 同じクエリが10回実行（N+1問題！）
+- ❌ 1.2秒は遅い
+
+**原因:**
+```python
+# users/serializers.py
+class UserSerializer(serializers.ModelSerializer):
+    department_name = serializers.CharField(
+        source='department.name'  # これが N+1 を引き起こす
+    )
+```
+
+**修正:**
+```python
+# users/views.py
+class UserViewSet(viewsets.ModelViewSet):
+    def get_queryset(self):
+        return User.objects.select_related('department')  # JOIN で一度に取得
+```
+
+---
+
+### まとめ: ログチェックリスト
+
+**リリース前に必ず確認:**
+
+- [ ] Duplicates が 0 か？
+- [ ] クエリ数が目標値内か？
+- [ ] 実行時間が0.5秒以内か？
+- [ ] N+1問題が発生していないか？
+- [ ] 同じSQLが繰り返されていないか？
+
+**よくあるパターン:**
+
+| 症状 | 原因 | 対策 |
+|------|------|------|
+| クエリ数が多い | N+1問題 | `select_related` / `prefetch_related` |
+| 同じクエリが重複 | キャッシュ不足 | 変数に保存 / Redis |
+| 処理が遅い | インデックス不足 | `db_index=True` |
+| セッション取得が遅い | DB保存 | Redis に切り替え |
+
+---
+
+**わからないことがあれば遠慮なく質問してください！**  
+この技術スタックは最初は複雑に感じますが、慣れればとても生産性が高いです 💪

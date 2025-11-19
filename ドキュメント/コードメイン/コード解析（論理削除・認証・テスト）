@@ -1,0 +1,1469 @@
+# コード解析ガイド（論理削除・認証・テスト）
+
+> **対象者**: 実際のコードを読んで理解を深めたい方  
+> **アプローチ**: コードの見方と業界標準の実装パターン
+
+---
+
+## 📖 目次
+
+1. [論理削除パターン](#論理削除パターン)
+2. [Model の見方](#model-の見方)
+3. [Serializer の見方](#serializer-の見方)
+4. [ViewSet vs APIView の使い分け](#viewset-vs-apiview-の使い分け)
+5. [Service クラスの見方](#service-クラスの見方)
+6. [セッション認証のセキュリティ確認](#セッション認証のセキュリティ確認)
+7. [テストコードの書き方](#テストコードの書き方)
+
+---
+
+## 論理削除パターン
+
+### 🎯 論理削除とは？
+
+ソフトデリーションは、データベースから実際にレコードを削除するのではなく、単純に「削除済み」としてマークする強力なソフトウェアパターンで、データ保存と復元、履歴追跡、障害からの高速復旧などのメリットがある
+
+```
+【物理削除（Hard Delete）】
+DELETE FROM users WHERE id = 1
+→ データが完全に消える（復旧不可能）
+
+【論理削除（Soft Delete）】
+UPDATE users SET deleted_at = NOW() WHERE id = 1
+→ データは残る（復旧可能）
+```
+
+**業界標準のパターン:**
+
+| パターン | 実装方法 | メリット | デメリット |
+|---------|---------|---------|----------|
+| **deleted_at** | タイムスタンプ | 削除日時がわかる | クエリに条件追加が必要 |
+| **is_deleted** | ブールフラグ | シンプル | 削除日時が不明 |
+| **両方** | deleted_at + is_deleted | 高速なクエリ | フィールド数が増える |
+
+このシステムでは **deleted_at のみ** を採用
+
+### 📊 あなたのコードの実装
+
+**models.py の設計:**
+
+```python
+class User(AbstractBaseUser, PermissionsMixin):
+    # 削除日時フィールド
+    deleted_at = models.DateTimeField(
+        "削除日時", 
+        blank=True, 
+        null=True  # NULL = アクティブ、値あり = 削除済み
+    )
+    
+    # 条件付きユニーク制約
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee_id"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_active_employee_id",
+            )
+        ]
+```
+
+**図解:**
+
+```
+【データベースの状態】
+
+┌────┬─────────┬─────────┬────────────┐
+│ id │employee│username │ deleted_at │ 状態
+├────┼─────────┼─────────┼────────────┤
+│ 1  │ 9999   │ 管理者  │ NULL       │ アクティブ
+│ 2  │ 1234   │ 太郎    │ NULL       │ アクティブ
+│ 3  │ 5678   │ 花子    │ 2025-11-18 │ 削除済み ←
+└────┴─────────┴─────────┴────────────┘
+
+【条件付きユニーク制約の動作】
+
+employee_id = "1234" かつ deleted_at IS NULL
+→ 一意制約が働く（重複不可）
+
+employee_id = "1234" かつ deleted_at IS NOT NULL
+→ 一意制約の対象外（重複可能）
+
+→ 退職した社員の番号を新入社員に再利用できる！
+```
+
+### 🔧 カスタムマネージャー
+
+Djangoでは、`deleted_at`フィールドを追加し、カスタムマネージャーでクエリセットをフィルタリングすることで、論理削除を実装できる
+
+```python
+class CustomUserManager(BaseUserManager):
+    """論理削除対応マネージャー(削除済み除外)"""
+    
+    def get_queryset(self):
+        # 常に deleted_at IS NULL の条件を追加
+        return super().get_queryset().filter(deleted_at__isnull=True)
+
+class AllObjectsManager(BaseUserManager):
+    """全レコード取得マネージャー(削除済み含む)"""
+    
+    def get_queryset(self):
+        # 条件なし（すべて取得）
+        return super().get_queryset()
+```
+
+**使い分け:**
+
+```python
+# 通常の操作（削除済み除外）
+User.objects.all()
+→ SELECT * FROM users WHERE deleted_at IS NULL
+
+# 削除済みも含める
+User.all_objects.all()
+→ SELECT * FROM users
+
+# 削除済みのみ
+User.all_objects.filter(deleted_at__isnull=False)
+→ SELECT * FROM users WHERE deleted_at IS NOT NULL
+```
+
+### ⚠️ 重要な注意点
+
+カスタムマネージャーをオーバーライドする際は、QuerySetレベルで一括削除の動作を正しく実装しないと、モデルのdelete()メソッドがバイパスされる場合がある
+
+```python
+# ❌ 危険: 一括削除でモデルのdelete()がバイパスされる
+User.objects.filter(is_admin=False).delete()
+→ デフォルトでは物理削除される！
+
+# ✅ 安全: カスタムQuerySetで対応
+class SoftDeleteQuerySet(models.QuerySet):
+    def delete(self):
+        # 一括更新に変更
+        return self.update(deleted_at=timezone.now())
+    
+    def hard_delete(self):
+        # 物理削除用のメソッドを別途用意
+        return super().delete()
+```
+
+**あなたのコードでの対応:**
+
+```python
+def soft_delete(self):
+    """論理削除(1回のSQLで完結)"""
+    self.deleted_at = timezone.now()
+    self.is_active = False
+    self.save(update_fields=["deleted_at", "is_active"])
+```
+
+→ **個別削除のみ対応**（一括削除は ViewSet で制御）
+
+---
+
+## Model の見方
+
+### 🎯 Model の役割
+
+**データベーステーブルの設計図**
+
+### 📊 フィールドの読み方
+
+```python
+employee_id = models.CharField(
+    "社員番号",           # 管理画面での表示名
+    max_length=50,       # 最大文字数
+    unique=False,        # ユニーク制約なし（条件付き制約を使用）
+    db_index=True,       # インデックス作成（検索高速化）
+)
+```
+
+**重要なフィールドオプション:**
+
+| オプション | 意味 | 使いどころ |
+|-----------|------|-----------|
+| `null=True` | データベースでNULL許可 | 削除日時など |
+| `blank=True` | フォームで空欄許可 | 必須でない項目 |
+| `default=` | デフォルト値 | is_active=True |
+| `db_index=True` | インデックス作成 | 検索が多いフィールド |
+| `unique=True` | 一意制約 | 社員番号など |
+
+### 🔗 Meta クラスの読み方
+
+```python
+class Meta:
+    db_table = "users"  # テーブル名を明示
+    ordering = ["-created_at"]  # デフォルトの並び順
+    
+    # 条件付きユニーク制約
+    constraints = [
+        models.UniqueConstraint(
+            fields=["employee_id"],
+            condition=models.Q(deleted_at__isnull=True),
+            name="unique_active_employee_id",
+        )
+    ]
+    
+    # インデックス設計
+    indexes = [
+        models.Index(fields=["employee_id"]),
+        models.Index(fields=["is_active"]),
+        models.Index(fields=["deleted_at"]),
+        # 複合インデックス（管理者カウントクエリ用）
+        models.Index(
+            fields=["deleted_at", "is_admin", "is_active"],
+            name="users_admin_count_idx",
+        ),
+    ]
+```
+
+**インデックス設計の考え方:**
+
+```
+【単一カラムインデックス】
+WHERE employee_id = '9999'
+→ Index(fields=["employee_id"])
+
+【複合インデックス】
+WHERE deleted_at IS NULL 
+  AND is_admin = TRUE 
+  AND is_active = TRUE
+→ Index(fields=["deleted_at", "is_admin", "is_active"])
+
+【重要】
+・最も選択性の高いカラムを先頭に
+・WHERE句での使用頻度が高い組み合わせ
+```
+
+### 🎨 メソッドの読み方
+
+```python
+def soft_delete(self):
+    """論理削除(1回のSQLで完結)"""
+    self.deleted_at = timezone.now()
+    self.is_active = False
+    # update_fields で更新フィールドを明示
+    self.save(update_fields=["deleted_at", "is_active"])
+```
+
+**update_fields の効果:**
+
+```sql
+# update_fields なし
+UPDATE users SET 
+    employee_id = '9999',
+    username = '管理者',
+    email = 'admin@example.com',
+    is_admin = true,
+    is_active = false,  ← ここだけ変えたいのに
+    deleted_at = '2025-11-18 10:00:00',
+    updated_at = '2025-11-18 10:00:00'
+WHERE id = 1;
+
+# update_fields あり
+UPDATE users SET 
+    is_active = false,
+    deleted_at = '2025-11-18 10:00:00'
+WHERE id = 1;
+→ 必要最小限のフィールドのみ更新（高速＆安全）
+```
+
+---
+
+## Serializer の見方
+
+### 🎯 Serializer の役割
+
+**Python オブジェクト ⇔ JSON の変換 + バリデーション**
+
+### 📊 あなたのコードの構造
+
+```python
+class UserSerializer(serializers.ModelSerializer):
+    """ユーザー情報取得用（読み取り専用）"""
+    
+    display_name = serializers.CharField(read_only=True)
+    
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "employee_id",
+            "username",
+            "email",
+            "display_name",
+            "is_admin",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+```
+
+**図解:**
+
+```
+【レスポンス時】
+User オブジェクト
+   ↓ UserSerializer
+{
+  "id": 1,
+  "employee_id": "9999",
+  "username": "管理者",
+  "email": "admin@example.com",
+  "display_name": "管理者",  ← @property から取得
+  "is_admin": true,
+  "is_active": true,
+  "created_at": "2025-11-18T10:00:00Z",
+  "updated_at": "2025-11-18T10:00:00Z"
+}
+```
+
+### 🔍 BaseUserSerializer パターン
+
+```python
+class BaseUserSerializer(serializers.ModelSerializer):
+    """共通バリデーション用ベースシリアライザー"""
+    
+    def validate_employee_id(self, value):
+        """社員番号の正規化（空白削除）"""
+        return value.strip() if value else value
+    
+    def validate_email(self, value):
+        """メールアドレス正規化（小文字変換）"""
+        return value.strip().lower() if value else None
+```
+
+**DRFのバリデーション実行順序:**
+
+DRFのシリアライザは、is_valid()を呼び出すと、フィールドをPythonオブジェクトに変換し、validate_<field_name>を実行し、その後validators属性のバリデータを実行し、最後にvalidate()メソッドを実行する
+
+```
+is_valid() 呼び出し
+   ↓
+① データ型変換（文字列 → 整数など）
+   ↓
+② validate_<field_name>() 実行
+   例: validate_employee_id()
+   ↓
+③ validators=[] の関数を実行
+   例: UniqueValidator
+   ↓
+④ validate() メソッド実行
+   全体のバリデーション
+   ↓
+すべて成功 → validated_data に保存
+1つでも失敗 → ValidationError
+```
+
+### 🎨 作成用と更新用の分離
+
+```python
+class UserCreateSerializer(BaseUserSerializer):
+    """ユーザー作成用"""
+    
+    password = serializers.CharField(
+        write_only=True,      # レスポンスに含めない
+        required=True,        # 必須
+        min_length=8,         # 8文字以上
+        max_length=128,
+    )
+    
+    employee_id = serializers.CharField(
+        required=True,
+        validators=[EMPLOYEE_ID_UNIQUE_VALIDATOR],  # 一意性チェック
+    )
+
+class UserUpdateSerializer(BaseUserSerializer):
+    """ユーザー更新用"""
+    
+    password = serializers.CharField(
+        write_only=True,
+        required=False,       # 任意（変更時のみ）
+        allow_blank=True,     # 空欄許可
+        min_length=8,
+    )
+    
+    def validate_password(self, value):
+        """空白のみは変更なし"""
+        return value.strip() if value and value.strip() else None
+```
+
+**なぜ分ける？**
+
+```
+【作成時】
+・password は必須
+・employee_id の一意性チェック
+・デフォルト値の設定
+
+【更新時】
+・password は任意（変更時のみ）
+・employee_id の一意性チェック（自分以外）
+・既存値の保持
+```
+
+---
+
+## ViewSet vs APIView の使い分け
+
+### 🎯 あなたのコードでの使い分け
+
+```
+【ViewSet を使用】
+users/views.py - UserViewSet
+→ 標準的なCRUD操作
+
+【APIView を使用】
+accounts/views.py - LoginAPIView, LogoutAPIView
+→ カスタムなビジネスロジック
+```
+
+### 📊 実装の違い
+
+**ViewSet（CRUD自動生成）:**
+
+```python
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    
+    # これだけで以下が自動生成:
+    # - list()    GET /api/users/
+    # - create()  POST /api/users/
+    # - retrieve() GET /api/users/1/
+    # - update()  PUT /api/users/1/
+    # - destroy() DELETE /api/users/1/
+```
+
+**APIView（カスタムロジック）:**
+
+```python
+class LoginAPIView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        # カスタムなログイン処理
+        # ・ブルートフォース攻撃対策
+        # ・失敗回数のカウント
+        # ・アカウントロック
+        ...
+```
+
+### 🔍 あなたのコードの詳細分析
+
+**UserViewSet の工夫:**
+
+```python
+def get_queryset(self):
+    """アクションに応じてクエリセットを動的に変更"""
+    
+    if self.action == "retrieve":
+        # 詳細取得時は削除済みも含める
+        return User.all_objects.all()
+    
+    # 一覧取得時は削除済みを除外
+    return super().get_queryset()
+```
+
+**なぜ retrieve で削除済みも取得？**
+
+```
+【シナリオ】
+① ユーザーAがブラウザAでユーザー詳細画面を開く
+② ユーザーBがブラウザBで同じユーザーを削除
+③ ユーザーAがブラウザAで「編集」ボタンを押す
+
+【retrieve で削除済みを除外すると】
+→ 404 Not Found（ユーザーが見つかりません）
+→ ユーザーAは混乱...
+
+【retrieve で削除済みも取得すると】
+→ 200 OK → 削除済みチェック
+→ 明確なエラーメッセージ
+  「このユーザーは削除されています」
+```
+
+**同時操作対策:**
+
+```python
+def update(self, request, *args, **kwargs):
+    # all_objectsで取得（削除済みも含める）
+    try:
+        instance = User.all_objects.get(pk=self.kwargs["pk"])
+    except User.DoesNotExist:
+        raise UserNotFoundError()
+    
+    # 削除済みチェック
+    if instance.deleted_at:
+        raise DeletedUserAccessError()
+    
+    # 更新処理
+    ...
+```
+
+### 🎨 カスタムアクション
+
+```python
+@action(detail=False, methods=["get"], url_path="admin-count")
+def admin_count(self, request):
+    """管理者数取得"""
+    count = User.objects.filter(is_admin=True, is_active=True).count()
+    return Response({"count": count, "can_delete": count > 1})
+```
+
+**Router が自動生成するURL:**
+
+```
+GET /api/users/admin-count/
+```
+
+**detail=False vs detail=True:**
+
+```
+detail=False（コレクション）:
+/api/users/admin-count/
+↑ ユーザー全体に対する操作
+
+detail=True（個別リソース）:
+/api/users/1/set_password/
+↑ 特定のユーザーに対する操作
+```
+
+---
+
+## Service クラスの見方
+
+### 🎯 Service層の役割
+
+**ビジネスロジックをViewから分離**
+
+### 📊 あなたのコードの構造
+
+```python
+class UserService:
+    """ユーザー管理サービス"""
+    
+    @staticmethod
+    def _get_active_admin_count(exclude_user_id=None):
+        """アクティブな管理者数を取得（プライベートメソッド）"""
+        ...
+    
+    @staticmethod
+    def _check_last_admin_for_delete(user_id):
+        """削除時の最後の管理者チェック（プライベートメソッド）"""
+        ...
+    
+    @staticmethod
+    @transaction.atomic
+    def delete_user(user_instance, request_user_id=None):
+        """ユーザー削除（パブリックメソッド）"""
+        ...
+```
+
+**図解:**
+
+```
+【レイヤードアーキテクチャ】
+
+View Layer:
+・HTTP リクエスト/レスポンス
+・権限チェック
+・Serializer の呼び出し
+
+        ↓
+
+Service Layer:  ← ビジネスロジック
+・最後の管理者チェック
+・自己削除防止
+・トランザクション管理
+
+        ↓
+
+Model Layer:
+・データベース操作
+・soft_delete() の実行
+```
+
+### 🔍 トランザクション管理
+
+```python
+@staticmethod
+@transaction.atomic
+def delete_user(user_instance, request_user_id=None):
+    """ユーザー削除（論理削除）"""
+    
+    # ① 自己削除チェック
+    if request_user_id and user_instance.id == request_user_id:
+        raise CannotDeleteSelfError()
+    
+    # ② 最後の管理者チェック
+    if user_instance.is_admin:
+        UserService._check_last_admin_for_delete(user_id=user_instance.id)
+    
+    # ③ 論理削除実行
+    user_instance.soft_delete()
+```
+
+**@transaction.atomic の効果:**
+
+```
+【transaction.atomic なし】
+① 自己削除チェック → OK
+② 最後の管理者チェック → OK
+③ soft_delete() → エラー！
+→ ①②の処理は残る（中途半端な状態）
+
+【transaction.atomic あり】
+① 自己削除チェック → OK
+② 最後の管理者チェック → OK
+③ soft_delete() → エラー！
+→ すべてロールバック（元の状態に戻る）
+```
+
+### 🎨 カスタム例外の活用
+
+```python
+class LastAdminError(UserServiceException):
+    """最後の管理者削除エラー"""
+    
+    def __init__(self, action="delete"):
+        messages = {
+            "delete": "最後の管理者を削除することはできません。",
+            "demote": "最後の管理者から管理者権限を外すことはできません。",
+            "deactivate": "最後の管理者を無効化することはできません。",
+        }
+        message = messages.get(action, messages["delete"])
+        super().__init__(detail=str(message))
+```
+
+**View での使用:**
+
+```python
+try:
+    UserService.delete_user(instance, request_user_id=request.user.id)
+    return Response(status=status.HTTP_204_NO_CONTENT)
+except UserServiceException as e:
+    # カスタム例外を捕捉
+    return Response({"detail": e.detail}, status=e.status_code)
+```
+
+---
+
+## セッション認証のセキュリティ確認
+
+### 🎯 セッション認証の仕組み
+
+**Cookie ベースのセッション管理**
+
+### 📊 デベロッパーツールでの確認方法
+
+**1. Chrome DevTools を開く**
+
+```
+F12 キー
+または
+右クリック → 検証
+```
+
+**2. Application タブを開く**
+
+```
+Application
+  ├─ Storage
+  │   └─ Cookies
+  │       └─ http://localhost:5173
+  │           ├─ sessionid  ← セッションID
+  │           └─ csrftoken  ← CSRFトークン
+```
+
+**3. Cookie の確認**
+
+```
+【sessionid】
+名前: sessionid
+値: i27k7ailip3prew051urb1szes3tlzg5
+ドメイン: localhost
+パス: /
+有効期限: 2025-11-19 10:54:24  ← SESSION_COOKIE_AGE
+HttpOnly: ✓  ← JavaScript からアクセス不可（XSS対策）
+Secure: （本番では✓）  ← HTTPS のみ
+SameSite: Lax  ← CSRF対策
+
+【csrftoken】
+名前: csrftoken
+値: xyz789abc...
+ドメイン: localhost
+パス: /
+有効期限: 1年後
+HttpOnly: ✗  ← JavaScript から読み取る必要がある
+Secure: （本番では✓）
+SameSite: Lax
+```
+
+### 🔍 ネットワークタブでの確認
+
+**1. Network タブを開く**
+
+```
+Network → Preserve log にチェック
+```
+
+**2. ログインリクエストを確認**
+
+```
+POST /api/auth/login/ HTTP/1.1
+
+【リクエストヘッダー】
+Content-Type: application/json
+X-CSRFToken: xyz789abc...  ← CSRF トークン送信
+
+【リクエストボディ】
+{
+  "employee_id": "9999",
+  "password": "test1234"
+}
+
+【レスポンスヘッダー】
+Set-Cookie: sessionid=i27k7ailip...; HttpOnly; Path=/; SameSite=Lax
+Set-Cookie: csrftoken=xyz789abc...; Path=/; SameSite=Lax
+
+【レスポンスボディ】
+{
+  "detail": "logged_in",
+  "user": {
+    "id": 1,
+    "employee_id": "9999",
+    ...
+  }
+}
+```
+
+**3. 次回のリクエストを確認**
+
+```
+GET /api/users/ HTTP/1.1
+
+【リクエストヘッダー】
+Cookie: sessionid=i27k7ailip...; csrftoken=xyz789abc...
+↑ ブラウザが自動的に送信
+
+【Django側の処理】
+①  SessionMiddleware が Cookie から sessionid を取得
+② データベースから session_data を取得
+③ セッションから user_id を取得
+④ User オブジェクトを取得
+⑤ request.user に設定
+```
+
+### 🛡️ セキュリティ設定の確認
+
+**settings.py の確認:**
+
+```python
+# 開発環境（現在の設定）
+SESSION_COOKIE_HTTPONLY = True  # デフォルト（明示的に設定推奨）
+SESSION_COOKIE_SECURE = False   # HTTPでも動作
+CSRF_COOKIE_HTTPONLY = False    # JavaScript から読み取り可能
+CSRF_COOKIE_SECURE = False      # HTTPでも動作
+
+# 本番環境（必須設定）
+SESSION_COOKIE_HTTPONLY = True  # ✅ JavaScript からアクセス不可
+SESSION_COOKIE_SECURE = True    # ✅ HTTPS のみ
+SESSION_COOKIE_SAMESITE = "Lax" # ✅ CSRF対策
+CSRF_COOKIE_HTTPONLY = False    # ✅ JavaScript から読み取り必要
+CSRF_COOKIE_SECURE = True       # ✅ HTTPS のみ
+CSRF_COOKIE_SAMESITE = "Lax"    # ✅ CSRF対策
+```
+
+**各設定の意味:**
+
+| 設定 | 効果 | 攻撃対策 |
+|------|------|---------|
+| **HttpOnly** | JavaScript からアクセス不可 | XSS攻撃対策 |
+| **Secure** | HTTPS のみ送信 | 盗聴対策 |
+| **SameSite=Lax** | クロスサイトリクエストで送信制限 | CSRF攻撃対策 |
+
+### 🔒 CSRF トークンの流れ
+
+```
+【初回アクセス】
+① フロントエンド: GET /api/auth/csrf/
+   ↓
+② Django: CSRFView.get() 実行
+   @ensure_csrf_cookie デコレータ
+   ↓
+③ レスポンスヘッダー:
+   Set-Cookie: csrftoken=xyz789abc...
+   ↓
+④ ブラウザ: Cookie に保存
+
+【POST/PUT/DELETE リクエスト】
+① Axios インターセプター:
+   Cookie から csrftoken を取得
+   ↓
+② リクエストヘッダーに追加:
+   X-CSRFToken: xyz789abc...
+   ↓
+③ Django CsrfViewMiddleware:
+   Cookie の csrftoken と
+   ヘッダーの X-CSRFToken を比較
+   ↓
+④ 一致 → 処理続行
+   不一致 → 403 Forbidden
+```
+
+### 🔍 あなたのコードでの実装
+
+**CSRFトークン取得:**
+
+```python
+# accounts/views.py
+class CSRFView(APIView):
+    permission_classes = [AllowAny]
+    
+    @method_decorator(ensure_csrf_cookie)
+    def get(self, request):
+        # CSRFトークンをCookieにセット
+        return Response(status=status.HTTP_204_NO_CONTENT)
+```
+
+**Axios での自動送信:**
+
+```javascript
+// plugins/axios.js
+api.interceptors.request.use(async (config) => {
+    const method = (config.method || '').toLowerCase();
+    
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+        // CSRFトークンを取得
+        await csrfManager.ensureToken();
+        const csrfToken = Cookies.get('csrftoken');
+        
+        if (csrfToken) {
+            config.headers['X-CSRFToken'] = csrfToken;
+        }
+    }
+    
+    return config;
+});
+```
+
+---
+
+## テストコードの書き方
+
+### 🎯 テストの種類
+
+```
+【ユニットテスト】
+・個別の関数/メソッドをテスト
+・モデルのメソッド
+・サービス層のロジック
+
+【統合テスト】
+・複数のコンポーネントの連携をテスト
+・API エンドポイント
+・データベース操作
+
+【E2Eテスト】
+・実際のユーザー操作をシミュレート
+・ブラウザ操作
+・画面遷移
+```
+
+### 📊 Django のテストフレームワーク
+
+**基本構造:**
+
+```python
+from django.test import TestCase
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class UserModelTest(TestCase):
+    """Userモデルのテスト"""
+    
+    def setUp(self):
+        """各テストの前に実行"""
+        self.user = User.objects.create_user(
+            employee_id='1234',
+            username='テストユーザー',
+            password='test1234'
+        )
+    
+    def tearDown(self):
+        """各テストの後に実行（自動でロールバック）"""
+        pass
+    
+    def test_soft_delete(self):
+        """論理削除のテスト"""
+        # 実行
+        self.user.soft_delete()
+        
+        # 検証
+        self.assertIsNotNone(self.user.deleted_at)
+        self.assertFalse(self.user.is_active)
+        
+        # objects では取得できない
+        self.assertFalse(
+            User.objects.filter(id=self.user.id).exists()
+        )
+        
+        # all_objects では取得できる
+        self.assertTrue(
+            User.all_objects.filter(id=self.user.id).exists()
+        )
+```
+
+### 🧪 論理削除のテストケース
+
+```python
+class SoftDeleteTest(TestCase):
+    """論理削除機能のテスト"""
+    
+    def setUp(self):
+        self.user = User.objects.create_user(
+            employee_id='1234',
+            username='テスト',
+            password='test1234'
+        )
+    
+    def test_soft_delete_sets_deleted_at(self):
+        """deleted_at がセットされる"""
+        self.user.soft_delete()
+        self.assertIsNotNone(self.user.deleted_at)
+    
+    def test_soft_delete_sets_is_active_false(self):
+        """is_active が False になる"""
+        self.user.soft_delete()
+        self.assertFalse(self.user.is_active)
+    
+    def test_soft_deleted_user_not_in_objects(self):
+        """objects マネージャーで取得できない"""
+        self.user.soft_delete()
+        count = User.objects.filter(id=self.user.id).count()
+        self.assertEqual(count, 0)
+    
+    def test_soft_deleted_user_in_all_objects(self):
+        """all_objects マネージャーで取得できる"""
+        self.user.soft_delete()
+        count = User.all_objects.filter(id=self.user.id).count()
+        self.assertEqual(count, 1)
+    
+    def test_employee_id_can_be_reused_after_soft_delete(self):
+        """削除後、社員番号を再利用できる"""
+        # ユーザーを削除
+        self.user.soft_delete()
+        
+        # 同じ社員番号で新規作成（エラーが出ないことを確認）
+        new_user = User.objects.create_user(
+            employee_id='1234',  # 同じ社員番号
+            username='新ユーザー',
+            password='test1234'
+        )
+        
+        self.assertEqual(new_user.employee_id, '1234')
+        
+    def test_restore(self):
+        """復元機能のテスト"""
+        self.user.soft_delete()
+        self.user.restore()
+        
+        self.assertIsNone(self.user.deleted_at)
+        self.assertTrue(self.user.is_active)
+```
+
+### 🔐 認証のテストケース
+
+```python
+from django.test import TestCase, Client
+from django.urls import reverse
+
+class AuthenticationTest(TestCase):
+    """認証機能のテスト"""
+    
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            employee_id='9999',
+            username='管理者',
+            password='test1234',
+            is_admin=True
+        )
+    
+    def test_login_success(self):
+        """ログイン成功"""
+        response = self.client.post(
+            reverse('accounts:login'),
+            {
+                'employee_id': '9999',
+                'password': 'test1234'
+            },
+            content_type='application/json'
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['detail'], 'logged_in')
+        self.assertIn('user', response.json())
+    
+    def test_login_failure_wrong_password(self):
+        """ログイン失敗（パスワード間違い）"""
+        response = self.client.post(
+            reverse('accounts:login'),
+            {
+                'employee_id': '9999',
+                'password': 'wrong_password'
+            },
+            content_type='application/json'
+        )
+        
+        self.assertEqual(response.status_code, 401)
+    
+    def test_login_lockout_after_max_attempts(self):
+        """最大試行回数後にロックされる"""
+        # 10回失敗
+        for _ in range(10):
+            self.client.post(
+                reverse('accounts:login'),
+                {
+                    'employee_id': '9999',
+                    'password': 'wrong'
+                },
+                content_type='application/json'
+            )
+        
+        # 11回目はロック
+        response = self.client.post(
+            reverse('accounts:login'),
+            {
+                'employee_id': '9999',
+                'password': 'test1234'  # 正しいパスワードでも
+            },
+            content_type='application/json'
+        )
+        
+        self.assertEqual(response.status_code, 429)
+```
+
+### 🎨 API テストケース
+
+```python
+from rest_framework.test import APITestCase, APIClient
+from rest_framework import status
+
+class UserAPITest(APITestCase):
+    """ユーザー管理APIのテスト"""
+    
+    def setUp(self):
+        self.client = APIClient()
+        
+        # 管理者ユーザーを作成
+        self.admin = User.objects.create_user(
+            employee_id='9999',
+            username='管理者',
+            password='test1234',
+            is_admin=True
+        )
+        
+        # 一般ユーザーを作成
+        self.user = User.objects.create_user(
+            employee_id='1234',
+            username='一般',
+            password='test1234',
+            is_admin=False
+        )
+        
+        # ログイン
+        self.client.force_authenticate(user=self.admin)
+    
+    def test_list_users(self):
+        """ユーザー一覧取得"""
+        response = self.client.get('/api/users/')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('results', response.json())
+    
+    def test_create_user(self):
+        """ユーザー作成"""
+        response = self.client.post('/api/users/', {
+            'employee_id': '5678',
+            'username': '新規ユーザー',
+            'password': 'test1234',
+            'email': 'new@example.com',
+            'is_admin': False
+        })
+        
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        
+        # データベースに保存されているか確認
+        self.assertTrue(
+            User.objects.filter(employee_id='5678').exists()
+        )
+    
+    def test_delete_user(self):
+        """ユーザー削除（論理削除）"""
+        response = self.client.delete(f'/api/users/{self.user.id}/')
+        
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        
+        # objects では取得できない
+        self.assertFalse(
+            User.objects.filter(id=self.user.id).exists()
+        )
+        
+        # all_objects では取得できる
+        deleted_user = User.all_objects.get(id=self.user.id)
+        self.assertIsNotNone(deleted_user.deleted_at)
+    
+    def test_cannot_delete_last_admin(self):
+        """最後の管理者は削除できない"""
+        response = self.client.delete(f'/api/users/{self.admin.id}/')
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('最後の管理者', response.json()['detail'])
+    
+    def test_cannot_delete_self(self):
+        """自分自身は削除できない"""
+        response = self.client.delete(f'/api/users/{self.admin.id}/')
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+```
+
+### 🔍 サービス層のテスト
+
+```python
+from django.test import TestCase
+from users.services.user_service import UserService
+from users.exceptions import (
+    LastAdminError,
+    CannotDeleteSelfError
+)
+
+class UserServiceTest(TestCase):
+    """UserServiceのテスト"""
+    
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            employee_id='9999',
+            username='管理者',
+            password='test1234',
+            is_admin=True
+        )
+        
+        self.user = User.objects.create_user(
+            employee_id='1234',
+            username='一般',
+            password='test1234',
+            is_admin=False
+        )
+    
+    def test_delete_user_success(self):
+        """削除成功"""
+        UserService.delete_user(self.user)
+        
+        # 論理削除されている
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.deleted_at)
+    
+    def test_delete_last_admin_raises_error(self):
+        """最後の管理者削除はエラー"""
+        with self.assertRaises(LastAdminError):
+            UserService.delete_user(self.admin)
+    
+    def test_delete_self_raises_error(self):
+        """自己削除はエラー"""
+        with self.assertRaises(CannotDeleteSelfError):
+            UserService.delete_user(
+                self.admin,
+                request_user_id=self.admin.id
+            )
+    
+    def test_update_last_admin_to_non_admin_raises_error(self):
+        """最後の管理者の権限剥奪はエラー"""
+        with self.assertRaises(LastAdminError):
+            UserService.update_user(
+                self.admin,
+                {'is_admin': False}
+            )
+```
+
+### 📊 テストの実行
+
+**コマンド:**
+
+```bash
+# すべてのテストを実行
+python manage.py test
+
+# 特定のアプリのみ
+python manage.py test users
+
+# 特定のテストクラスのみ
+python manage.py test users.tests.UserModelTest
+
+# 特定のテストメソッドのみ
+python manage.py test users.tests.UserModelTest.test_soft_delete
+
+# 詳細な出力
+python manage.py test --verbosity=2
+
+# 失敗したテストで停止
+python manage.py test --failfast
+```
+
+**出力例:**
+
+```
+Creating test database for alias 'default'...
+System check identified no issues (0 silenced).
+..........
+----------------------------------------------------------------------
+Ran 10 tests in 0.234s
+
+OK
+Destroying test database for alias 'default'...
+```
+
+### 🎯 カバレッジの測定
+
+**インストール:**
+
+```bash
+pip install coverage
+```
+
+**実行:**
+
+```bash
+# テスト実行 + カバレッジ測定
+coverage run --source='.' manage.py test users
+
+# レポート表示（ターミナル）
+coverage report
+
+# HTML レポート生成
+coverage html
+
+# ブラウザで確認
+open htmlcov/index.html
+```
+
+**レポート例:**
+
+```
+Name                      Stmts   Miss  Cover
+---------------------------------------------
+users/models.py             45      2    96%
+users/serializers.py        32      0   100%
+users/services.py           28      1    96%
+users/views.py              78      5    94%
+---------------------------------------------
+TOTAL                      183      8    96%
+```
+
+### 🔧 テストデータの作成
+
+**Factory パターン（推奨）:**
+
+```bash
+pip install factory-boy
+```
+
+```python
+# users/factories.py
+import factory
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class UserFactory(factory.django.DjangoModelFactory):
+    """ユーザーのファクトリー"""
+    
+    class Meta:
+        model = User
+    
+    employee_id = factory.Sequence(lambda n: f'{n:04d}')
+    username = factory.Faker('name', locale='ja_JP')
+    email = factory.Faker('email')
+    password = factory.PostGenerationMethodCall('set_password', 'test1234')
+    is_admin = False
+    is_active = True
+
+class AdminUserFactory(UserFactory):
+    """管理者ユーザーのファクトリー"""
+    is_admin = True
+```
+
+**使用例:**
+
+```python
+class UserTestWithFactory(TestCase):
+    def test_with_factory(self):
+        # ユーザーを簡単に作成
+        user = UserFactory()
+        admin = AdminUserFactory()
+        
+        # 複数のユーザーを作成
+        users = UserFactory.create_batch(10)
+        
+        # 特定の値を指定
+        specific_user = UserFactory(
+            employee_id='9999',
+            username='特定ユーザー'
+        )
+```
+
+### 🎨 モックの使用
+
+```python
+from unittest.mock import patch, Mock
+from django.test import TestCase
+
+class ExternalAPITest(TestCase):
+    """外部APIを使う機能のテスト"""
+    
+    @patch('users.services.send_email')
+    def test_create_user_sends_email(self, mock_send_email):
+        """ユーザー作成時にメール送信される"""
+        
+        # サービスを実行
+        UserService.create_user({
+            'employee_id': '1234',
+            'username': 'テスト',
+            'email': 'test@example.com'
+        })
+        
+        # メール送信が呼ばれたか確認
+        mock_send_email.assert_called_once()
+        
+        # 引数の確認
+        args, kwargs = mock_send_email.call_args
+        self.assertEqual(kwargs['to'], 'test@example.com')
+```
+
+---
+
+## まとめ
+
+### 🎯 論理削除の実装チェックリスト
+
+```
+✅ deleted_at フィールドの追加
+✅ カスタムマネージャーの実装
+✅ 条件付きユニーク制約
+✅ soft_delete() メソッド
+✅ ViewSet での削除済みチェック
+✅ 同時操作対策（all_objects使用）
+✅ インデックスの最適化
+```
+
+### 🔐 セッション認証のチェックリスト
+
+```
+✅ SESSION_COOKIE_HTTPONLY = True
+✅ SESSION_COOKIE_SECURE = True（本番）
+✅ SESSION_COOKIE_SAMESITE = "Lax"
+✅ CSRF_COOKIE_HTTPONLY = False
+✅ CSRF_COOKIE_SECURE = True（本番）
+✅ CORS_ALLOW_CREDENTIALS = True
+✅ withCredentials: true（Axios）
+✅ CSRFトークンの自動送信
+```
+
+### 🧪 テストのチェックリスト
+
+```
+✅ ユニットテスト（モデル・サービス）
+✅ 統合テスト（API エンドポイント）
+✅ 認証テスト
+✅ 権限テスト
+✅ エッジケースのテスト
+✅ カバレッジ 80% 以上
+```
+
+---
+
+## 実践: デバッグの流れ
+
+### 🔍 問題発生時の確認手順
+
+**1. ログを確認**
+
+```bash
+# Django のログ
+tail -f logs/audit.log
+
+# 開発サーバーのログ
+python manage.py runserver
+```
+
+**2. デベロッパーツールで確認**
+
+```
+【Network タブ】
+・リクエスト/レスポンスの確認
+・ステータスコード
+・Cookie の送受信
+
+【Application タブ】
+・Cookie の確認
+・localStorage の確認
+
+【Console タブ】
+・JavaScript エラー
+```
+
+**3. Django Debug Toolbar**
+
+```
+http://localhost:8000/__debug__/
+
+【確認できること】
+・実行された SQL
+・SQL の実行時間
+・N+1 問題の検出
+・キャッシュの状態
+```
+
+**4. テストを書いて再現**
+
+```python
+def test_reproduce_bug(self):
+    """バグを再現するテスト"""
+    # バグが発生する手順を再現
+    user = UserFactory()
+    user.soft_delete()
+    
+    # 期待される動作
+    self.assertIsNotNone(user.deleted_at)
+```
+
+---
+
+## 参考リンク
+
+**Django 公式:**
+- [Testing in Django](https://docs.djangoproject.com/en/stable/topics/testing/)
+- [Django Managers](https://docs.djangoproject.com/en/stable/topics/db/managers/)
+- [Django Sessions](https://docs.djangoproject.com/en/stable/topics/http/sessions/)
+
+**DRF 公式:**
+- [Testing](https://www.django-rest-framework.org/api-guide/testing/)
+- [Serializers](https://www.django-rest-framework.org/api-guide/serializers/)
+- [ViewSets](https://www.django-rest-framework.org/api-guide/viewsets/)
+
+**セキュリティ:**
+- [OWASP Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+- [Django Security](https://docs.djangoproject.com/en/stable/topics/security/)
+
+**テスト:**
+- [Coverage.py](https://coverage.readthedocs.io/)
+- [Factory Boy](https://factoryboy.readthedocs.io/)
+
+---
+
+**このガイドが、コードの理解とテストの作成に役立てば幸いです！** 📚✨
+
+**わからないことがあれば、いつでも質問してください！** 💪😊

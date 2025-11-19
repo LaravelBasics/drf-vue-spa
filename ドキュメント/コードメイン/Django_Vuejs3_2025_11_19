@@ -1,0 +1,2336 @@
+# Django REST Framework + Vue.js 3 技術ドキュメント
+
+## 📋 目次
+
+1. [システム概要](#システム概要)
+2. [技術スタック](#技術スタック)
+3. [バックエンド (Django + DRF)](#バックエンド-django--drf)
+4. [フロントエンド (Vue.js 3)](#フロントエンド-vuejs-3)
+5. [開発ガイドライン](#開発ガイドライン)
+6. [トラブルシューティング](#トラブルシューティング)
+
+---
+
+## システム概要
+
+### アーキテクチャ
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        ユーザー                              │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│              フロントエンド (Vue.js 3)                       │
+│  ┌─────────────┐  ┌──────────┐  ┌────────────────────┐    │
+│  │ Vuetify 3   │  │  Pinia   │  │   Vue Router 4     │    │
+│  │ (UI Library)│  │ (状態管理)│  │  (ルーティング)     │    │
+│  └─────────────┘  └──────────┘  └────────────────────┘    │
+└───────────────────────┬─────────────────────────────────────┘
+                        │ HTTP/HTTPS (Axios)
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│             バックエンド (Django + DRF)                      │
+│  ┌────────────────┐  ┌──────────────────────────────┐      │
+│  │   Django REST  │  │     認証システム              │      │
+│  │   Framework    │  │  (Session + CSRF)            │      │
+│  └────────────────┘  └──────────────────────────────┘      │
+└───────────────────────┬─────────────────────────────────────┘
+                        │
+                        ▼
+┌─────────────────────────────────────────────────────────────┐
+│              データベース (PostgreSQL)                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 主な特徴
+
+- **SPA (Single Page Application)**: ページ遷移なしでスムーズな画面切り替え
+- **セッションベース認証**: Cookie + CSRF トークンによる安全な認証
+- **レスポンシブデザイン**: PC・タブレット・スマホに対応
+- **多言語対応**: 日本語・英語切り替え可能
+- **権限管理**: 管理者・一般ユーザーの区別
+
+---
+
+## 技術スタック
+
+### バックエンド
+
+| 技術 | バージョン | 役割 |
+|------|-----------|------|
+| **Python** | 3.10+ | プログラミング言語 |
+| **Django** | 4.x | Webフレームワーク |
+| **Django REST Framework (DRF)** | 3.x | API構築フレームワーク |
+| **PostgreSQL** | 13+ | データベース |
+
+### フロントエンド
+
+| 技術 | バージョン | 役割 |
+|------|-----------|------|
+| **Vue.js** | 3.x | UIフレームワーク (Composition API) |
+| **Vuetify** | 3.x | Material Design UIコンポーネント |
+| **Pinia** | 2.x | 状態管理ライブラリ |
+| **Vue Router** | 4.x | ルーティング管理 |
+| **Vue I18n** | 9.x | 多言語対応 |
+| **Axios** | 1.x | HTTP通信ライブラリ |
+| **Vite** | 5.x | ビルドツール |
+
+---
+
+## バックエンド (Django + DRF)
+
+### 1. プロジェクト構成
+
+```
+backend/
+├── config/                 # プロジェクト設定
+│   ├── settings.py        # Django設定ファイル
+│   ├── urls.py           # ルートURLconf
+│   └── wsgi.py           # WSGIエントリーポイント
+├── accounts/              # 認証アプリ
+│   ├── backends.py       # カスタム認証バックエンド
+│   ├── serializers.py    # ログイン用シリアライザー
+│   ├── views.py          # 認証API (ログイン/ログアウト/CSRF)
+│   └── urls.py           # 認証エンドポイント
+├── users/                 # ユーザー管理アプリ
+├── common/                # 共通機能 (ミドルウェア、ユーティリティ)
+└── .env                   # 環境変数 (Git管理外)
+```
+
+### 2. 認証システムの仕組み
+
+#### 2.1 セッションベース認証の流れ
+
+Django のデフォルト認証を使用していますが、**社員番号 (employee_id)** でログインできるようカスタマイズしています。
+
+```python
+# accounts/backends.py - カスタム認証バックエンド
+
+class EmployeeIdBackend(BaseBackend):
+    """社員番号でログインできるようにする認証バックエンド"""
+    
+    def authenticate(self, request, username=None, password=None, **kwargs):
+        # username は社員番号として扱う
+        employee_id = username
+        
+        if not employee_id or not password:
+            return None
+        
+        try:
+            user = User.objects.filter(employee_id=employee_id).first()
+        except Exception:
+            # タイミング攻撃対策: DBエラー時も同じ処理時間を確保
+            User().set_password(password)
+            return None
+        
+        if user is None:
+            # タイミング攻撃対策: ユーザーが存在しない場合も処理時間を統一
+            User().set_password(password)
+            return None
+        
+        # パスワード検証
+        if user.check_password(password):
+            return user
+        
+        return None
+```
+
+**🔍 重要ポイント:**
+
+- **タイミング攻撃対策**: ユーザーの有無を処理時間から推測できないよう、常に `set_password()` を実行
+- Django の `check_password()` は自動的にハッシュ化されたパスワードと比較
+- 認証成功時は User オブジェクトを返す
+
+**📚 参考:** [Django Authentication Backends](https://docs.djangoproject.com/en/stable/topics/auth/customizing/#writing-an-authentication-backend)
+
+#### 2.2 ログインAPI実装
+
+```python
+# accounts/views.py
+
+class LoginAPIView(APIView):
+    permission_classes = [AllowAny]  # 誰でもアクセス可能
+    
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+        
+        employee_id = serializer.validated_data["employee_id"]
+        password = serializer.validated_data["password"]
+        
+        # ブルートフォース攻撃対策
+        if self._is_locked(employee_id):
+            return Response({"detail": "ロックされています"}, status=429)
+        
+        # 認証
+        user = authenticate(request, username=employee_id, password=password)
+        
+        if user:
+            if not user.is_active:
+                return Response({"detail": "無効なアカウント"}, status=401)
+            
+            # ログイン成功
+            self._reset_attempts(employee_id)
+            login(request, user)  # セッション作成
+            
+            return Response({
+                "detail": "logged_in",
+                "user": UserSerializer(user).data
+            })
+        
+        # 認証失敗
+        attempts = self._increment_attempts(employee_id)
+        if attempts >= settings.LOGIN_MAX_ATTEMPTS:
+            self._lock_user(employee_id)
+            return Response({"detail": "ロックされました"}, status=429)
+        
+        return Response({"detail": "認証失敗"}, status=401)
+```
+
+**🔍 重要ポイント:**
+
+- **ブルートフォース攻撃対策**: Django キャッシュを使って失敗回数を記録
+- `login(request, user)` でセッションを作成 (Cookie に `sessionid` が保存される)
+- ログイン成功時は `200 OK` + ユーザー情報を返す
+
+**📚 参考:** [Django Authentication Views](https://docs.djangoproject.com/en/stable/topics/auth/default/#how-to-log-a-user-in)
+
+#### 2.3 CSRFトークンの仕組み
+
+CSRF (Cross-Site Request Forgery) 攻撃を防ぐため、Django は CSRF トークンを使用します。
+
+```python
+# accounts/views.py
+
+class CSRFView(APIView):
+    permission_classes = [AllowAny]
+    
+    @method_decorator(ensure_csrf_cookie)
+    def get(self, request):
+        """
+        CSRFトークンを Cookie にセット
+        フロントエンドはこのエンドポイントを呼び出してトークンを取得
+        """
+        return Response(status=204)  # No Content
+```
+
+**フロー:**
+
+1. フロントエンドが `/api/auth/csrf/` を呼び出す
+2. Django が `csrftoken` Cookie をセット
+3. フロントエンドは Cookie から取得したトークンを `X-CSRFToken` ヘッダーに含めて POST リクエスト
+
+```javascript
+// フロントエンド (axios.js)
+
+// リクエストインターセプター
+api.interceptors.request.use(async (config) => {
+    const method = config.method.toLowerCase();
+    
+    // POST/PUT/PATCH/DELETE の場合は CSRF トークンが必要
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+        await csrfManager.ensureToken();  // トークン取得
+        const csrfToken = Cookies.get('csrftoken');
+        if (csrfToken) {
+            config.headers['X-CSRFToken'] = csrfToken;
+        }
+    }
+    
+    return config;
+});
+```
+
+**🔍 重要ポイント:**
+
+- CSRF トークンは Cookie に保存されるが、`HttpOnly` ではない (JavaScript から読み取る必要があるため)
+- POST/PUT/PATCH/DELETE リクエスト時は必ず `X-CSRFToken` ヘッダーが必要
+- GET リクエストは CSRF 保護の対象外
+
+**📚 参考:** 
+- [Django CSRF Protection](https://docs.djangoproject.com/en/stable/ref/csrf/)
+- [DRF CSRF with Session Authentication](https://www.django-rest-framework.org/topics/ajax-csrf-cors/#csrf)
+
+### 3. セキュリティ設定
+
+#### 3.1 パスワードハッシュ化
+
+```python
+# config/settings.py
+
+PASSWORD_HASHERS = [
+    'django.contrib.auth.hashers.Argon2PasswordHasher',  # 推奨
+    'django.contrib.auth.hashers.PBKDF2PasswordHasher',
+    'django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher',
+    'django.contrib.auth.hashers.BCryptSHA256PasswordHasher',
+]
+```
+
+**Argon2** は現在最も安全とされるハッシュアルゴリズムです。
+
+**📚 参考:** [Django Password Management](https://docs.djangoproject.com/en/stable/topics/auth/passwords/)
+
+#### 3.2 CORS設定
+
+フロントエンドとバックエンドが異なるポートで動作するため、CORS (Cross-Origin Resource Sharing) 設定が必要です。
+
+```python
+# config/settings.py
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # Vite の開発サーバー
+]
+
+CORS_ALLOW_CREDENTIALS = True  # Cookie を送受信するために必須
+```
+
+**🔍 重要ポイント:**
+
+- `CORS_ALLOW_CREDENTIALS = True` を設定しないと、Cookie (セッションID) がブラウザに保存されない
+- 本番環境では `CORS_ALLOWED_ORIGINS` に実際のフロントエンドURLを設定
+
+**📚 参考:** [django-cors-headers](https://github.com/adamchainz/django-cors-headers)
+
+#### 3.3 セッション設定
+
+```python
+# config/settings.py
+
+SESSION_COOKIE_AGE = 86400  # 24時間 (秒単位)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # ブラウザを閉じてもセッション維持
+SESSION_SAVE_EVERY_REQUEST = False  # リクエストごとにセッションを保存しない (DB負荷軽減)
+
+# 本番環境では以下を有効化
+# SESSION_COOKIE_SECURE = True  # HTTPS のみ
+# SESSION_COOKIE_HTTPONLY = True  # JavaScript からアクセス不可
+# SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF攻撃対策
+```
+
+**📚 参考:** [Django Session Framework](https://docs.djangoproject.com/en/stable/topics/http/sessions/)
+
+### 4. REST API設計
+
+#### 4.1 エンドポイント一覧
+
+| メソッド | エンドポイント | 説明 | 認証 |
+|---------|---------------|------|------|
+| GET | `/api/auth/csrf/` | CSRFトークン取得 | 不要 |
+| POST | `/api/auth/login/` | ログイン | 不要 |
+| POST | `/api/auth/logout/` | ログアウト | 必要 |
+| GET | `/api/auth/me/` | ログイン中のユーザー情報取得 | 必要 |
+| GET | `/api/users/` | ユーザー一覧取得 | 必要 |
+| GET | `/api/users/{id}/` | ユーザー詳細取得 | 必要 |
+| POST | `/api/users/` | ユーザー作成 | 必要 (管理者) |
+| PUT | `/api/users/{id}/` | ユーザー更新 | 必要 (管理者) |
+| DELETE | `/api/users/{id}/` | ユーザー削除 | 必要 (管理者) |
+
+#### 4.2 DRF の基本概念
+
+**Serializer (シリアライザー)**
+
+Python オブジェクト ⇔ JSON の変換を行います。
+
+```python
+# accounts/serializers.py
+
+class UserSerializer(serializers.ModelSerializer):
+    display_name = serializers.CharField(read_only=True)
+    
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'employee_id',
+            'username',
+            'email',
+            'display_name',
+            'is_admin',
+            'is_active',
+        ]
+        read_only_fields = fields  # すべて読み取り専用
+```
+
+**🔍 重要ポイント:**
+
+- `ModelSerializer` は Django モデルから自動的にフィールドを生成
+- `read_only=True` のフィールドは API レスポンスに含まれるが、リクエストでは無視される
+
+**📚 参考:** [DRF Serializers](https://www.django-rest-framework.org/api-guide/serializers/)
+
+**ViewSet vs APIView**
+
+- **APIView**: 低レベルなAPI。カスタムロジックが多い場合に使用
+- **ViewSet**: CRUD操作を自動生成。標準的なRESTful APIに最適
+
+このプロジェクトでは、認証系は `APIView`、ユーザー管理は `ViewSet` を使用しています。
+
+**📚 参考:** [DRF Views](https://www.django-rest-framework.org/api-guide/views/)
+
+---
+
+## フロントエンド (Vue.js 3)
+
+### 1. プロジェクト構成
+
+```
+frontend/
+├── src/
+│   ├── api/              # APIクライアント
+│   │   ├── auth.js       # 認証API
+│   │   └── users.js      # ユーザー管理API
+│   ├── assets/           # 静的ファイル
+│   │   └── style/
+│   │       └── main.scss # グローバルスタイル
+│   ├── components/       # 再利用可能なコンポーネント
+│   │   ├── NavBar.vue
+│   │   ├── SideBar.vue
+│   │   ├── Header.vue
+│   │   ├── Footer.vue
+│   │   ├── Notification.vue
+│   │   └── ...
+│   ├── composables/      # Composition API ロジック
+│   │   ├── usePermissions.js  # 権限管理
+│   │   ├── useValidation.js   # バリデーション
+│   │   ├── useBreadcrumbs.js  # パンくずリスト
+│   │   └── useApiError.js     # エラーハンドリング
+│   ├── constants/        # 定数定義
+│   │   ├── routes.js     # ルートパス
+│   │   ├── icons.js      # アイコン
+│   │   └── theme.js      # テーマ設定
+│   ├── locales/          # 多言語対応
+│   │   ├── ja.json
+│   │   └── en.json
+│   ├── plugins/          # Vue プラグイン
+│   │   ├── axios.js      # Axios設定
+│   │   ├── vuetify.js    # Vuetify設定
+│   │   └── i18n.js       # 多言語設定
+│   ├── router/           # ルーティング
+│   │   ├── index.js
+│   │   ├── auth-guard.js
+│   │   └── admin-guard.js
+│   ├── stores/           # Pinia ストア
+│   │   ├── auth.js       # 認証状態
+│   │   ├── ui.js         # UI状態
+│   │   ├── notification.js
+│   │   └── locale.js
+│   ├── utils/            # ユーティリティ
+│   │   └── validation.js
+│   ├── views/            # ページコンポーネント
+│   │   ├── Login.vue
+│   │   ├── Home.vue
+│   │   ├── Settings.vue
+│   │   └── admin/
+│   │       └── AdminMenu.vue
+│   ├── App.vue           # ルートコンポーネント
+│   └── main.js           # エントリーポイント
+├── .env                  # 環境変数
+├── index.html
+└── vite.config.js        # Vite設定
+```
+
+### 2. Vue.js 3 Composition API の基礎
+
+Vue.js 3 では **Composition API** が推奨されています。Options API に比べてロジックの再利用性が高く、TypeScript との相性も良好です。
+
+#### 2.1 基本構文
+
+```vue
+<script setup>
+import { ref, computed, onMounted } from 'vue';
+
+// リアクティブな状態
+const count = ref(0);
+
+// 算出プロパティ
+const doubleCount = computed(() => count.value * 2);
+
+// メソッド
+function increment() {
+    count.value++;
+}
+
+// ライフサイクルフック
+onMounted(() => {
+    console.log('コンポーネントがマウントされました');
+});
+</script>
+
+<template>
+    <div>
+        <p>Count: {{ count }}</p>
+        <p>Double: {{ doubleCount }}</p>
+        <button @click="increment">+1</button>
+    </div>
+</template>
+```
+
+**🔍 重要ポイント:**
+
+- `<script setup>` は Composition API のシンタックスシュガー (簡潔に書ける)
+- `ref()` で定義した変数は `.value` でアクセス (テンプレート内では自動アンラップされるので不要)
+- `computed()` は依存する値が変わると自動的に再計算
+
+**📚 参考:** [Vue 3 Composition API](https://vuejs.org/guide/introduction.html#composition-api)
+
+#### 2.2 Composable (再利用可能なロジック)
+
+Composable は React の Custom Hooks に相当します。
+
+```javascript
+// composables/usePermissions.js
+
+import { computed } from 'vue';
+import { useAuthStore } from '@/stores/auth';
+
+export const usePermissions = () => {
+    const auth = useAuthStore();
+    
+    // 管理者権限を持つか判定
+    const isAdmin = computed(() => {
+        return auth.user?.is_admin === true;
+    });
+    
+    return {
+        isAdmin,
+    };
+};
+```
+
+**使用例:**
+
+```vue
+<script setup>
+import { usePermissions } from '@/composables/usePermissions';
+
+const { isAdmin } = usePermissions();
+</script>
+
+<template>
+    <div v-if="isAdmin">
+        管理者専用コンテンツ
+    </div>
+</template>
+```
+
+**📚 参考:** [Vue 3 Composables](https://vuejs.org/guide/reusability/composables.html)
+
+### 3. Pinia (状態管理)
+
+Pinia は Vuex の後継で、Vue 3 に最適化された状態管理ライブラリです。
+
+#### 3.1 基本構文
+
+```javascript
+// stores/auth.js
+
+import { defineStore } from 'pinia';
+import { ref, computed } from 'vue';
+
+export const useAuthStore = defineStore('auth', () => {
+    // State (状態)
+    const user = ref(null);
+    const loading = ref(false);
+    
+    // Getters (算出プロパティ)
+    const isAuthenticated = computed(() => !!user.value);
+    
+    // Actions (メソッド)
+    async function login(employeeId, password) {
+        loading.value = true;
+        try {
+            const response = await authAPI.login(employeeId, password);
+            user.value = response.data.user;
+        } finally {
+            loading.value = false;
+        }
+    }
+    
+    return {
+        user,
+        loading,
+        isAuthenticated,
+        login,
+    };
+}, {
+    // 永続化設定
+    persist: {
+        paths: ['user'],  // user のみ localStorage に保存
+    },
+});
+```
+
+**🔍 重要ポイント:**
+
+- `defineStore()` の第2引数は Setup 関数 (Composition API スタイル)
+- `persist: true` で localStorage に自動保存 (ページリロード後も状態維持)
+- `computed()` は Vuex の getters に相当
+
+**📚 参考:** [Pinia Documentation](https://pinia.vuejs.org/)
+
+#### 3.2 ストアの使用
+
+```vue
+<script setup>
+import { useAuthStore } from '@/stores/auth';
+
+const auth = useAuthStore();
+
+async function handleLogin() {
+    await auth.login(employeeId.value, password.value);
+}
+</script>
+
+<template>
+    <div>
+        <p v-if="auth.isAuthenticated">
+            ようこそ、{{ auth.user.username }} さん
+        </p>
+        <button @click="handleLogin">ログイン</button>
+    </div>
+</template>
+```
+
+### 4. Vue Router 4
+
+#### 4.1 ルート定義
+
+```javascript
+// router/index.js
+
+import { createRouter, createWebHistory } from 'vue-router';
+
+const router = createRouter({
+    history: createWebHistory(),
+    routes: [
+        {
+            path: '/',
+            name: 'Home',
+            component: () => import('@/views/Home.vue'),
+            meta: {
+                requiresAuth: true,  // 認証必須
+                breadcrumb: 'breadcrumbs.home',
+            },
+        },
+        {
+            path: '/admin',
+            name: 'Admin',
+            component: () => import('@/views/admin/AdminMenu.vue'),
+            meta: {
+                requiresAuth: true,
+                requiresAdmin: true,  // 管理者権限必須
+                breadcrumb: 'breadcrumbs.admin',
+            },
+        },
+    ],
+});
+```
+
+**🔍 重要ポイント:**
+
+- `meta` にカスタムデータを保存できる
+- `() => import()` は遅延ロード (コード分割) で初期ロード時間を短縮
+
+**📚 参考:** [Vue Router 4](https://router.vuejs.org/)
+
+#### 4.2 ナビゲーションガード
+
+ルート遷移の前に認証チェックを行います。
+
+```javascript
+// router/auth-guard.js
+
+export const authGuard = async (to, from) => {
+    const auth = useAuthStore();
+    
+    // 認証が必要なページの場合
+    if (to.meta.requiresAuth) {
+        if (!auth.user) {
+            // ログインページにリダイレクト
+            return {
+                path: '/auth/login',
+                query: { next: to.fullPath },  // ログイン後に元のページに戻る
+            };
+        }
+    }
+    
+    return true;  // 通過
+};
+
+// router/index.js で登録
+router.beforeEach(authGuard);
+```
+
+**📚 参考:** [Vue Router Navigation Guards](https://router.vuejs.org/guide/advanced/navigation-guards.html)
+
+### 5. Vuetify 3 (UIコンポーネント)
+
+Vuetify は Material Design に基づいた Vue 用 UI コンポーネントライブラリです。
+
+#### 5.1 基本的な使い方
+
+```vue
+<template>
+    <!-- カード -->
+    <v-card>
+        <v-card-title>タイトル</v-card-title>
+        <v-card-text>内容</v-card-text>
+        <v-card-actions>
+            <v-btn color="primary">ボタン</v-btn>
+        </v-card-actions>
+    </v-card>
+    
+    <!-- データテーブル -->
+    <v-data-table
+        :items="users"
+        :headers="headers"
+        :loading="loading"
+    />
+    
+    <!-- ダイアログ -->
+    <v-dialog v-model="dialog" max-width="500">
+        <v-card>
+            <v-card-title>確認</v-card-title>
+            <v-card-text>削除しますか?</v-card-text>
+            <v-card-actions>
+                <v-btn @click="handleDelete">削除</v-btn>
+                <v-btn @click="dialog = false">キャンセル</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+</template>
+```
+
+**📚 参考:** [Vuetify 3 Components](https://vuetifyjs.com/en/components/all/)
+
+#### 5.2 レスポンシブデザイン
+
+Vuetify のグリッドシステムは Bootstrap と似ています。
+
+```vue
+<template>
+    <v-container>
+        <v-row>
+            <!-- モバイル: 12列 (全幅), タブレット: 6列 (半分), PC: 4列 (1/3) -->
+            <v-col cols="12" sm="6" md="4">
+                コンテンツ1
+            </v-col>
+            <v-col cols="12" sm="6" md="4">
+                コンテンツ2
+            </v-col>
+            <v-col cols="12" sm="6" md="4">
+                コンテンツ3
+            </v-col>
+        </v-row>
+    </v-container>
+</template>
+```
+
+**ブレイクポイント:**
+
+| サイズ | 幅 | デバイス |
+|-------|----|----|
+| xs | < 600px | モバイル (縦) |
+| sm | 600-960px | モバイル (横), 小型タブレット |
+| md | 960-1280px | タブレット |
+| lg | 1280-1920px | PC |
+| xl | > 1920px | 大型ディスプレイ |
+
+**📚 参考:** [Vuetify Grid System](https://vuetifyjs.com/en/components/grids/)
+
+### 6. Axios (HTTP通信)
+
+#### 6.1 インターセプター
+
+すべてのリクエスト/レスポンスに共通処理を適用します。
+
+```javascript
+// plugins/axios.js
+
+import axios from 'axios';
+import Cookies from 'js-cookie';
+
+const api = axios.create({
+    baseURL: 'http://localhost:8000/api/',
+    withCredentials: true,  // Cookie を送信
+    timeout: 10000,
+});
+
+// リクエストインターセプター
+api.interceptors.request.use(async (config) => {
+    // 言語ヘッダーを追加
+    const localeStore = useLocaleStore();
+    config.headers['Accept-Language'] = localeStore.locale;
+    
+    // POST/PUT/DELETE には CSRF トークンが必要
+    if (['post', 'put', 'patch', 'delete'].includes(config.method)) {
+        const csrfToken = Cookies.get('csrftoken');
+        if (csrfToken) {
+            config.headers['X-CSRFToken'] = csrfToken;
+        }
+    }
+    
+    return config;
+});
+
+// レスポンスインターセプター
+api.interceptors.response.use(
+    response => response,
+    async error => {
+        // 401/403 エラー時は自動ログアウト
+        if ([401, 403].includes(error.response?.status)) {
+            const auth = useAuthStore();
+            await auth.logout();
+        }
+        return Promise.reject(error);
+    }
+);
+
+export default api;
+```
+
+**🔍 重要ポイント:**
+
+- `withCredentials: true` を設定しないと Cookie が送信されない
+- インターセプターでエラーハンドリングを一元管理
+
+**📚 参考:** [Axios Interceptors](https://axios-http.com/docs/interceptors)
+
+### 7. Vue I18n (多言語対応)
+
+#### 7.1 翻訳ファイル
+
+```json
+// locales/ja.json
+{
+    "auth": {
+        "login": "ログイン",
+        "logout": "ログアウト"
+    },
+    "form": {
+        "fields": {
+            "username": "ユーザー名",
+            "password": "パスワード"
+        },
+        "validation": {
+            "required": "{field}は必須です"
+        }
+    }
+}
+```
+
+#### 7.2 使用方法
+
+```vue
+<script setup>
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
+</script>
+
+<template>
+    <h1>{{ t('auth.login') }}</h1>
+    
+    <!-- パラメータ付き -->
+    <p>{{ t('form.validation.required', { field: t('form.fields.username') }) }}</p>
+</template>
+```
+
+**📚 参考:** [Vue I18n](https://vue-i18n.intlify.dev/)
+
+---
+
+## 開発ガイドライン
+
+### 1. 新しいページを追加する手順
+
+#### バックエンド
+
+1. **モデルを作成** (`models.py`)
+2. **シリアライザーを作成** (`serializers.py`)
+3. **ViewSet/APIView を作成** (`views.py`)
+4. **URLを登録** (`urls.py`)
+5. **マイグレーション実行**
+
+#### フロントエンド
+
+1. **APIクライアントを作成** (`src/api/xxx.js`)
+2. **ルートを登録** (`src/router/index.js`)
+3. **ストアを作成** (必要に応じて `src/stores/xxx.js`)
+4. **ページコンポーネントを作成** (`src/views/Xxx.vue`)
+5. **翻訳を追加** (`src/locales/ja.json`, `en.json`)
+
+### 2. コーディング規約
+
+- **命名規則**:
+  - コンポーネント: PascalCase (`UserList.vue`)
+  - 関数・変数: camelCase (`fetchUser`)
+  - 定数: UPPER_SNAKE_CASE (`API_BASE_URL`)
+  - CSS クラス: kebab-case (`user-list-item`)
+
+- **コンポーネント設計**:
+  - 1コンポーネント = 1責務
+  - 200行を超えたら分割を検討
+  - Props は読み取り専用 (子から親のデータを変更しない)
+
+---
+
+## トラブルシューティング
+
+### よくあるエラー
+
+#### 1. CORS エラー
+
+```
+Access to XMLHttpRequest at 'http://localhost:8000/api/...' from origin 'http://localhost:5173' has been blocked by CORS policy
+```
+
+**解決方法:**
+
+```python
+# backend/config/settings.py
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
+CORS_ALLOW_CREDENTIALS = True
+```
+
+#### 2. CSRF トークンエラー
+
+```
+403 Forbidden: CSRF token missing or incorrect
+```
+
+**解決方法:**
+
+- `/api/auth/csrf/` を呼び出して Cookie を取得
+- `X-CSRFToken` ヘッダーに Cookie の値を設定
+
+#### 3. セッションが保存されない
+
+**原因:** `withCredentials: true` が設定されていない
+
+```javascript
+// 修正前
+axios.get('http://localhost:8000/api/auth/me/');
+
+// 修正後
+axios.get('http://localhost:8000/api/auth/me/', {
+    withCredentials: true
+});
+```
+
+---
+
+## バックエンド応用編
+
+### 1. ユーザー管理機能の実装
+
+#### 1.1 モデル設計（論理削除対応）
+
+```python
+# users/models.py
+
+class User(AbstractBaseUser, PermissionsMixin):
+    """論理削除対応ユーザーモデル"""
+    
+    employee_id = models.CharField("社員番号", max_length=50, db_index=True)
+    username = models.CharField("ユーザー名", max_length=50)
+    email = models.EmailField("メールアドレス", max_length=255)
+    
+    is_admin = models.BooleanField("管理者", default=False)
+    is_active = models.BooleanField("アクティブ", default=True)
+    
+    created_at = models.DateTimeField("作成日時", default=timezone.now)
+    updated_at = models.DateTimeField("更新日時", auto_now=True)
+    deleted_at = models.DateTimeField("削除日時", null=True, blank=True)
+    
+    objects = CustomUserManager()  # 削除済み除外
+    all_objects = AllObjectsManager()  # 削除済み含む
+    
+    class Meta:
+        constraints = [
+            # 削除済みでない場合のみ社員番号を一意に
+            models.UniqueConstraint(
+                fields=["employee_id"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="unique_active_employee_id",
+            )
+        ]
+    
+    def soft_delete(self):
+        """論理削除"""
+        self.deleted_at = timezone.now()
+        self.is_active = False
+        self.save(update_fields=["deleted_at", "is_active"])
+```
+
+**🔍 論理削除のメリット:**
+
+- **データ復旧**: 誤削除時に復元可能
+- **監査証跡**: 削除したユーザーの履歴を保持
+- **社員番号の再利用**: 退職後の社員番号を新規ユーザーに割り当て可能
+
+**条件付きユニーク制約:**
+
+```sql
+-- 生成される SQL（PostgreSQL）
+CREATE UNIQUE INDEX unique_active_employee_id 
+ON users (employee_id) 
+WHERE deleted_at IS NULL;
+```
+
+これにより、`deleted_at` が NULL（アクティブ）のレコードのみ `employee_id` が一意になります。
+
+**📚 参考:** [Django Constraints](https://docs.djangoproject.com/en/stable/ref/models/constraints/)
+
+#### 1.2 カスタムマネージャー
+
+```python
+class CustomUserManager(BaseUserManager):
+    """削除済みを除外するマネージャー"""
+    
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
+
+class AllObjectsManager(BaseUserManager):
+    """削除済みも含めるマネージャー"""
+    
+    def get_queryset(self):
+        return super().get_queryset()
+```
+
+**使い分け:**
+
+```python
+# 通常の操作（削除済み除外）
+User.objects.all()  # アクティブなユーザーのみ
+
+# 削除済みも含める
+User.all_objects.all()  # すべてのユーザー
+
+# 削除済みのみ取得
+User.all_objects.filter(deleted_at__isnull=False)
+```
+
+**📚 参考:** [Django Custom Managers](https://docs.djangoproject.com/en/stable/topics/db/managers/)
+
+#### 1.3 ビジネスロジック（サービス層）
+
+```python
+# users/services/user_service.py
+
+class UserService:
+    """ユーザー管理のビジネスロジック"""
+    
+    @staticmethod
+    def delete_user(user_instance, request_user_id=None):
+        """
+        ユーザー削除（論理削除）
+        
+        チェック:
+        1. 自分自身の削除を防止
+        2. 最後の管理者削除を防止
+        """
+        # 自己削除チェック
+        if request_user_id and user_instance.id == request_user_id:
+            raise CannotDeleteSelfError()
+        
+        # 最後の管理者チェック
+        if user_instance.is_admin:
+            admin_count = User.objects.filter(
+                is_admin=True, is_active=True
+            ).exclude(id=user_instance.id).count()
+            
+            if admin_count == 0:
+                raise LastAdminError(action="delete")
+        
+        user_instance.soft_delete()
+```
+
+**🔍 重要ポイント:**
+
+- **サービス層**: ビジネスロジックを View から分離
+- **トランザクション**: `@transaction.atomic` でデータ整合性を保証
+- **カスタム例外**: わかりやすいエラーメッセージ
+
+**MVC と MVT の違い:**
+
+```
+MVC (一般的なパターン)          MVT (Django)
+┌────────┐                      ┌────────┐
+│  Model │                      │  Model │
+└────────┘                      └────────┘
+     ↑                               ↑
+     │                               │
+┌────────┐    ┌────────┐       ┌────────┐
+│  View  │←──→│Controller│      │  View  │
+└────────┘    └────────┘       └────────┘
+                                     ↑
+                                     │
+                              ┌────────────┐
+                              │  Template  │
+                              └────────────┘
+
+サービス層を追加した構造:
+┌────────┐
+│  Model │
+└────────┘
+     ↑
+     │
+┌────────────┐
+│  Service   │  ← ビジネスロジック
+└────────────┘
+     ↑
+     │
+┌────────┐
+│  View  │  ← HTTP リクエスト処理
+└────────┘
+```
+
+#### 1.4 ViewSet実装
+
+```python
+# users/views.py
+
+class UserViewSet(viewsets.ModelViewSet):
+    """ユーザー管理API"""
+    
+    queryset = User.objects.all()
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def get_queryset(self):
+        """
+        アクションに応じてクエリセットを変更
+        - retrieve: 削除済みも含める（明確なエラーメッセージのため）
+        - その他: 削除済みを除外
+        """
+        if self.action == "retrieve":
+            return User.all_objects.all()
+        return super().get_queryset()
+    
+    def retrieve(self, request, *args, **kwargs):
+        """詳細取得（削除済みチェック付き）"""
+        instance = self.get_object()
+        
+        # 削除済みチェック
+        if instance.deleted_at:
+            raise DeletedUserAccessError()
+        
+        return Response(UserSerializer(instance).data)
+```
+
+**同時操作対策:**
+
+```python
+def destroy(self, request, *args, **kwargs):
+    """削除（同時削除を検知）"""
+    
+    # all_objects で取得（削除済みも含める）
+    try:
+        instance = User.all_objects.get(pk=self.kwargs["pk"])
+    except User.DoesNotExist:
+        raise UserNotFoundError()
+    
+    # 別タブで既に削除されていないかチェック
+    if instance.deleted_at:
+        raise DeletedUserAccessError()
+    
+    UserService.delete_user(instance, request_user_id=request.user.id)
+    return Response(status=status.HTTP_204_NO_CONTENT)
+```
+
+**📚 参考:** [DRF ViewSets](https://www.django-rest-framework.org/api-guide/viewsets/)
+
+### 2. 監査ログシステム
+
+#### 2.1 シグナルによる自動記録
+
+Django の **シグナル** は、特定のイベント発生時に自動的に処理を実行する仕組みです。
+
+```python
+# common/signals.py
+
+from django.db.models.signals import post_save, post_delete, pre_save
+from django.dispatch import receiver
+
+@receiver(pre_save)
+def audit_pre_save(sender, instance, **kwargs):
+    """
+    更新前の値を保存
+    
+    シグナルの流れ:
+    1. user.save() が呼ばれる
+    2. pre_save シグナルが発火
+    3. 古い値を instance._old_instance に保存
+    4. データベースに保存
+    5. post_save シグナルが発火
+    """
+    if not should_audit(sender):
+        return
+    
+    if instance.pk:
+        try:
+            old = sender.objects.get(pk=instance.pk)
+            instance._old_instance = old
+        except sender.DoesNotExist:
+            pass
+
+@receiver(post_save)
+def audit_post_save(sender, instance, created, **kwargs):
+    """作成・更新を記録"""
+    if not should_audit(sender):
+        return
+    
+    action = "CREATE" if created else "UPDATE"
+    changes = {}
+    
+    if not created and hasattr(instance, "_old_instance"):
+        changes = get_field_changes(instance._old_instance, instance)
+    
+    log_audit(action, instance, changes)
+```
+
+**🔍 シグナルの仕組み:**
+
+```
+通常の処理:
+user.username = "新しい名前"
+user.save()  →  データベースに保存
+
+シグナルありの処理:
+user.username = "新しい名前"
+user.save()
+    ↓
+【pre_save シグナル】
+    ↓ 古い値を保存
+データベースに保存
+    ↓
+【post_save シグナル】
+    ↓ 監査ログに記録
+完了
+```
+
+**監査ログ出力例:**
+
+```json
+{
+  "request_id": "c0eb301c-f5db-4c2a-a35f-d843e9e11a90",
+  "timestamp": "2025-11-13 20:07:35",
+  "level": "INFO",
+  "user": "9999",
+  "action": "UPDATE",
+  "model": "User",
+  "object_id": 1,
+  "ip": "127.0.0.1",
+  "changes": "{\"username\": {\"old\": \"太郎\", \"new\": \"花子\"}}",
+  "message": "user UPDATE: 1"
+}
+```
+
+**📚 参考:** [Django Signals](https://docs.djangoproject.com/en/stable/topics/signals/)
+
+#### 2.2 ミドルウェアでリクエスト情報を記録
+
+```python
+# common/middleware.py
+
+class AuditMiddleware:
+    """監査ミドルウェア"""
+    
+    def __call__(self, request):
+        # リクエストIDを生成
+        request_id = request.META.get("HTTP_X_REQUEST_ID", str(uuid.uuid4()))
+        request._request_id = request_id
+        
+        # スレッドローカルに保存（シグナルから参照）
+        set_current_request(request)
+        
+        response = self.get_response(request)
+        
+        # レスポンスヘッダーに追加
+        response["X-Request-ID"] = request_id
+        
+        return response
+```
+
+**スレッドローカルストレージ:**
+
+```python
+# common/context.py
+
+import threading
+
+_request_local = threading.local()
+
+def set_current_request(request):
+    """リクエストをスレッドローカルに保存"""
+    _request_local.request = request
+
+def get_current_request():
+    """リクエストをスレッドローカルから取得"""
+    return getattr(_request_local, "request", None)
+```
+
+**シグナル内でリクエスト情報を取得:**
+
+```python
+def log_audit(action, instance, changes=None):
+    request = get_current_request()
+    
+    user_info = "system"
+    ip = "127.0.0.1"
+    request_id = "N/A"
+    
+    if request:
+        user_info = request.user.employee_id
+        ip = get_client_ip(request)
+        request_id = getattr(request, "_request_id", "N/A")
+    
+    audit_logger.info(f"{action}: {instance.pk}", extra={
+        "request_id": request_id,
+        "user": user_info,
+        "ip": ip,
+        "changes": json.dumps(changes or {})
+    })
+```
+
+**📚 参考:** [Django Middleware](https://docs.djangoproject.com/en/stable/topics/http/middleware/)
+
+### 3. CSV出力機能
+
+```python
+# users/views.py
+
+@action(detail=False, methods=["get"], url_path="export-csv")
+def export_csv(self, request):
+    """CSV出力（検索条件を反映）"""
+    
+    # フィルタリングを適用
+    queryset = self.filter_queryset(self.get_queryset())
+    
+    # 件数制限
+    count = queryset.count()
+    if count > 1100:
+        return Response({
+            "detail": f"CSV出力は1100件までです。現在: {count}件"
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # CSV生成
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    # ヘッダー
+    writer.writerow(["ID", "社員番号", "ユーザー名", "管理者", "作成日時"])
+    
+    # データ
+    for user in queryset:
+        writer.writerow([
+            user.id,
+            user.employee_id,
+            user.username or "",
+            "○" if user.is_admin else "",
+            user.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        ])
+    
+    # レスポンス
+    response = HttpResponse(
+        output.getvalue().encode("utf-8-sig"),  # BOM付きでExcel対応
+        content_type="text/csv; charset=utf-8-sig",
+    )
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"users_{timestamp}.csv"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    
+    return response
+```
+
+**フロントエンド側のダウンロード処理:**
+
+```javascript
+// utils/file.js
+
+export function downloadCSVFromResponse(response, defaultFilename = 'export.csv') {
+    // ファイル名を取得
+    const filename = extractFilename(
+        response.headers['content-disposition'],
+        defaultFilename
+    );
+    
+    // Blob作成
+    const blob = new Blob([response.data], {
+        type: 'text/csv; charset=utf-8-sig'
+    });
+    
+    // ダウンロード
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+}
+```
+
+**📚 参考:** [DRF Actions](https://www.django-rest-framework.org/api-guide/viewsets/#marking-extra-actions-for-routing)
+
+### 4. 多言語対応（i18n）
+
+#### 4.1 翻訳ファイルの作成
+
+```bash
+# 翻訳ファイルを生成
+python manage.py makemessages -l ja
+python manage.py makemessages -l en
+
+# .po ファイルを編集後、コンパイル
+python manage.py compilemessages
+```
+
+#### 4.2 コード内での使用
+
+```python
+from django.utils.translation import gettext_lazy as _
+
+class UserSerializer(serializers.ModelSerializer):
+    employee_id = serializers.CharField(
+        error_messages={
+            "required": _("社員番号は必須です"),
+            "blank": _("社員番号は必須です"),
+        }
+    )
+```
+
+**翻訳ファイル（.po）:**
+
+```po
+# locale/ja/LC_MESSAGES/django.po
+msgid "社員番号は必須です"
+msgstr "社員番号は必須です"
+
+# locale/en/LC_MESSAGES/django.po
+msgid "社員番号は必須です"
+msgstr "Employee ID is required"
+```
+
+**📚 参考:** [Django Internationalization](https://docs.djangoproject.com/en/stable/topics/i18n/)
+
+---
+
+## フロントエンド応用編
+
+### 1. データテーブル（ページネーション、ソート、検索）
+
+```vue
+<script setup>
+import { ref, computed, onMounted } from 'vue';
+import { usersAPI } from '@/api/users';
+
+const users = ref([]);
+const loading = ref(false);
+const searchQuery = ref('');
+const currentPage = ref(1);
+const itemsPerPage = ref(10);
+const totalItems = ref(0);
+const sortBy = ref([]);
+
+// データ取得
+async function loadItems({ page, itemsPerPage, sortBy }) {
+    loading.value = true;
+    
+    try {
+        const params = {
+            page,
+            page_size: itemsPerPage,
+        };
+        
+        // 検索クエリ
+        if (searchQuery.value?.trim()) {
+            params.search = searchQuery.value.trim();
+        }
+        
+        // ソート
+        if (sortBy && sortBy.length > 0) {
+            const sort = sortBy[0];
+            const orderPrefix = sort.order === 'desc' ? '-' : '';
+            params.ordering = `${orderPrefix}${sort.key}`;
+        }
+        
+        const response = await usersAPI.list(params);
+        users.value = response.data.results;
+        totalItems.value = response.data.count;
+    } finally {
+        loading.value = false;
+    }
+}
+
+// 検索時の処理（デバウンス）
+let searchTimer = null;
+watch(searchQuery, () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+        currentPage.value = 1;
+        loadItems({
+            page: 1,
+            itemsPerPage: itemsPerPage.value,
+            sortBy: sortBy.value,
+        });
+    }, 300);
+});
+
+onMounted(() => {
+    loadItems({
+        page: currentPage.value,
+        itemsPerPage: itemsPerPage.value,
+        sortBy: sortBy.value,
+    });
+});
+</script>
+
+<template>
+    <v-data-table-server
+        :headers="headers"
+        :items="users"
+        :items-length="totalItems"
+        :loading="loading"
+        v-model:page="currentPage"
+        v-model:items-per-page="itemsPerPage"
+        v-model:sort-by="sortBy"
+        @update:options="loadItems"
+    >
+        <!-- カスタムスロット -->
+        <template #item.is_admin="{ item }">
+            <v-icon :color="item.is_admin ? 'success' : 'grey'">
+                {{ item.is_admin ? 'check' : 'remove' }}
+            </v-icon>
+        </template>
+    </v-data-table-server>
+</template>
+```
+
+**🔍 重要ポイント:**
+
+- **v-data-table-server**: サーバー側ページネーション（大量データに対応）
+- **デバウンス**: 検索入力のたびにAPIを呼ばない（300ms待機）
+- **クリーンアップ**: `onBeforeUnmount` でタイマーをクリア
+
+**📚 参考:** [Vuetify Data Tables](https://vuetifyjs.com/en/components/data-tables/basics/)
+
+### 2. フォームバリデーション
+
+```javascript
+// composables/useValidation.js
+
+export function useValidation() {
+    const { t } = useI18n();
+    
+    const createRules = {
+        // ユーザー名（3文字以上）
+        username() {
+            return [
+                (value) => !!value || t('form.validation.required', { field: t('form.fields.username') }),
+                (value) => value.length >= 3 || t('form.validation.minLength', { field: t('form.fields.username'), min: 3 }),
+            ];
+        },
+        
+        // 社員番号（半角数字のみ）
+        employeeId() {
+            return [
+                (value) => !!value || t('form.validation.required', { field: t('form.fields.employeeId') }),
+                (value) => /^\d{1,50}$/.test(value) || t('form.validation.employeeIdFormat'),
+            ];
+        },
+        
+        // パスワード（英数字8文字以上）
+        newPassword() {
+            return [
+                (value) => !!value || t('form.validation.required', { field: t('form.fields.password') }),
+                (value) => value.length >= 8 || t('form.validation.minLength', { field: t('form.fields.password'), min: 8 }),
+                (value) => /(?=.*[a-zA-Z])(?=.*\d)/.test(value) || t('form.validation.passwordStrength'),
+            ];
+        },
+    };
+    
+    return { createRules };
+}
+```
+
+**使用例:**
+
+```vue
+<script setup>
+const { createRules } = useValidation();
+
+const usernameRules = createRules.username();
+const passwordRules = createRules.newPassword();
+</script>
+
+<template>
+    <v-form ref="form">
+        <v-text-field
+            v-model="formData.username"
+            :rules="usernameRules"
+            label="ユーザー名"
+        />
+        
+        <v-text-field
+            v-model="formData.password"
+            :rules="passwordRules"
+            type="password"
+            label="パスワード"
+        />
+    </v-form>
+</template>
+```
+
+### 3. エラーハンドリング
+
+```javascript
+// composables/useApiError.js
+
+export function useApiError() {
+    const notification = useNotificationStore();
+    const { t } = useI18n();
+    
+    async function handleApiError(error, fallbackMessageKey = null) {
+        let errorMessage = null;
+        
+        if (error.response?.data) {
+            let errorData = error.response.data;
+            
+            // Blob エラーレスポンスの場合は JSON に変換
+            if (errorData instanceof Blob) {
+                try {
+                    const text = await errorData.text();
+                    errorData = JSON.parse(text);
+                } catch (e) {
+                    errorMessage = t('backend.errors.UNKNOWN_ERROR');
+                }
+            }
+            
+            // Django が翻訳済みの detail を優先
+            if (errorData.detail) {
+                errorMessage = errorData.detail;
+            }
+            
+            // フィールド別エラー
+            if (!errorMessage) {
+                errorMessage = extractFirstFieldError(errorData);
+            }
+        }
+        
+        // フォールバック
+        if (!errorMessage && fallbackMessageKey) {
+            errorMessage = t(fallbackMessageKey);
+        }
+        
+        if (!errorMessage) {
+            errorMessage = t('backend.errors.UNKNOWN_ERROR');
+        }
+        
+        notification.error(errorMessage, 7000);
+        return errorMessage;
+    }
+    
+    return { handleApiError };
+}
+```
+
+---
+
+## 開発ガイドライン（応用編）
+
+### 1. マイグレーションの管理
+
+#### マイグレーションの作成と適用
+
+```bash
+# モデルを変更した後
+python manage.py makemigrations
+
+# SQLを確認
+python manage.py sqlmigrate users 0002
+
+# データベースに反映
+python manage.py migrate
+
+# マイグレーション状態を確認
+python manage.py showmigrations
+```
+
+#### データマイグレーション
+
+```python
+# users/migrations/0002_create_initial_superuser.py
+
+from django.db import migrations
+
+def create_initial_superuser(apps, schema_editor):
+    """初期管理者を作成"""
+    User = apps.get_model('users', 'User')
+    
+    if User.objects.filter(employee_id='9999').exists():
+        return
+    
+    from django.contrib.auth.hashers import make_password
+    
+    User.objects.create(
+        employee_id='9999',
+        username='管理者',
+        password=make_password('test1234'),
+        is_admin=True,
+        is_active=True,
+    )
+
+def reverse_func(apps, schema_editor):
+    """ロールバック処理"""
+    User = apps.get_model('users', 'User')
+    User.objects.filter(employee_id='9999').delete()
+
+class Migration(migrations.Migration):
+    dependencies = [
+        ('users', '0001_initial'),
+    ]
+    
+    operations = [
+        migrations.RunPython(create_initial_superuser, reverse_func),
+    ]
+```
+
+**📚 参考:** [Django Migrations](https://docs.djangoproject.com/en/stable/topics/migrations/)
+
+### 2. パフォーマンス最適化
+
+#### N+1問題の回避
+
+```python
+# ❌ 悪い例（N+1問題）
+users = User.objects.all()
+for user in users:
+    print(user.groups.all())  # 各ユーザーごとにクエリ発行
+
+# ✅ 良い例（prefetch_related）
+users = User.objects.prefetch_related('groups').all()
+for user in users:
+    print(user.groups.all())  # 1回のクエリで取得済み
+```
+
+#### インデックスの活用
+
+```python
+class User(models.Model):
+    employee_id = models.CharField(max_length=50, db_index=True)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['employee_id']),
+            models.Index(fields=['is_admin', 'is_active']),
+            models.Index(fields=['-created_at']),
+        ]
+```
+
+**📚 参考:** [Django Database Optimization](https://docs.djangoproject.com/en/stable/topics/db/optimization/)
+
+### 3. テストの書き方
+
+```python
+# users/tests.py
+
+from django.test import TestCase
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+class UserModelTest(TestCase):
+    def test_soft_delete(self):
+        """論理削除のテスト"""
+        user = User.objects.create_user(
+            employee_id='12345',
+            username='テストユーザー',
+            password='test1234'
+        )
+        
+        user.soft_delete()
+        
+        # 削除フラグが立つ
+        self.assertIsNotNone(user.deleted_at)
+        self.assertFalse(user.is_active)
+        
+        # objects では取得できない
+        self.assertFalse(User.objects.filter(id=user.id).exists())
+        
+        # all_objects では取得できる
+        self.assertTrue(User.all_objects.filter(id=user.id).exists())
+```
+
+**テスト実行:**
+
+```bash
+# すべてのテスト
+python manage.py test
+
+# 特定のアプリのみ
+python manage.py test users
+
+# カバレッジ測定
+coverage run manage.py test
+coverage report
+```
+
+**📚 参考:** [Django Testing](https://docs.djangoproject.com/en/stable/topics/testing/)
+
+---
+
+## デバッグとパフォーマンス分析
+
+### 1. Django Debug Toolbar
+
+Django Debug Toolbar は開発時にリクエストの詳細情報を表示するツールです。
+
+#### 1.1 インストールと設定
+
+```python
+# settings.py
+
+INSTALLED_APPS = [
+    # ...
+    'debug_toolbar',
+]
+
+MIDDLEWARE = [
+    'debug_toolbar.middleware.DebugToolbarMiddleware',  # 先頭付近に追加
+    # ...
+]
+
+INTERNAL_IPS = [
+    '127.0.0.1',
+]
+```
+
+```python
+# urls.py
+
+from django.conf import settings
+
+if settings.DEBUG:
+    import debug_toolbar
+    urlpatterns = [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ] + urlpatterns
+```
+
+**📚 参考:** [Django Debug Toolbar](https://django-debug-toolbar.readthedocs.io/)
+
+#### 1.2 使い方
+
+開発サーバーを起動すると、ブラウザの右側にツールバーが表示されます。
+
+```
+┌─────────────────────────────────────────┐
+│  ページ内容                              │
+│                                         │  ┌──────────┐
+│                                         │  │ DjDT     │
+│                                         │  │ 7 SQL    │
+│                                         │  │ 0.19s    │
+│                                         │  └──────────┘
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+クリックすると詳細情報が表示されます：
+
+- **SQL**: 実行されたSQLクエリ
+- **Time**: 処理時間
+- **Request**: リクエスト情報
+- **Settings**: 設定値
+- **Cache**: キャッシュの使用状況
+
+### 2. django-querycount の読み方
+
+django-querycount は各リクエストで実行されたSQLクエリの統計を表示します。
+
+#### 2.1 基本的な見方
+
+```
+|------|-----------|----------|----------|----------|------------|
+| Type | Database  |   Reads  |  Writes  |  Totals  | Duplicates |
+|------|-----------|----------|----------|----------|------------|
+| RESP |  default  |    4     |    0     |    4     |     0      |
+|------|-----------|----------|----------|----------|------------|
+Total queries: 4 in 0.2093s
+```
+
+**各項目の意味:**
+
+| 項目 | 説明 |
+|------|------|
+| **Type** | リクエストタイプ (RESP = レスポンス) |
+| **Database** | データベース名 |
+| **Reads** | SELECT クエリの数 |
+| **Writes** | INSERT/UPDATE/DELETE の数 |
+| **Totals** | 合計クエリ数 |
+| **Duplicates** | 重複クエリの数 |
+| **Total queries: X in Y.Zs** | 合計クエリ数と実行時間 |
+
+#### 2.2 実際のログ分析
+
+##### 例1: ログアウト処理
+
+```
+http://localhost:8000/api/auth/logout/
+|------|-----------|----------|----------|----------|------------|
+| Type | Database  |   Reads  |  Writes  |  Totals  | Duplicates |
+|------|-----------|----------|----------|----------|------------|
+| RESP |  default  |    3     |    3     |    6     |     0      |
+|------|-----------|----------|----------|----------|------------|
+Total queries: 6 in 0.6445s
+```
+
+**解説:**
+
+- **Reads: 3** - セッション取得、ユーザー情報取得など
+- **Writes: 3** - BEGIN, DELETE (セッション削除), COMMIT
+- **合計: 6クエリ** - 妥当な数（ログアウトは重い処理ではない）
+- **実行時間: 0.64秒** - やや遅い（通常は0.1秒以下が理想）
+
+**実行されたSQL:**
+
+```sql
+-- 1. セッション取得
+SELECT * FROM "django_session" 
+WHERE "session_key" = 'xxx' 
+AND "expire_date" > '2025-11-18T10:54:15'
+
+-- 2. ユーザー情報取得
+SELECT * FROM "users" 
+WHERE "deleted_at" IS NULL 
+AND "id" = 1
+
+-- 3. セッションの再取得（不要なクエリ）
+SELECT * FROM "django_session" 
+WHERE "session_key" = 'xxx'
+
+-- 4. トランザクション開始
+BEGIN
+
+-- 5. セッション削除
+DELETE FROM "django_session" 
+WHERE "session_key" IN ('xxx')
+
+-- 6. コミット
+COMMIT
+```
+
+**改善ポイント:**
+
+- セッションを2回取得している（クエリ3が重複）
+- キャッシュやセッション設定の見直しで改善可能
+
+##### 例2: ログイン成功
+
+```
+http://localhost:8000/api/auth/login/
+|------|-----------|----------|----------|----------|------------|
+| Type | Database  |   Reads  |  Writes  |  Totals  | Duplicates |
+|------|-----------|----------|----------|----------|------------|
+| RESP |  default  |    3     |    4     |    7     |     0      |
+|------|-----------|----------|----------|----------|------------|
+Total queries: 7 in 0.1966s
+```
+
+**実行されたSQL:**
+
+```sql
+-- 1. ユーザー認証
+SELECT * FROM "users" 
+WHERE "deleted_at" IS NULL 
+AND "employee_id" = '9999'
+ORDER BY "created_at" DESC 
+LIMIT 1
+
+-- 2. セッション存在チェック
+SELECT 1 FROM "django_session" 
+WHERE "session_key" = 'xxx' 
+LIMIT 1
+
+-- 3-5. セッション作成（トランザクション）
+BEGIN
+INSERT INTO "django_session" (...) VALUES (...)
+COMMIT
+
+-- 6. ユーザー情報再取得
+SELECT * FROM "users" 
+WHERE "deleted_at" IS NULL 
+AND "id" = 1
+
+-- 7. last_login 更新
+UPDATE "users" 
+SET "last_login" = '2025-11-18T10:54:24' 
+WHERE "id" = 1
+```
+
+**解説:**
+
+- **7クエリ** - ログイン処理としては妥当
+- **0.19秒** - 許容範囲
+- **重複なし** - 良好
+
+##### 例3: ユーザー一覧取得
+
+```
+http://localhost:8000/api/users/?page=1&page_size=10
+|------|-----------|----------|----------|----------|------------|
+| Type | Database  |   Reads  |  Writes  |  Totals  | Duplicates |
+|------|-----------|----------|----------|----------|------------|
+| RESP |  default  |    4     |    0     |    4     |     0      |
+|------|-----------|----------|----------|----------|------------|
+Total queries: 4 in 0.2093s
+```
+
+**実行されたSQL:**
+
+```sql
+-- 1. セッション検証
+SELECT * FROM "django_session" 
+WHERE "expire_date" > '2025-11-18T10:54:26' 
+AND "session_key" = 'xxx'
+
+-- 2. ログインユーザー情報取得
+SELECT * FROM "users" 
+WHERE "deleted_at" IS NULL 
+AND "id" = 1
+
+-- 3. 件数カウント（ページネーション用）
+SELECT COUNT(*) AS "__count" 
+FROM "users" 
+WHERE "deleted_at" IS NULL
+
+-- 4. データ取得
+SELECT * FROM "users" 
+WHERE "deleted_at" IS NULL 
+ORDER BY "id" ASC 
+LIMIT 10
+```
+
+**解説:**
+
+- **4クエリ** - 理想的（最小限）
+- **0.20秒** - 許容範囲
+- **ページネーション** - COUNT と LIMIT/OFFSET を使用
+
+##### 例4: ユーザー更新（問題あり）
+
+```
+http://localhost:8000/api/users/1/
+|------|-----------|----------|----------|----------|------------|
+| Type | Database  |   Reads  |  Writes  |  Totals  | Duplicates |
+|------|-----------|----------|----------|----------|------------|
+| RESP |  default  |    6     |    3     |    9     |     2      |
+|------|-----------|----------|----------|----------|------------|
+Total queries: 9 in 0.1296s
+```
+
+**⚠️ 問題点: Duplicates が 2**
+
+```sql
+-- ❌ 同じクエリが2回実行されている
+Executed 2 time(s).
+SELECT * FROM "users" 
+WHERE "deleted_at" IS NULL 
+AND "id" = 1
+```
+
+**原因と対策:**
+
+```python
+# ❌ 悪い例
+def update(self, request, *args, **kwargs):
+    user = User.objects.get(pk=self.kwargs['pk'])  # 1回目
+    
+    # バリデーション処理...
+    
+    user = User.objects.get(pk=self.kwargs['pk'])  # 2回目（重複）
+    user.username = request.data['username']
+    user.save()
+
+# ✅ 良い例
+def update(self, request, *args, **kwargs):
+    user = User.objects.get(pk=self.kwargs['pk'])  # 1回だけ
+    
+    # バリデーション処理...
+    
+    user.username = request.data['username']
+    user.save()
+```
+
+**📚 参考:** [django-querycount](https://github.com/bradmontgomery/django-querycount)
+
+### 3. N+1問題の検出と解決
+
+#### 3.1 N+1問題とは
+
+```python
+# ❌ N+1問題（悪い例）
+users = User.objects.all()  # 1回のクエリ
+
+for user in users:
+    print(user.groups.all())  # ユーザーごとにクエリ（N回）
+    # → 合計: 1 + N回のクエリ
+```
+
+**ログ出力例:**
+
+```
+|------|-----------|----------|----------|----------|------------|
+| Type | Database  |   Reads  |  Writes  |  Totals  | Duplicates |
+|------|-----------|----------|----------|----------|------------|
+| RESP |  default  |   101    |    0     |   101    |    100     |
+|------|-----------|----------|----------|----------|------------|
+Total queries: 101 in 2.5s
+```
+
+**⚠️ 100人のユーザーを取得すると 101回のクエリ！**
+
+#### 3.2 解決方法
+
+```python
+# ✅ select_related（1対1、多対1）
+users = User.objects.select_related('profile').all()
+for user in users:
+    print(user.profile.bio)  # クエリなし（JOIN済み）
+
+# ✅ prefetch_related（多対多、1対多）
+users = User.objects.prefetch_related('groups').all()
+for user in users:
+    print(user.groups.all())  # クエリなし（事前取得済み）
+```
+
+**改善後のログ:**
+
+```
+|------|-----------|----------|----------|----------|------------|
+| Type | Database  |   Reads  |  Writes  |  Totals  | Duplicates |
+|------|-----------|----------|----------|----------|------------|
+| RESP |  default  |    2     |    0     |    2     |     0      |
+|------|-----------|----------|----------|----------|------------|
+Total queries: 2 in 0.05s
+```
+
+**📚 参考:** [Django Select Related](https://docs.djangoproject.com/en/stable/ref/models/querysets/#select-related)
+
+### 4. パフォーマンスのベストプラクティス
+
+#### 4.1 クエリ数の目安
+
+| クエリ数 | 評価 | 対応 |
+|---------|------|------|
+| 1-5 | ✅ 優秀 | 問題なし |
+| 6-10 | ⚠️ 許容範囲 | 必要に応じて最適化 |
+| 11-20 | ⚠️ 要注意 | 最適化を検討 |
+| 21+ | ❌ 問題あり | 必ず最適化 |
+
+#### 4.2 実行時間の目安
+
+| 時間 | 評価 | ユーザー体験 |
+|------|------|------------|
+| < 0.1秒 | ✅ 優秀 | 即座に応答 |
+| 0.1-0.3秒 | ⚠️ 許容範囲 | わずかな遅延 |
+| 0.3-1.0秒 | ⚠️ 要注意 | 体感的に遅い |
+| > 1.0秒 | ❌ 問題あり | ユーザーが不満 |
+
+#### 4.3 最適化チェックリスト
+
+```python
+# 1. インデックスの確認
+class User(models.Model):
+    employee_id = models.CharField(db_index=True)  # ✅ インデックス
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['is_admin', 'is_active']),  # 複合インデックス
+        ]
+
+# 2. select_related / prefetch_related
+queryset = User.objects.select_related('profile').prefetch_related('groups')
+
+# 3. only() / defer() で必要なフィールドのみ取得
+User.objects.only('id', 'username', 'email')
+
+# 4. exists() で存在チェック
+if User.objects.filter(employee_id='9999').exists():  # ✅ 高速
+    pass
+
+# ❌ count() は遅い
+if User.objects.filter(employee_id='9999').count() > 0:
+    pass
+
+# 5. bulk_create() で一括挿入
+users = [User(...), User(...), User(...)]
+User.objects.bulk_create(users)  # 1回のクエリ
+
+# ❌ ループで save() は遅い
+for user in users:
+    user.save()  # N回のクエリ
+```
+
+### 5. 実践的なデバッグ例
+
+#### 5.1 CSV出力のエラー
+
+```
+http://localhost:8000/api/users/export-csv/
+|------|-----------|----------|----------|----------|------------|
+| Type | Database  |   Reads  |  Writes  |  Totals  | Duplicates |
+|------|-----------|----------|----------|----------|------------|
+| RESP |  default  |    3     |    0     |    3     |     0      |
+|------|-----------|----------|----------|----------|------------|
+Total queries: 3 in 0.1911s
+
+WARNING 2025-11-18 19:54:34,763 log Bad Request: /api/users/export-csv/
+WARNING 2025-11-18 19:54:34,765 basehttp "GET /api/users/export-csv/ HTTP/1.1" 400 105
+```
+
+**分析:**
+
+- **400 Bad Request** - クライアント側のエラー
+- **クエリ数: 3** - データ取得前にエラー
+- **0.19秒** - バリデーションエラー
+
+**実行されたSQL:**
+
+```sql
+-- 1. セッション検証
+SELECT * FROM "django_session" ...
+
+-- 2. ユーザー情報取得
+SELECT * FROM "users" WHERE "id" = 1
+
+-- 3. 件数カウント
+SELECT COUNT(*) FROM "users" WHERE "deleted_at" IS NULL
+```
+
+**エラー原因:**
+
+```python
+# views.py
+def export_csv(self, request):
+    queryset = self.filter_queryset(self.get_queryset())
+    count = queryset.count()
+    
+    if count > 1100:
+        return Response({
+            "detail": "CSV出力は1100件までです。現在: {count}件"
+        }, status=400)
+    
+    if count == 0:
+        return Response({
+            "detail": "出力対象のデータがありません。"
+        }, status=400)
+```
+
+**対策:**
+
+フロントエンド側で適切なエラーハンドリング：
+
+```javascript
+try {
+    const response = await usersAPI.exportCSV(params);
+    downloadCSVFromResponse(response, 'users.csv');
+} catch (error) {
+    // 400エラーの場合は detail メッセージを表示
+    if (error.response?.status === 400) {
+        const message = error.response.data.detail;
+        notification.error(message);
+    }
+}
+```
+
+### 6. 開発環境での設定
+
+#### 6.1 django-querycount の詳細設定
+
+```python
+# settings.py
+
+QUERYCOUNT = {
+    'THRESHOLDS': {
+        'MEDIUM': 50,      # 50クエリで警告
+        'HIGH': 200,       # 200クエリでアラート
+        'MIN_TIME_TO_LOG': 0,  # 0秒以上で記録
+        'MIN_QUERY_COUNT_TO_LOG': 0,  # 0クエリ以上で記録
+    },
+    'IGNORE_REQUEST_PATTERNS': [
+        r'^/__debug__/',   # Debug Toolbarを除外
+    ],
+    'IGNORE_SQL_PATTERNS': [],
+    'DISPLAY_DUPLICATES': 10,  # 重複クエリを10個まで表示
+    'RESPONSE_HEADER': 'X-DjangoQueryCount-Count',  # レスポンスヘッダー
+}
+```
+
+#### 6.2 本番環境での注意
+
+```python
+# settings.py
+
+if DEBUG:
+    INSTALLED_APPS += ['debug_toolbar']
+    MIDDLEWARE = ['debug_toolbar.middleware.DebugToolbarMiddleware'] + MIDDLEWARE
+
+# ⚠️ 本番環境では必ず DEBUG = False
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
+```
+
+**本番環境でのログ記録:**
+
+```python
+# settings.py
+
+LOGGING = {
+    'version': 1,
+    'handlers': {
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': BASE_DIR / 'logs' / 'django.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10MB
+            'backupCount': 10,
+        },
+    },
+    'loggers': {
+        'django.db.backends': {  # SQLクエリをログに記録
+            'handlers': ['file'],
+            'level': 'DEBUG',
+        },
+    },
+}
+```
+
+---
+
+## まとめ
+
+このドキュメントでは、Django + Vue.js 3 の実践的な実装パターンを解説しました。
+
+**重要な実装パターン:**
+
+- **論理削除**: データ復旧可能な削除方式
+- **監査ログ**: シグナルによる自動記録
+- **権限管理**: 最後の管理者削除防止
+- **CSV出力**: 検索条件を反映したエクスポート
+- **同時操作対策**: 削除済みデータの検知
+
+**参考リンク:**
+
+- [Django 公式ドキュメント](https://docs.djangoproject.com/)
+- [Django REST Framework](https://www.django-rest-framework.org/)
+- [Vue.js 3](https://vuejs.org/)
+- [Pinia](https://pinia.vuejs.org/)
+- [Vuetify 3](https://vuetifyjs.com/)
+- [Vue Router 4](https://router.vuejs.org/)
+
+開発を進める中で不明点があれば、公式ドキュメントを参照してください!

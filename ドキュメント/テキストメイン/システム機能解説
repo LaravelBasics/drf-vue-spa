@@ -1,0 +1,2009 @@
+# システム機能解説ドキュメント（概念編）
+
+> **対象者**: 各機能が「何をしているのか」を理解したい方  
+> **アプローチ**: コードより概念と流れを重視した解説
+
+---
+
+## 📖 目次
+
+1. [認証システム](#認証システム)
+2. [データ変換層（Serializer）](#データ変換層serializer)
+3. [ビジネスロジック層（ViewSet vs Generic Views）](#ビジネスロジック層viewset-vs-generic-views)
+4. [ルーティング（urls.py）](#ルーティングurlspy)
+5. [データモデル層](#データモデル層)
+6. [サービスクラス層](#サービスクラス層)
+7. [フロントエンド状態管理（Pinia）](#フロントエンド状態管理pinia)
+8. [UIコンポーネント（Vuetify 3）](#uiコンポーネントvuetify-3)
+9. [HTTP通信層（Axios）](#http通信層axios)
+10. [ルーティングとガード](#ルーティングとガード)
+11. [再利用可能なロジック（Composables）](#再利用可能なロジックcomposables)
+12. [定数管理（Constants）](#定数管理constants)
+13. [プラグイン層](#プラグイン層)
+14. [エントリーポイント（main.js / App.vue）](#エントリーポイントmainjs--appvue)
+15. [設定ファイル（settings.py）](#設定ファイルsettingspy)
+16. [権限管理システム](#権限管理システム)
+17. [バリデーション層](#バリデーション層)
+18. [国際化対応（i18n）](#国際化対応i18n)
+19. [マイグレーションシステム](#マイグレーションシステム)
+20. [監査証跡システム](#監査証跡システム)
+21. [共通機能（Common）](#共通機能common)
+
+---
+
+## 認証システム
+
+### 🎯 役割
+
+「このユーザーは本人か？」「ログインしているか？」を管理する
+
+### 📍 処理の流れ
+
+```
+【ログイン時】
+① ユーザーが社員番号とパスワードを入力
+   ↓
+② フロントエンド → POST /api/auth/login/
+   ↓
+③ Django の authenticate() がカスタム認証バックエンドを呼び出し
+   ↓
+④ EmployeeIdBackend が社員番号でユーザーを検索
+   ↓
+⑤ パスワードをハッシュ化して比較（check_password）
+   ↓
+⑥ 認証成功 → login() でセッション作成
+   ↓
+⑦ Cookie に sessionid をセット
+   ↓
+⑧ フロントエンドにユーザー情報を返す
+```
+
+### 🔑 重要な概念
+
+**認証バックエンド（Authentication Backend）**
+
+Djangoでは、認証バックエンドをカスタマイズすることで、デフォルトのusername/passwordではなく、任意のフィールドでログインできるようになる
+
+```
+通常のDjango認証:
+username + password でログイン
+
+このシステム:
+employee_id（社員番号）+ password でログイン
+```
+
+**なぜカスタムが必要？**
+
+- 社員番号でログインしたい
+- usernameは表示名として使いたい
+- 既存の社員管理システムと統合しやすい
+
+**セッションの仕組み**
+
+```
+【初回ログイン】
+サーバー: ランダムなセッションID「abc123」を生成
+         ↓
+         データベースに保存
+         ↓
+         Cookie に「sessionid=abc123」をセット
+
+【2回目以降】
+ブラウザ: Cookie「sessionid=abc123」を自動送信
+         ↓
+サーバー: データベースで「abc123」を検索
+         ↓
+         紐づくユーザー情報を取得
+         ↓
+         「このユーザーはログイン済み」と判断
+```
+
+**セッションのメリット**
+
+- Cookie は HttpOnly（JavaScript から読めない）→ XSS対策
+- サーバー側でセッションを削除すれば即座に無効化できる
+- 有効期限を柔軟に管理できる
+
+**📚 参考**: [Django Authentication System](https://docs.djangoproject.com/ja/stable/topics/auth/)
+
+---
+
+## データ変換層（Serializer）
+
+### 🎯 役割
+
+**Python オブジェクト ⇔ JSON の相互変換**
+
+### 📍 なぜ必要？
+
+```
+【問題】
+データベース: Userオブジェクト（Python）
+フロントエンド: JSON（JavaScript）
+→ そのままでは送受信できない！
+
+【解決】
+Serializer が自動変換してくれる
+```
+
+### 🔄 動作の流れ
+
+**シリアライズ（Python → JSON）**
+
+```
+① データベースからUserオブジェクトを取得
+   User(id=1, employee_id="9999", username="太郎")
+   ↓
+② UserSerializer に渡す
+   ↓
+③ 自動的にJSONに変換
+   {"id": 1, "employee_id": "9999", "username": "太郎"}
+   ↓
+④ APIレスポンスとして送信
+```
+
+**デシリアライズ（JSON → Python）**
+
+```
+① フロントエンドからJSON受信
+   {"employee_id": "1234", "username": "花子"}
+   ↓
+② UserSerializer で検証
+   ・employee_id は必須か？
+   ・username は3文字以上か？
+   ・既に存在する社員番号ではないか？
+   ↓
+③ 検証成功 → Pythonオブジェクトに変換
+   ↓
+④ データベースに保存
+```
+
+### 🛡️ バリデーションの階層
+
+DRFのバリデーションは3つのレベルで実行される：フィールドレベル、オブジェクトレベル、カスタムバリデータ
+
+```
+【レイヤー1: フィールド単位のバリデーション】
+各フィールドを個別にチェック
+
+例: validate_username(self, value)
+    「admin」を含んではいけない
+
+【レイヤー2: オブジェクト全体のバリデーション】
+複数フィールドの関係性をチェック
+
+例: validate(self, data)
+    開始日 < 終了日 であるか
+
+【レイヤー3: カスタムバリデータ】
+再利用可能な検証ロジック
+
+例: validators=[validate_phone_number]
+    複数のシリアライザーで使い回せる
+```
+
+### 📊 実行順序
+
+シリアライザは is_valid() を呼び出すと、まずフィールドをPythonオブジェクトに変換し、次に validate_<field_name> を実行し、その後 validators 属性のバリデータを実行し、最後に validate() メソッドを実行する
+
+```
+is_valid() 呼び出し
+   ↓
+① データ型変換（文字列 → 数値など）
+   ↓
+② validate_<field_name>() 実行
+   ↓
+③ validators=[] の関数を実行
+   ↓
+④ validate() メソッド実行
+   ↓
+すべて成功 → validated_data に保存
+```
+
+### 🎨 ModelSerializer の利点
+
+ModelSerializerは、モデルフィールドから自動的にシリアライザフィールドを生成し、unique_together などのバリデータも自動生成する
+
+```
+通常のSerializer:
+すべてのフィールドを手動で定義
+
+ModelSerializer:
+モデルから自動生成
+  ↓
+・フィールド定義が不要
+・バリデータも自動追加
+・create/update メソッドも自動実装
+```
+
+**📚 参考**: [DRF Serializers](https://www.django-rest-framework.org/api-guide/serializers/)
+
+---
+
+## ビジネスロジック層（ViewSet vs Generic Views）
+
+### 🎯 役割
+
+APIエンドポイントの処理を担当
+
+### 📊 階層構造の理解
+
+DRFのViewは階層構造になっており、APIView → ViewSet → GenericViewSet → ModelViewSet の順に機能が追加される
+
+```
+【階層ピラミッド】
+
+                    ModelViewSet
+                   （すべて込み）
+                         ↑
+                 GenericViewSet
+              （get_object等の便利メソッド）
+                         ↑
+                     ViewSet
+                （アクション方式）
+                         ↑
+                     APIView
+                  （HTTP メソッド）
+```
+
+### 🔍 各層の役割
+
+**APIView（最下層）**
+
+APIViewはHTTPメソッド（get, post, put, patch, delete）のハンドラを提供する
+
+```
+役割: HTTPメソッドを直接処理
+
+使うとき:
+・完全にカスタムな処理
+・既存の枠に収まらない複雑なロジック
+
+特徴:
+・最も自由度が高い
+・すべて自分で実装する必要がある
+```
+
+**ViewSet（中層）**
+
+ViewSetは、HTTPメソッドではなく「アクション」（list, create, retrieve, update, destroy）として処理を整理する。Routerと組み合わせることで、URLを自動生成できる
+
+```
+役割: REST的な「アクション」で整理
+
+使うとき:
+・標準的なREST API
+・Router で URL を自動生成したい
+
+特徴:
+・list（一覧）、create（作成）など意味のある名前
+・URL設定が簡単
+```
+
+**GenericViewSet（上層）**
+
+GenericViewSetは、GenericAPIViewを継承し、get_object()やget_queryset()などの便利メソッドを提供するが、アクション自体は実装していない
+
+```
+役割: 便利メソッドを提供
+
+使うとき:
+・一部のアクションだけ実装したい
+・Mixinと組み合わせたい
+
+特徴:
+・ページネーション機能
+・フィルタリング機能
+・get_object() で個別取得
+```
+
+**ModelViewSet（最上層）**
+
+ModelViewSetは、create, list, retrieve, update, partial_update, destroy の全アクションを自動実装する
+
+```
+役割: CRUD操作を自動実装
+
+使うとき:
+・シンプルなCRUD API
+・データベースモデルに対応したAPI
+
+特徴:
+・数行のコードでAPIが完成
+・最も生産性が高い
+```
+
+### ⚖️ 使い分けの判断基準
+
+小規模で基本的な要件にはGeneric API Viewsを使用し、複雑なカスタマイズや大規模プロジェクトにはViewSetsを使用することが推奨される
+
+```
+【判断フローチャート】
+
+標準的なCRUD操作だけ？
+  YES → ModelViewSet を使う
+  NO  ↓
+
+一部のアクションだけ必要？
+  YES → GenericViewSet + Mixin
+  NO  ↓
+
+複雑なビジネスロジックあり？
+  YES → APIView を使う
+```
+
+**実例:**
+
+```
+ユーザー管理API:
+→ ModelViewSet
+理由: 標準的なCRUD操作のみ
+
+ログインAPI:
+→ APIView
+理由: 認証ロジックが特殊
+
+統計情報API:
+→ APIView
+理由: データベース操作が複雑
+```
+
+**📚 参考**: [DRF ViewSets](https://www.django-rest-framework.org/api-guide/viewsets/)
+
+---
+
+## ルーティング（urls.py）
+
+### 🎯 役割
+
+「このURLにアクセスしたら、どの処理を実行するか」を定義
+
+### 📍 ルーティングの流れ
+
+```
+① ブラウザ: GET /api/users/1/
+   ↓
+② Django: urls.py を読み込み
+   ↓
+③ パターンマッチング
+   /api/users/<int:pk>/ に一致
+   ↓
+④ UserViewSet.retrieve() を呼び出し
+   ↓
+⑤ レスポンスを返す
+```
+
+### 🔄 Router の自動生成
+
+**手動設定（従来）**
+
+```
+urls.py で1つ1つ定義:
+
+path('users/', UserViewSet.as_view({'get': 'list'}))
+path('users/<int:pk>/', UserViewSet.as_view({'get': 'retrieve'}))
+path('users/<int:pk>/', UserViewSet.as_view({'put': 'update'}))
+...（繰り返し）
+```
+
+**Router 使用（推奨）**
+
+```
+router = DefaultRouter()
+router.register('users', UserViewSet)
+
+↓ これだけで自動生成
+
+GET    /api/users/          → list（一覧）
+POST   /api/users/          → create（作成）
+GET    /api/users/1/        → retrieve（詳細）
+PUT    /api/users/1/        → update（更新）
+PATCH  /api/users/1/        → partial_update（部分更新）
+DELETE /api/users/1/        → destroy（削除）
+```
+
+### 🎨 カスタムアクション
+
+```
+@action(detail=True, methods=['post'])
+def set_password(self, request, pk=None):
+    ...
+
+↓ Router が自動認識
+
+POST /api/users/1/set_password/
+```
+
+**detail=True vs detail=False**
+
+```
+detail=True（個別リソース）:
+/api/users/1/set_password/
+↑ 特定のユーザーに対する操作
+
+detail=False（コレクション）:
+/api/users/export-csv/
+↑ ユーザー全体に対する操作
+```
+
+**📚 参考**: [DRF Routers](https://www.django-rest-framework.org/api-guide/routers/)
+
+---
+
+## データモデル層
+
+### 🎯 役割
+
+データベースの「設計図」を定義
+
+### 📊 モデルの責務
+
+```
+【モデルがやること】
+・テーブル構造の定義
+・フィールドの型・制約
+・リレーションシップ
+・ビジネスロジック（メソッド）
+・バリデーション
+
+【モデルがやらないこと】
+・HTTP リクエストの処理 → View の仕事
+・JSON 変換 → Serializer の仕事
+```
+
+### 🏗️ 論理削除の概念
+
+```
+【物理削除（通常）】
+DELETE FROM users WHERE id = 1
+→ データが完全に消える
+
+【論理削除（このシステム）】
+UPDATE users SET deleted_at = NOW() WHERE id = 1
+→ データは残る（deleted_at に日時が入る）
+```
+
+**なぜ論理削除？**
+
+```
+メリット:
+✅ 誤削除から復旧可能
+✅ 監査証跡として履歴を保持
+✅ 他テーブルとの整合性を保てる
+
+デメリット:
+❌ データ容量が増える
+❌ クエリが複雑になる（deleted_at IS NULL）
+```
+
+### 🔧 カスタムマネージャー
+
+```
+【デフォルトマネージャー（objects）】
+User.objects.all()
+↓ deleted_at IS NULL のみ取得（削除済みは除外）
+
+【全オブジェクトマネージャー（all_objects）】
+User.all_objects.all()
+↓ 削除済みも含めてすべて取得
+```
+
+**使い分け:**
+
+```
+通常の業務処理:
+User.objects.all()  # アクティブなユーザーのみ
+
+管理画面・復旧処理:
+User.all_objects.all()  # 削除済みも含める
+```
+
+### 🔗 リレーションシップ
+
+```
+ForeignKey（多対一）:
+ユーザー → 部署
+（1つの部署に複数のユーザー）
+
+ManyToManyField（多対多）:
+ユーザー ←→ グループ
+（ユーザーは複数のグループに所属可能）
+
+OneToOneField（一対一）:
+ユーザー → プロフィール
+（1ユーザー = 1プロフィール）
+```
+
+**📚 参考**: [Django Models](https://docs.djangoproject.com/ja/stable/topics/db/models/)
+
+---
+
+## サービスクラス層
+
+### 🎯 役割
+
+ビジネスロジックを View から分離
+
+### 📍 なぜサービス層が必要？
+
+```
+【問題: View にビジネスロジックを書くと】
+・View が肥大化
+・ロジックの再利用が困難
+・テストが書きにくい
+
+【解決: サービス層に分離】
+・責務が明確
+・複数の View から呼び出せる
+・ユニットテストが簡単
+```
+
+### 🏗️ レイヤードアーキテクチャ
+
+```
+【従来】
+View → Model
+（すべてViewに書く）
+
+【サービス層導入後】
+View → Service → Model
+
+View:
+・HTTP リクエスト/レスポンス
+・権限チェック
+
+Service:
+・ビジネスルール
+・複雑な処理
+・トランザクション管理
+
+Model:
+・データ構造
+・基本的なメソッド
+```
+
+### 🔒 トランザクション管理
+
+```
+@transaction.atomic
+def delete_user(user_instance):
+    # ① 最後の管理者チェック
+    if is_last_admin(user_instance):
+        raise LastAdminError()
+    
+    # ② 関連データを更新
+    update_related_data(user_instance)
+    
+    # ③ ユーザーを論理削除
+    user_instance.soft_delete()
+    
+    # すべて成功 → コミット
+    # 途中でエラー → すべてロールバック
+```
+
+**なぜ @transaction.atomic？**
+
+```
+【問題】
+② で成功、③ で失敗
+→ 中途半端な状態になる
+
+【解決】
+transaction.atomic で囲む
+→ すべて成功 or すべて失敗（原子性）
+```
+
+### 🎯 実例: ユーザー削除のビジネスルール
+
+```
+【ビジネスルール】
+1. 自分自身は削除できない
+2. 最後の管理者は削除できない
+3. 論理削除を実行
+4. 監査ログに記録
+
+【実装場所】
+View:
+・リクエストを受け取る
+・権限チェック（管理者か？）
+・Service を呼び出す
+
+Service:
+・ビジネスルール1〜4を実行
+・エラー時は適切な例外を投げる
+
+Model:
+・soft_delete() メソッドを提供
+```
+
+---
+
+## フロントエンド状態管理（Pinia）
+
+### 🎯 役割
+
+Piniaは、アプリケーション全体で共有されるデータを一元管理するVue 3公式の状態管理ライブラリ。コンポーネント間でのpropsのバケツリレーやイベント連鎖を防ぐために使用する
+
+### 📍 なぜ状態管理が必要？
+
+```
+【問題: Propsで渡していくと...】
+
+App.vue
+  ↓ props: user
+Header.vue（ユーザー名表示）
+  ↓ props: user
+Sidebar.vue
+  ↓ props: user
+UserProfile.vue
+
+→ 深い階層まで延々とpropsを渡す（Props Drilling）
+```
+
+**Props Drilling の問題点:**
+
+```
+・中間コンポーネントが不要なpropsを受け取る
+・データの流れが追いにくい
+・変更時の影響範囲が大きい
+```
+
+```
+【解決: Pinia で一元管理】
+
+         Pinia Store
+        （中央の倉庫）
+              ↓
+    ┌─────────┼─────────┐
+    ↓         ↓         ↓
+Header   Sidebar   UserProfile
+
+→ どのコンポーネントからも直接アクセス可能
+```
+
+### 🏗️ Store の構造
+
+Piniaストアは、state（状態）、getters（算出プロパティ）、actions（メソッド）の3つの概念で構成され、それぞれdata、computed、methodsに対応する
+
+```
+【State（状態）】
+= データそのもの
+
+例: user, loading, items
+
+【Getters（算出プロパティ）】
+= State から計算される値
+
+例: isAuthenticated (user が存在するか)
+    itemCount (items の数)
+
+【Actions（操作）】
+= State を変更するメソッド
+
+例: login(), logout(), fetchData()
+```
+
+### 🔄 データの流れ
+
+```
+① Component がアクションを呼び出し
+   auth.login(employeeId, password)
+   ↓
+② Action が API を呼び出し
+   const response = await authAPI.login(...)
+   ↓
+③ レスポンスを State に保存
+   user.value = response.data.user
+   ↓
+④ すべてのコンポーネントが自動更新
+   （リアクティブだから！）
+```
+
+### 💾 永続化（Persistence）
+
+```
+【問題】
+ページをリロードすると State が消える
+
+【解決】
+pinia-plugin-persistedstate を使用
+
+persist: {
+    paths: ['user'],  # user だけ localStorage に保存
+}
+
+↓
+
+リロード後も user 情報が残る
+```
+
+### 🆚 Pinia vs Vuex
+
+Piniaは、mutations が不要で、TypeScript サポートが組み込まれており、名前空間の代わりにフラットな構造を採用している
+
+```
+【Vuex の問題点】
+・mutations が冗長
+・TypeScript 対応が複雑
+・namespaced modules が必要
+
+【Pinia の改善点】
+✅ mutations 不要（actions のみ）
+✅ TypeScript 完全対応
+✅ シンプルな構造
+✅ Vue DevTools 統合
+```
+
+**📚 参考**: [Pinia公式](https://pinia.vuejs.org/)
+
+---
+
+## UIコンポーネント（Vuetify 3）
+
+### 🎯 役割
+
+すぐ使える Material Design UI 部品を提供
+
+### 📍 なぜVuetifyを使うのか？
+
+```
+【問題】
+デザインを1から作るのは大変
+・ボタンのスタイル
+・レスポンシブ対応
+・アクセシビリティ
+・ブラウザ互換性
+
+【解決】
+Vuetify = 完成されたUI部品集
+```
+
+### 🎨 主要コンポーネント
+
+```
+v-btn: ボタン
+  color, size, variant などのプロパティで見た目を制御
+
+v-card: カード型のコンテナ
+  情報をまとめて表示
+
+v-data-table: テーブル
+  ソート、ページネーション、検索機能付き
+
+v-dialog: モーダルダイアログ
+  確認画面、フォーム入力
+
+v-text-field: 入力フィールド
+  バリデーション表示機能付き
+
+v-menu: メニュー
+  ドロップダウン、コンテキストメニュー
+```
+
+### 📱 レスポンシブデザイン
+
+```
+Vuetify のグリッドシステム:
+
+v-container: コンテナ（最大幅制限）
+  ↓
+v-row: 行
+  ↓
+v-col: 列（12列グリッド）
+
+<v-col cols="12" sm="6" md="4">
+  スマホ: 全幅（12/12）
+  タブレット: 半分（6/12）
+  PC: 1/3（4/12）
+</v-col>
+```
+
+**ブレイクポイント:**
+
+```
+xs: 0〜599px    スマホ縦
+sm: 600〜959px   スマホ横・小型タブレット
+md: 960〜1279px  タブレット
+lg: 1280〜1919px PC
+xl: 1920px〜     大型ディスプレイ
+```
+
+### 🎯 実例: データテーブル
+
+```
+<v-data-table-server
+  :items="users"
+  :headers="headers"
+  :loading="loading"
+>
+```
+
+**自動で提供される機能:**
+
+- ✅ ヘッダークリックでソート
+- ✅ ページネーション
+- ✅ ローディング表示
+- ✅ 空データ時のメッセージ
+- ✅ レスポンシブ対応
+
+**📚 参考**: [Vuetify 3 Components](https://vuetifyjs.com/en/components/all/)
+
+---
+
+## HTTP通信層（Axios）
+
+### 🎯 役割
+
+フロントエンドとバックエンド間のHTTP通信を担当
+
+### 📍 なぜAxiosを使うのか？
+
+```
+【標準のfetch API】
+fetch('/api/users/')
+  .then(res => res.json())
+  .then(data => ...)
+  .catch(err => ...)
+
+【Axios】
+const response = await axios.get('/api/users/')
+// response.data にデータが入っている
+
+→ シンプル！
+```
+
+**Axios の利点:**
+
+```
+✅ 自動的にJSONに変換
+✅ リクエスト/レスポンスのインターセプター
+✅ タイムアウト設定
+✅ CSRF トークン自動送信
+✅ エラーハンドリングが簡単
+```
+
+### 🔧 インターセプター（Interceptor）
+
+**概念:**
+
+```
+すべてのリクエスト/レスポンスに
+共通処理を挟み込む仕組み
+```
+
+**リクエストインターセプター:**
+
+```
+【処理の流れ】
+
+axios.get('/api/users/')
+   ↓
+【インターセプター起動】
+   ↓ ヘッダーを追加
+   ↓ CSRF トークンを付与
+   ↓ 言語設定を追加
+   ↓
+サーバーへ送信
+```
+
+**実際の処理:**
+
+```
+axios.interceptors.request.use(config => {
+    // CSRF トークン追加
+    config.headers['X-CSRFToken'] = getCsrfToken();
+    
+    // 言語ヘッダー追加
+    config.headers['Accept-Language'] = locale;
+    
+    return config;
+});
+```
+
+**レスポンスインターセプター:**
+
+```
+サーバーからレスポンス
+   ↓
+【インターセプター起動】
+   ↓ 401エラー？ → 自動ログアウト
+   ↓ 403エラー？ → ログインページへ
+   ↓ 200 OK？ → そのまま返す
+   ↓
+Component へ
+```
+
+### 🍪 Cookie 自動送信
+
+```
+axios.create({
+    withCredentials: true,
+})
+
+↓ この設定により
+
+・ブラウザが自動的に Cookie を送信
+・セッション認証が機能する
+・CORS設定と連携が必要
+```
+
+**注意点:**
+
+```
+withCredentials: true を使う場合、
+サーバー側も以下の設定が必要:
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = ['http://localhost:5173']
+
+※ CORS_ALLOW_ORIGIN_ALL = True だと動かない！
+```
+
+**📚 参考**: [Axios Documentation](https://axios-http.com/docs/intro)
+
+---
+
+## ルーティングとガード
+
+### 🎯 役割
+
+**Vue Router**: URL とコンポーネントの紐付け  
+**Navigation Guard**: ページ遷移前のチェック処理
+
+### 📍 ルーティングの基本
+
+```
+URL: /users/1
+   ↓
+Router: routes 定義を検索
+   ↓
+{ path: '/users/:id', component: UserDetail }
+   ↓
+UserDetail.vue を表示
+```
+
+### 🛡️ Navigation Guard の種類
+
+Vue Routerは、グローバル、ルート単位、コンポーネント内の3つのレベルでナビゲーションガードを提供する
+
+```
+【グローバルガード】
+すべてのページ遷移で実行
+
+router.beforeEach((to, from) => {
+    // 認証チェックなど
+})
+
+【ルート単位ガード】
+特定のルートのみ
+
+{
+    path: '/admin',
+    beforeEnter: (to, from) => {
+        // 管理者チェック
+    }
+}
+
+【コンポーネント内ガード】
+コンポーネント内で定義
+
+onBeforeRouteEnter((to, from) => {
+    // このコンポーネントに入る前
+})
+```
+
+### 🔐 認証ガードの仕組み
+
+```
+【処理の流れ】
+
+① ユーザーが /admin にアクセス
+   ↓
+② router.beforeEach が起動
+   ↓
+③ ルートのメタ情報をチェック
+   to.meta.requiresAuth === true
+   ↓
+④ ログインしているか確認
+   auth.user が存在するか
+   ↓
+⑤-A ログイン済み → 通過
+⑤-B 未ログイン → /login へリダイレクト
+```
+
+**メタ情報の活用:**
+
+```
+routes: [
+    {
+        path: '/admin',
+        meta: {
+            requiresAuth: true,      // 認証必須
+            requiresAdmin: true,     // 管理者権限必須
+            breadcrumb: 'admin.title'  // パンくずリスト用
+        }
+    }
+]
+
+↓
+
+ガードで meta 情報を読み取って判断
+```
+
+### 🔄 リダイレクトパターン
+
+```
+【ログイン後に元のページへ戻る】
+
+① ユーザーが /admin にアクセス（未ログイン）
+   ↓
+② ガードが /login?next=/admin へリダイレクト
+   ↓
+③ ログイン成功
+   ↓
+④ next パラメータを読み取る
+   ↓
+⑤ /admin へ自動遷移
+```
+
+**📚 参考**: [Vue Router Navigation Guards](https://router.vuejs.org/guide/advanced/navigation-guards.html)
+
+---
+
+## 再利用可能なロジック（Composables）
+
+### 🎯 役割
+
+コンポーネント間で共有するロジックを関数として切り出す
+
+### 📍 Composables とは？
+
+ComposablesはReactのCustom Hooksと同様に、状態を持つロジックをカプセル化して再利用可能にするVue 3のパターン
+
+```
+【従来の問題】
+同じロジックを複数のコンポーネントに
+コピペ → メンテナンスが大変
+
+【Composables で解決】
+ロジックを1つの関数にまとめる
+→ どのコンポーネントからも使える
+```
+
+### 🎨 実例: 権限チェック
+
+```
+【usePermissions.js】
+現在のユーザーの権限を判定
+
+export function usePermissions() {
+    const auth = useAuthStore();
+    
+    const isAdmin = computed(() => {
+        return auth.user?.is_admin === true;
+    });
+    
+    const canDelete = computed(() => {
+        return isAdmin.value;
+    });
+    
+    return { isAdmin, canDelete };
+}
+
+【使う側】
+const { isAdmin, canDelete } = usePermissions();
+
+<v-btn v-if="canDelete">削除</v-btn>
+```
+
+### 🔄 状態を持つ Composables
+
+```
+【useCounter.js】
+複数コンポーネントで同じカウンターを共有
+
+// モジュールスコープで定義 = 共有される
+const count = ref(0);
+
+export function useCounter() {
+    function increment() {
+        count.value++;
+    }
+    
+    return { count, increment };
+}
+
+【結果】
+どのコンポーネントで useCounter() を呼んでも
+同じ count を参照する
+```
+
+### 🎯 よくある Composables パターン
+
+```
+usePermissions: 権限判定
+useValidation: バリデーションルール
+useApiError: エラーハンドリング
+useBreadcrumbs: パンくずリスト
+useConfirm: 確認ダイアログ
+usePagination: ページネーション
+useDebounce: 入力遅延処理
+```
+
+**📚 参考**: [Vue Composables](https://vuejs.org/guide/reusability/composables.html)
+
+---
+
+## 定数管理（Constants）
+
+### 🎯 役割
+
+アプリケーション全体で使う定数を一元管理
+
+### 📍 なぜ定数を分離するのか？
+
+```
+【問題】
+'admin' という文字列がコードに散らばっている
+→ 変更時にすべて修正が必要
+
+【解決】
+constants/routes.js:
+export const ADMIN_PATH = '/admin';
+
+→ 変更は1箇所だけ
+```
+
+### 🎨 定数の種類
+
+**ルートパス（routes.js）**
+
+```
+export const ROUTES = {
+    HOME: '/',
+    LOGIN: '/auth/login',
+    USERS: '/admin/users',
+    SETTINGS: '/settings'
+};
+
+【メリット】
+・タイポを防げる
+・自動補完が効く
+・変更時の影響を最小化
+```
+
+**アイコン（icons.js）**
+
+```
+export const ICONS = {
+    USER: 'mdi-account',
+    EDIT: 'mdi-pencil',
+    DELETE: 'mdi-delete',
+    SAVE: 'mdi-content-save'
+};
+
+【メリット】
+・アイコン名の統一
+・変更時の一括置換
+```
+
+**テーマ設定（theme.js）**
+
+```
+export const THEME = {
+    COLORS: {
+        PRIMARY: '#1976D2',
+        SECONDARY: '#424242',
+        ERROR: '#FF5252'
+    },
+    SIZES: {
+        BUTTON_HEIGHT: 40,
+        SIDEBAR_WIDTH: 256
+    }
+};
+```
+
+### 🔧 環境変数 vs 定数
+
+```
+【環境変数（.env）】
+環境ごとに変わる値
+
+VITE_API_BASE_URL=http://localhost:8000
+VITE_APP_TITLE=開発環境
+
+【定数（constants/）】
+環境に依存しない固定値
+
+ROUTES, ICONS, ステータスコード
+```
+
+---
+
+## プラグイン層
+
+### 🎯 役割
+
+Vue アプリケーションにグローバル機能を追加
+
+### 📍 プラグインとは？
+
+Vueプラグインは、app.use()で登録され、グローバルプロパティやディレクティブ、コンポーネントを追加できる
+
+```
+【処理の流れ】
+
+main.js:
+import { createApp } from 'vue';
+import vuetify from './plugins/vuetify';
+import router from './router';
+import pinia from './stores';
+
+const app = createApp(App);
+
+app.use(vuetify);  // Vuetify をインストール
+app.use(router);   // Vue Router をインストール
+app.use(pinia);    // Pinia をインストール
+
+app.mount('#app');
+
+【結果】
+すべてのコンポーネントから
+これらの機能が使えるようになる
+```
+
+### 🎨 主要プラグイン
+
+**Vuetify（vuetify.js）**
+
+```
+役割: UI コンポーネントライブラリ
+
+設定内容:
+・テーマカラー
+・アイコンセット
+・デフォルトのプロパティ
+```
+
+**Vue Router（router/index.js）**
+
+```
+役割: ルーティング管理
+
+設定内容:
+・ルート定義
+・ナビゲーションガード
+・スクロール動作
+```
+
+**Pinia（stores/index.js）**
+
+```
+役割: 状態管理
+
+設定内容:
+・永続化プラグイン
+・DevTools 統合
+```
+
+**Vue I18n（i18n.js）**
+
+```
+役割: 多言語対応
+
+設定内容:
+・デフォルト言語
+・翻訳データの読み込み
+・フォールバック言語
+```
+
+**Axios（axios.js）**
+
+```
+役割: HTTP 通信
+
+設定内容:
+・ベースURL
+・タイムアウト
+・インターセプター
+・withCredentials
+```
+
+### 🔧 カスタムプラグインの作成
+
+```
+【notification プラグイン例】
+
+export default {
+    install(app, options) {
+        // グローバルメソッドを追加
+        app.config.globalProperties.$notify = (message) => {
+            // 通知表示ロジック
+        };
+    }
+}
+
+【使い方】
+import notificationPlugin from './plugins/notification';
+app.use(notificationPlugin);
+
+【コンポーネント内】
+this.$notify('保存しました');
+```
+
+---
+
+## エントリーポイント（main.js / App.vue）
+
+### 🎯 役割
+
+**main.js**: アプリケーションの起動ファイル  
+**App.vue**: ルートコンポーネント
+
+### 📍 main.js の処理順序
+
+```
+① プラグインのインポート
+   import vuetify from './plugins/vuetify'
+   
+② Vue アプリの作成
+   const app = createApp(App)
+   
+③ プラグインの登録
+   app.use(vuetify)
+   app.use(router)
+   app.use(pinia)
+   
+④ グローバル設定
+   app.config.errorHandler = ...
+   
+⑤ DOM にマウント
+   app.mount('#app')
+```
+
+**実行順序の重要性:**
+
+```
+❌ 間違い:
+app.mount('#app')
+app.use(router)  // マウント後は登録できない
+
+✅ 正しい:
+app.use(router)
+app.mount('#app')
+```
+
+### 🎨 App.vue の役割
+
+```
+【構造】
+<template>
+    <v-app>
+        <router-view />  ← ページコンポーネントが表示される
+    </v-app>
+</template>
+
+【責務】
+・アプリ全体のレイアウト
+・共通コンポーネント（通知、ローディングなど）
+・グローバルな状態監視
+```
+
+**レイアウトパターン:**
+
+```
+App.vue
+ ├── NavBar（ヘッダー）
+ ├── SideBar（サイドメニュー）
+ ├── router-view（メインコンテンツ）
+ └── Footer（フッター）
+```
+
+---
+
+## 設定ファイル（settings.py）
+
+### 🎯 役割
+
+Django プロジェクト全体の設定を管理
+
+### 📍 主要な設定項目
+
+**INSTALLED_APPS**
+
+```
+役割: 使用するアプリケーションの登録
+
+INSTALLED_APPS = [
+    'django.contrib.admin',     # 管理画面
+    'django.contrib.auth',      # 認証
+    'rest_framework',           # DRF
+    'corsheaders',              # CORS
+    'users',                    # 自作アプリ
+]
+
+【重要】
+上から順番に読み込まれる
+→ 依存関係に注意
+```
+
+**MIDDLEWARE**
+
+```
+役割: リクエスト/レスポンスの前処理
+
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+]
+
+【実行順序】
+リクエスト: 上から下
+レスポンス: 下から上
+```
+
+**DATABASES**
+
+```
+役割: データベース接続設定
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': env('DB_NAME'),
+        'USER': env('DB_USER'),
+        'PASSWORD': env('DB_PASSWORD'),
+        'HOST': env('DB_HOST', default='localhost'),
+        'PORT': env('DB_PORT', default='5432'),
+    }
+}
+```
+
+**REST_FRAMEWORK**
+
+```
+役割: DRF の動作設定
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 
+        'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+}
+```
+
+**CORS 設定**
+
+```
+役割: クロスオリジン通信の許可
+
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5173',
+]
+CORS_ALLOW_CREDENTIALS = True
+
+【重要】
+CORS_ALLOW_CREDENTIALS = True の場合、
+CORS_ALLOW_ALL_ORIGINS = True は使えない
+```
+
+### 🔒 セキュリティ設定
+
+```
+【開発環境】
+DEBUG = True
+SECRET_KEY = 'development-key'
+ALLOWED_HOSTS = ['*']
+
+【本番環境】
+DEBUG = False
+SECRET_KEY = env('SECRET_KEY')  # 環境変数から取得
+ALLOWED_HOSTS = ['example.com']
+
+SESSION_COOKIE_SECURE = True    # HTTPS のみ
+CSRF_COOKIE_SECURE = True       # HTTPS のみ
+SECURE_SSL_REDIRECT = True      # HTTP → HTTPS 強制
+```
+
+**📚 参考**: [Django Settings](https://docs.djangoproject.com/ja/stable/ref/settings/)
+
+---
+
+## 権限管理システム
+
+### 🎯 役割
+
+「このユーザーはこの操作ができるか？」を判定
+
+### 📍 権限チェックの階層
+
+```
+【レイヤー1: Django の Permission Classes】
+バックエンドで API レベルでチェック
+
+class UserViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+【レイヤー2: Vue Router の Navigation Guard】
+フロントエンドでページレベルでチェック
+
+router.beforeEach((to, from) => {
+    if (to.meta.requiresAdmin && !auth.user?.is_admin) {
+        return '/forbidden';
+    }
+})
+
+【レイヤー3: UI の表示制御】
+フロントエンドで要素レベルでチェック
+
+<v-btn v-if="isAdmin">削除</v-btn>
+```
+
+### 🔐 Django Permission Classes
+
+DRFは、IsAuthenticated、IsAdminUser、IsAuthenticatedOrReadOnlyなどの組み込みパーミッションクラスを提供している
+
+```
+【組み込みクラス】
+
+AllowAny:
+誰でもアクセス可能
+
+IsAuthenticated:
+ログイン必須
+
+IsAdminUser:
+管理者のみ（is_staff=True）
+
+IsAuthenticatedOrReadOnly:
+読み取りは誰でも、書き込みはログイン必須
+```
+
+**カスタム Permission:**
+
+```
+class IsOwnerOrAdmin(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        # 自分のデータ または 管理者
+        return obj.user == request.user or request.user.is_admin
+```
+
+### 🎨 権限の組み合わせ
+
+```
+permission_classes = [IsAuthenticated, IsAdminUser]
+↓ AND 条件（両方満たす必要がある）
+
+permission_classes = [IsAuthenticated | IsAdminUser]
+↓ OR 条件（どちらか満たせばOK）
+```
+
+### 🛡️ フロントエンドの権限チェック
+
+```
+【重要な原則】
+フロントエンドの権限チェックは
+「見た目を制御するだけ」
+
+バックエンドでも必ず権限チェックする！
+```
+
+**なぜ両方必要？**
+
+```
+フロントエンドのみ:
+・ブラウザのDevToolsで改ざん可能
+・APIを直接叩かれたら無意味
+
+バックエンドのみ:
+・UI上で不要なボタンが表示される
+・ユーザーが混乱する
+
+両方:
+・UI: 操作できないものは見せない
+・API: 操作を確実に拒否
+→ セキュリティと使いやすさの両立
+```
+
+---
+
+## バリデーション層
+
+### 🎯 役割
+
+データの妥当性を検証
+
+### 📍 バリデーションの多層防御
+
+```
+【レイヤー1: フロントエンド】
+即座にフィードバック（UX向上）
+
+<v-text-field
+    :rules="[
+        v => !!v || '必須です',
+        v => v.length >= 3 || '3文字以上'
+    ]"
+/>
+
+【レイヤー2: Django Serializer】
+データ型・必須チェック・カスタムルール
+
+class UserSerializer(serializers.ModelSerializer):
+    def validate_username(self, value):
+        if 'admin' in value.lower():
+            raise ValidationError('adminは使えません')
+        return value
+
+【レイヤー3: データベース制約】
+最終防衛ライン
+
+class User(models.Model):
+    username = models.CharField(
+        max_length=50,
+        unique=True,  # DB レベルで一意性保証
+    )
+```
+
+### 🔍 Serializer のバリデーションフロー
+
+```
+is_valid() を呼び出すと:
+
+① フィールドの型チェック
+   CharField → 文字列か？
+   IntegerField → 整数か？
+   
+② フィールドレベルのバリデータ
+   validate_<field_name>() 実行
+   
+③ validators 属性の関数を実行
+   
+④ オブジェクトレベルのバリデーション
+   validate() 実行
+   
+⑤ 一意性制約のチェック
+   unique=True の確認
+   
+すべて成功 → validated_data に保存
+1つでも失敗 → ValidationError
+```
+
+### 🎨 実例: パスワードのバリデーション
+
+```
+【フロントエンド】
+password_rules = [
+    v => !!v || 'パスワードは必須です',
+    v => v.length >= 8 || '8文字以上',
+    v => /[A-Z]/.test(v) || '大文字を含めてください',
+    v => /[0-9]/.test(v) || '数字を含めてください',
+]
+
+【バックエンド】
+def validate_password(self, value):
+    if len(value) < 8:
+        raise ValidationError('8文字以上')
+    if not re.search(r'[A-Z]', value):
+        raise ValidationError('大文字必須')
+    if not re.search(r'[0-9]', value):
+        raise ValidationError('数字必須')
+    return value
+```
+
+**なぜ両方で同じチェック？**
+
+```
+フロントエンドのみ:
+・JavaScriptを無効化されたら突破される
+・APIを直接叩かれたら無防備
+
+両方:
+・フロントエンド: 即座にフィードバック（UX）
+・バックエンド: 確実な検証（セキュリティ）
+```
+
+---
+
+## 国際化対応（i18n）
+
+### 🎯 役割
+
+複数言語でアプリケーションを提供
+
+### 📍 フロントエンドの国際化（Vue I18n）
+
+```
+【翻訳ファイル】
+locales/ja.json:
+{
+    "auth": {
+        "login": "ログイン",
+        "logout": "ログアウト"
+    }
+}
+
+locales/en.json:
+{
+    "auth": {
+        "login": "Login",
+        "logout": "Logout"
+    }
+}
+
+【使用】
+{{ $t('auth.login') }}
+↓ 日本語なら「ログイン」
+↓ 英語なら「Login」
+```
+
+**パラメータ付き翻訳:**
+
+```
+【翻訳ファイル】
+"greeting": "こんにちは、{name}さん"
+
+【使用】
+$t('greeting', { name: userName })
+↓ "こんにちは、太郎さん"
+```
+
+**複数形対応:**
+
+```
+【翻訳ファイル】
+"items": "{count}個のアイテム | {count}個のアイテム"
+
+【使用】
+$t('items', { count: 1 })  → "1個のアイテム"
+$t('items', { count: 5 })  → "5個のアイテム"
+```
+
+### 🌐 バックエンドの国際化（Django i18n）
+
+```
+【翻訳マーカー】
+from django.utils.translation import gettext_lazy as _
+
+error_message = _("社員番号は必須です")
+
+【翻訳ファイル生成】
+python manage.py makemessages -l ja
+python manage.py makemessages -l en
+
+【翻訳ファイル編集】
+locale/ja/LC_MESSAGES/django.po:
+msgid "社員番号は必須です"
+msgstr "社員番号は必須です"
+
+locale/en/LC_MESSAGES/django.po:
+msgid "社員番号は必須です"
+msgstr "Employee ID is required"
+
+【コンパイル】
+python manage.py compilemessages
+```
+
+### 🔄 言語切り替えの流れ
+
+```
+① ユーザーが言語選択（ja → en）
+   ↓
+② Pinia Store に保存
+   locale.setLocale('en')
+   ↓
+③ localStorage に永続化
+   ↓
+④ Vue I18n が自動的に英語表示に切り替わる
+   ↓
+⑤ 次回のAPIリクエスト時
+   Accept-Language: en ヘッダーを送信
+   ↓
+⑥ Django が英語でエラーメッセージを返す
+```
+
+**📚 参考**: 
+- [Vue I18n](https://vue-i18n.intlify.dev/)
+- [Django i18n](https://docs.djangoproject.com/ja/stable/topics/i18n/)
+
+---
+
+## マイグレーションシステム
+
+### 🎯 役割
+
+データベーススキーマの変更を安全に管理
+
+### 📍 マイグレーションとは？
+
+```
+【問題】
+モデルを変更したら、
+データベースのテーブル構造も変える必要がある
+
+【従来の方法】
+手動でSQLを書いて実行
+→ ミスが発生しやすい
+→ チームで共有が困難
+
+【Djangoのマイグレーション】
+変更を自動検出 → マイグレーションファイル生成
+→ 誰でも同じ変更を適用できる
+```
+
+### 🔄 マイグレーションの流れ
+
+```
+① models.py を変更
+   email = models.EmailField()  # 追加
+
+② マイグレーションファイル生成
+   python manage.py makemigrations
+   ↓
+   migrations/0002_user_email.py が作成される
+
+③ マイグレーションファイルの中身
+   operations = [
+       migrations.AddField(
+           model_name='user',
+           name='email',
+           field=models.EmailField(),
+       ),
+   ]
+
+④ データベースに適用
+   python manage.py migrate
+   ↓
+   ALTER TABLE users ADD COLUMN email VARCHAR(255);
+```
+
+### 🎨 マイグレーションの種類
+
+**スキーママイグレーション:**
+
+```
+・フィールドの追加/削除
+・テーブルの作成/削除
+・インデックスの追加
+```
+
+**データマイグレーション:**
+
+```
+・初期データの投入
+・既存データの変換
+
+例:
+def create_initial_admin(apps, schema_editor):
+    User = apps.get_model('users', 'User')
+    User.objects.create(
+        employee_id='9999',
+        username='管理者',
+        is_admin=True
+    )
+
+operations = [
+    migrations.RunPython(create_initial_admin),
+]
+```
+
+### ⚠️ マイグレーションの注意点
+
+```
+【本番環境での注意】
+・マイグレーション前にバックアップ
+・ピーク時間を避ける
+・ロールバック手順を準備
+
+【チーム開発での注意】
+・マイグレーションファイルは Git 管理
+・マージ時に競合が発生したら要調整
+・本番適用前にステージング環境でテスト
+```
+
+**📚 参考**: [Django Migrations](https://docs.djangoproject.com/ja/stable/topics/migrations/)
+
+---
+
+## 監査証跡システム
+
+### 🎯 役割
+
+「誰が・いつ・何をしたか」を記録
+
+### 📍 監査ログの重要性
+
+```
+【なぜ必要？】
+✅ セキュリティインシデント調査
+✅ コンプライアンス要件
+✅ 不正操作の検知
+✅ データの復旧
+
+【記録すべき情報】
+・誰が（ユーザー）
+・いつ（タイムスタンプ）
+・何を（操作内容）
+・どこで（IPアドレス）
+・結果（成功/失敗）
+```
+
+### 🔄 監査ログの仕組み
+
+```
+【Djangoシグナルによる自動記録】
+
+① ユーザーがデータを更新
+   user.username = "新しい名前"
+   user.save()
+   ↓
+② pre_save シグナルが発火
+   古い値を保存
+   ↓
+③ データベースに保存
+   ↓
+④ post_save シグナルが発火
+   変更内容をログに記録
+   ↓
+⑤ ログファイルに出力
+```
+
+**シグナルの仕組み:**
+
+Djangoシグナルは、モデルのsave、deleteなどの操作の前後に自動的に関数を実行する仕組みで、監査ログやキャッシュクリアなどに使用される
+
+```
+【シグナルの種類】
+
+pre_save: 保存前
+post_save: 保存後
+
+pre_delete: 削除前
+post_delete: 削除後
+
+【使いどころ】
+・監査ログ記録
+・キャッシュのクリア
+・関連データの更新
+・通知の送信
+```
+
+### 📊 ログの構造
+
+```
+{
+  "timestamp": "2025-11-18 19:54:30",
+  "request_id": "c0eb301c-f5db-4c2a-a35f",
+  "user": "9999",
+  "action": "UPDATE",
+  "model": "User",
+  "object_id": 1,
+  "ip": "127.0.0.1",
+  "changes": {
+    "username": {
+      "old": "太郎",
+      "new": "花子"
+    }
+  }
+}
+```
+
+### 🔧 ミドルウェアとの連携
+
+```
+【リクエスト単位での追跡】
+
+① Middleware がリクエストIDを生成
+   request._request_id = uuid.uuid4()
+   ↓
+② スレッドローカルに保存
+   set_current_

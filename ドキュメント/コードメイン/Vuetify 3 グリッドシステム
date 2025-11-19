@@ -1,0 +1,2934 @@
+# Vuetify 3 グリッドシステム完全ガイド
+
+## 目次
+
+1. [グリッドシステムの基本](#1-グリッドシステムの基本)
+2. [v-container（コンテナ）](#2-v-containerコンテナ)
+3. [v-row（行）](#3-v-row行)
+4. [v-col（列）](#4-v-col列)
+5. [ブレイクポイント（レスポンシブ）](#5-ブレイクポイントレスポンシブ)
+6. [フレックスボックス](#6-フレックスボックス)
+7. [余白（Spacing）](#7-余白spacing)
+8. [横幅・縦幅の制御](#8-横幅縦幅の制御)
+9. [実践例：あなたのコードから学ぶ](#9-実践例あなたのコードから学ぶ)
+10. [よくあるパターン集](#10-よくあるパターン集)
+
+---
+
+## 1. グリッドシステムの基本
+
+### 1.1 グリッドシステムとは
+
+Vuetify のグリッドシステムは **12列グリッド** を基本とします。
+
+```
+【12列グリッド】
+┌─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┐
+│1│2│3│4│5│6│7│8│9│10│11│12│
+└─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┘
+
+【使い方】
+cols="12" → 全幅（12列すべて使用）
+cols="6"  → 半分（6列使用）
+cols="4"  → 1/3（4列使用）
+cols="3"  → 1/4（3列使用）
+```
+
+### 1.2 基本構造
+
+```vue
+<v-container>           ← 外枠（最大幅を制御）
+  <v-row>               ← 行（横並びの親）
+    <v-col>             ← 列（実際のコンテンツを入れる）
+      コンテンツ
+    </v-col>
+  </v-row>
+</v-container>
+```
+
+**階層ルール:**
+
+```
+v-container
+  └─ v-row（必須）
+       └─ v-col（必須）
+            └─ コンテンツ
+
+⚠️ v-row の直下には必ず v-col を配置
+⚠️ v-col の外にコンテンツを置かない
+```
+
+### 1.3 なぜグリッドシステムを使うのか
+
+```
+【問題】
+画面サイズごとにレイアウトを変えたい
+- PC: 3列表示
+- タブレット: 2列表示
+- スマホ: 1列表示
+
+【解決】
+<v-col cols="12" sm="6" md="4">
+  ↓
+自動的にレスポンシブ対応
+```
+
+---
+
+## 2. v-container（コンテナ）
+
+### 2.1 コンテナの役割
+
+```
+【役割】
+① 最大幅を制限
+② 中央寄せ
+③ 左右の余白を確保
+
+【画面サイズによる最大幅】
+xs (～599px):   余白なし（画面全体）
+sm (600～959px): 600px
+md (960～1279px): 960px
+lg (1280～1919px): 1280px
+xl (1920px～):    1920px
+```
+
+### 2.2 基本的な使い方
+
+```vue
+<!-- 標準コンテナ -->
+<v-container>
+  コンテンツ
+</v-container>
+```
+
+**表示例:**
+
+```
+【PC画面（1920px）】
+┌────────────────────────────────────────┐
+│        ←余白→                ←余白→      │
+│              ┌──────────┐              │
+│              │ コンテンツ │              │
+│              └──────────┘              │
+│                                        │
+└────────────────────────────────────────┘
+        最大幅1920pxで中央寄せ
+
+【スマホ画面（375px）】
+┌──────────┐
+│コンテンツ  │ ← 余白なし（画面全体）
+│          │
+└──────────┘
+```
+
+### 2.3 fluid（画面全体を使う）
+
+```vue
+<v-container fluid>
+  コンテンツ
+</v-container>
+```
+
+**違い:**
+
+```
+【通常】
+最大幅1920px + 中央寄せ
+
+【fluid】
+画面サイズいっぱいに広がる
+```
+
+**使い分け:**
+
+```
+【通常】
+- 記事コンテンツ
+- フォーム
+- カード表示
+
+【fluid】
+- データテーブル（横に広い）
+- ダッシュボード
+- 全画面表示が必要な場合
+```
+
+### 2.4 あなたのコードの例
+
+#### 例1: UserList.vue（データテーブル）
+
+```vue
+<v-container fluid class="pa-4">
+  <v-row>
+    <!-- データテーブル -->
+  </v-row>
+</v-container>
+```
+
+**解説:**
+
+```
+fluid
+  ↓
+画面全体を使う（データテーブルは横に広い方が見やすい）
+
+class="pa-4"
+  ↓
+padding: 16px（4 × 4px = 16px）
+すべての方向に余白
+```
+
+#### 例2: UserCreate.vue（フォーム画面）
+
+```vue
+<v-container class="pa-4">
+  <v-row justify="center">
+    <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+      <v-card>
+        <!-- フォーム -->
+      </v-card>
+    </v-col>
+  </v-row>
+</v-container>
+```
+
+**解説:**
+
+```
+fluid なし
+  ↓
+最大幅を制限（フォームは狭い方が見やすい）
+
+justify="center"
+  ↓
+v-col を中央に配置
+```
+
+#### 例3: MenuCardGrid.vue（カード一覧）
+
+```vue
+<v-container fluid class="pa-4">
+  <v-row class="ga-0">
+    <v-col
+      v-for="item in items"
+      :key="item.id"
+      cols="12"
+      sm="6"
+      md="4"
+      lg="3"
+      xl="2"
+    >
+      <MenuCard />
+    </v-col>
+  </v-row>
+</v-container>
+```
+
+**解説:**
+
+```
+fluid
+  ↓
+カードを画面いっぱいに表示
+
+ga-0
+  ↓
+グリッド間の余白をなくす（MenuCard 自体に余白がある）
+```
+
+---
+
+## 3. v-row（行）
+
+### 3.1 行の役割
+
+```
+【役割】
+① 列（v-col）を横並びにする
+② 列の間隔を管理
+③ 配置方法を制御
+```
+
+### 3.2 基本的な使い方
+
+```vue
+<v-row>
+  <v-col>列1</v-col>
+  <v-col>列2</v-col>
+  <v-col>列3</v-col>
+</v-row>
+```
+
+**表示例:**
+
+```
+┌────────┬────────┬────────┐
+│  列1   │  列2   │  列3   │
+└────────┴────────┴────────┘
+```
+
+### 3.3 間隔の制御（gutter）
+
+```vue
+<!-- デフォルト（間隔あり） -->
+<v-row>
+  <v-col>A</v-col>
+  <v-col>B</v-col>
+</v-row>
+
+<!-- 間隔なし -->
+<v-row no-gutters>
+  <v-col>A</v-col>
+  <v-col>B</v-col>
+</v-row>
+
+<!-- カスタム間隔 -->
+<v-row class="ga-4">
+  <v-col>A</v-col>
+  <v-col>B</v-col>
+</v-row>
+```
+
+**表示の違い:**
+
+```
+【デフォルト】
+┌────┐ 間隔 ┌────┐
+│ A  │ 12px │ B  │
+└────┘      └────┘
+
+【no-gutters】
+┌────┬────┐
+│ A  │ B  │
+└────┴────┘
+
+【ga-4（gap: 16px）】
+┌────┐     ┌────┐
+│ A  │ 16px│ B  │
+└────┘     └────┘
+```
+
+### 3.4 配置の制御
+
+```vue
+<!-- 横方向の配置 -->
+<v-row justify="start">     <!-- 左寄せ -->
+<v-row justify="center">    <!-- 中央 -->
+<v-row justify="end">       <!-- 右寄せ -->
+<v-row justify="space-between"> <!-- 両端寄せ -->
+
+<!-- 縦方向の配置 -->
+<v-row align="start">       <!-- 上寄せ -->
+<v-row align="center">      <!-- 中央 -->
+<v-row align="end">         <!-- 下寄せ -->
+```
+
+**表示例（justify）:**
+
+```
+【justify="start"（左寄せ）】
+┌──┬──┬──┐                  
+│A │B │C │                  
+└──┴──┴──┘                  
+
+【justify="center"（中央）】
+      ┌──┬──┬──┐            
+      │A │B │C │            
+      └──┴──┴──┘            
+
+【justify="end"（右寄せ）】
+            ┌──┬──┬──┐      
+            │A │B │C │      
+            └──┴──┴──┘      
+
+【justify="space-between"】
+┌──┐      ┌──┐      ┌──┐  
+│A │      │B │      │C │  
+└──┘      └──┘      └──┘  
+```
+
+### 3.5 あなたのコードの例
+
+#### 例1: UserList.vue（検索バー + ボタン）
+
+```vue
+<v-row class="mb-1 align-center">
+  <v-col cols="12" sm="10" md="6">
+    <!-- 検索フィールド -->
+  </v-col>
+  
+  <v-col cols="12" sm="4" md="3">
+    <!-- 件数表示 -->
+  </v-col>
+  
+  <v-spacer />
+  
+  <v-col cols="12" sm="3" md="3">
+    <!-- ボタン -->
+  </v-col>
+</v-row>
+```
+
+**解説:**
+
+```
+class="mb-1"
+  ↓
+margin-bottom: 4px
+
+align-center
+  ↓
+縦方向を中央揃え（高さが違う要素を揃える）
+
+<v-spacer />
+  ↓
+残りのスペースを埋める
+```
+
+**レスポンシブ動作:**
+
+```
+【PC（md以上）】
+┌─────────┬──────┬───────┬───────┐
+│ 検索     │ 件数  │ 余白  │ボタン │
+│ 6列     │ 3列  │ 自動  │ 3列   │
+└─────────┴──────┴───────┴───────┘
+
+【タブレット（sm）】
+┌─────────────┬─────┬───────┐
+│ 検索         │件数  │ボタン │
+│ 10列        │4列  │ 3列   │
+└─────────────┴─────┴───────┘
+
+【スマホ（xs）】
+┌───────────────┐
+│ 検索          │ 12列（全幅）
+├───────────────┤
+│ 件数          │ 12列（全幅）
+├───────────────┤
+│ ボタン        │ 12列（全幅）
+└───────────────┘
+```
+
+#### 例2: UserUpdate.vue（フォームフィールド）
+
+```vue
+<v-row>
+  <v-col cols="12" md="6" class="pb-0">
+    <v-text-field v-model="formData.username" />
+  </v-col>
+
+  <v-col cols="12" md="6" class="pb-0">
+    <v-text-field v-model="formData.employee_id" />
+  </v-col>
+
+  <v-col cols="12" md="6" class="pt-0">
+    <!-- パスワード変更チェックボックス -->
+  </v-col>
+</v-row>
+```
+
+**解説:**
+
+```
+【PC（md以上）】
+┌─────────────┬─────────────┐
+│ ユーザー名   │ 社員番号     │
+│ 6列         │ 6列         │
+└─────────────┴─────────────┘
+
+【スマホ（xs）】
+┌─────────────┐
+│ ユーザー名   │ 12列
+├─────────────┤
+│ 社員番号     │ 12列
+└─────────────┘
+
+class="pb-0" / class="pt-0"
+  ↓
+padding-bottom: 0 / padding-top: 0
+フィールド間の余白を細かく調整
+```
+
+#### 例3: MenuCardGrid.vue（カードグリッド）
+
+```vue
+<v-row class="ga-0">
+  <v-col
+    v-for="item in items"
+    :key="item.id"
+    cols="12"
+    sm="6"
+    md="4"
+    lg="3"
+    xl="2"
+  >
+    <MenuCard />
+  </v-col>
+</v-row>
+```
+
+**解説:**
+
+```
+class="ga-0"
+  ↓
+gap: 0（列間の余白なし）
+MenuCard 自体に余白を持たせる設計
+
+レスポンシブ動作:
+- xs: 1列（全幅）
+- sm: 2列
+- md: 3列
+- lg: 4列
+- xl: 6列
+```
+
+---
+
+## 4. v-col（列）
+
+### 4.1 列の基本
+
+```vue
+<!-- 幅を指定しない（均等） -->
+<v-row>
+  <v-col>A</v-col>
+  <v-col>B</v-col>
+  <v-col>C</v-col>
+</v-row>
+```
+
+**表示:**
+
+```
+┌────┐     ┌────┐     ┌────┐
+│更新 │ 余白 │削除 │ 余白 │戻る│
+└────┘     └────┘     └────┘
+
+複数の v-spacer で均等に配置
+```
+
+#### 例3: Header.vue（アプリタイトル + パンくずリスト + ボタン）
+
+```vue
+<v-app-bar>
+  <!-- アプリタイトル -->
+  <div class="d-flex align-center flex-shrink-1 ml-4">
+    <span class="text-h6 font-weight-bold text-truncate">
+      {{ appTitle }}
+    </span>
+  </div>
+
+  <!-- パンくずリスト -->
+  <div v-if="displayBreadcrumbs && displayBreadcrumbs.length > 0" class="flex-grow-1 d-flex justify-center">
+    <v-breadcrumbs :items="displayBreadcrumbs" />
+  </div>
+
+  <v-spacer v-else />
+
+  <!-- ページボタン -->
+  <div class="d-flex align-center ga-4 mr-4 flex-shrink-0">
+    <v-btn v-for="button in pageButtons" :key="button.id" />
+  </div>
+</v-app-bar>
+```
+
+#### レイアウトの詳細
+
+```
+【PC画面】
+┌─────────┬───────────────────┬─────────────┐
+│         │                   │             │
+│ タイトル │ パンくずリスト     │ ボタン×n    │
+│         │                   │             │
+└─────────┴───────────────────┴─────────────┘
+  固定幅      中央・拡大可能       固定幅
+
+【スマホ画面（パンくずリストが長い場合）】
+┌─────────────────────────────────┐
+│ タイトル          ボタン         │
+│ パンくずリストは自動で折り返し    │
+└─────────────────────────────────┘
+```
+
+#### ポイント解説
+
+```
+1. d-flex align-center
+   → 縦方向を中央揃え
+
+2. flex-shrink-1（タイトル）
+   → 必要に応じて縮小可能
+
+3. flex-grow-1（パンくずリスト）
+   → 余白を埋めて拡大
+
+4. flex-shrink-0（ボタン）
+   → 縮小しない（常に表示）
+
+5. justify-center（パンくずリスト）
+   → 中央に配置
+
+6. ga-4（ボタン間）
+   → 16pxの間隔
+
+7. ml-4 / mr-4
+   → 左右に余白
+```
+
+### 9.7 フッター（Footer.vue）
+
+#### 全体構造
+
+```vue
+<v-footer app class="bg-grey-lighten-4 py-1 px-4">
+  <v-container fluid class="pa-0">
+    <div class="d-flex flex-column flex-sm-row justify-space-between align-center ga-0">
+      <div class="text-caption text-grey-darken-1">
+        {{ copyrightText }}
+      </div>
+
+      <div v-if="isAdmin" class="text-caption text-grey">
+        {{ versionText }}
+      </div>
+    </div>
+  </v-container>
+</v-footer>
+```
+
+#### レスポンシブ動作の詳細
+
+```
+【スマホ（xs）】
+┌───────────────────────┐
+│   © 2024 Company      │
+│   Version 1.0.0       │
+└───────────────────────┘
+     ↑ 縦並び・中央揃え
+
+【PC（sm以上）】
+┌───────────────────────┐
+│ © 2024 Company        │
+│            Version 1.0.0│
+└───────────────────────┘
+     ↑ 横並び・両端寄せ
+```
+
+#### ポイント解説
+
+```
+1. py-1 px-4
+   → 上下: 4px、左右: 16px
+
+2. pa-0
+   → コンテナの余白を削除
+   → フッター自体の余白のみ
+
+3. flex-column
+   → デフォルトは縦並び
+
+4. flex-sm-row
+   → sm以上（600px～）で横並び
+
+5. justify-space-between
+   → 両端に配置（横並び時）
+
+6. align-center
+   → 縦方向を中央揃え
+
+7. ga-0
+   → gap: 0（余白は不要）
+```
+
+### 9.8 ログイン画面（Login.vue）
+
+#### 全体構造
+
+```vue
+<v-container fluid class="fill-height login-page">
+  <v-row align="center" justify="center">
+    <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+      <v-card rounded="lg" :elevation="12" class="login-card" max-width="480">
+        <v-toolbar :color="primaryColor" flat>
+          <div class="d-flex w-100 justify-center align-center">
+            <span class="text-h5 font-weight-bold">
+              {{ t('auth.loginTitle') }}
+            </span>
+          </div>
+        </v-toolbar>
+
+        <v-card-text class="pa-6">
+          <v-form ref="form" class="d-flex flex-column ga-4">
+            <v-text-field v-model="employeeId" />
+            <v-text-field v-model="password" />
+            <v-btn type="submit">ログイン</v-btn>
+          </v-form>
+        </v-card-text>
+      </v-card>
+    </v-col>
+  </v-row>
+</v-container>
+```
+
+#### レスポンシブ動作の詳細
+
+```
+【スマホ】
+画面全体に表示
+┌─────────────┐
+│  ログイン    │
+│─────────────│
+│ 社員番号     │
+│ パスワード   │
+│ [ログイン]   │
+└─────────────┘
+
+【PC】
+中央に配置
+┌──────┬───────┬──────┐
+│      │ログイン│      │
+│      │───────│      │
+│ 余白 │社員番号│ 余白 │
+│      │パスワード│      │
+│      │[ログイン]│      │
+└──────┴───────┴──────┘
+```
+
+#### ポイント解説
+
+```
+1. fill-height
+   → 画面いっぱいの高さ
+
+2. align="center" justify="center"
+   → カードを中央に配置
+
+3. cols="12" sm="10" md="6" lg="5" xl="4"
+   → レスポンシブな幅調整
+
+4. max-width="480"
+   → 最大幅を制限
+
+5. pa-6
+   → カード内に十分な余白
+
+6. d-flex flex-column ga-4
+   → フォーム要素を縦並び
+   → 間隔: 16px
+
+7. w-100 justify-center
+   → タイトルを中央揃え
+```
+
+---
+
+## 10. よくあるパターン集
+
+### 10.1 中央寄せレイアウト
+
+#### パターン1: カードを中央に配置
+
+```vue
+<v-container class="pa-4">
+  <v-row justify="center">
+    <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+      <v-card>
+        <!-- コンテンツ -->
+      </v-card>
+    </v-col>
+  </v-row>
+</v-container>
+```
+
+**使用例:**
+- フォーム画面（UserCreate, UserUpdate）
+- 詳細画面（UserDetail）
+- 削除確認画面（UserDelete）
+
+#### パターン2: 要素を水平方向に中央配置
+
+```vue
+<div class="d-flex justify-center">
+  <v-btn>ボタン</v-btn>
+</div>
+```
+
+#### パターン3: 要素を垂直方向に中央配置
+
+```vue
+<div class="d-flex align-center h-100">
+  <span>テキスト</span>
+</div>
+```
+
+### 10.2 両端寄せレイアウト
+
+#### パターン1: ボタンを左右に配置
+
+```vue
+<div class="d-flex">
+  <v-btn>左ボタン</v-btn>
+  <v-spacer />
+  <v-btn>右ボタン</v-btn>
+</div>
+```
+
+**使用例:**
+- UserCreate: 作成 / 戻る
+- UserUpdate: 保存 / 戻る
+- UserDelete: 削除する / 戻る
+
+#### パターン2: 3つのボタンを均等配置
+
+```vue
+<div class="d-flex ga-2">
+  <v-btn>左ボタン</v-btn>
+  <v-spacer />
+  <v-btn>中央ボタン</v-btn>
+  <v-spacer />
+  <v-btn>右ボタン</v-btn>
+</div>
+```
+
+**使用例:**
+- UserDetail: 更新 / 削除 / 戻る
+
+#### パターン3: 検索バーとボタン
+
+```vue
+<v-row align="center">
+  <v-col cols="12" md="6">
+    <v-text-field />
+  </v-col>
+  
+  <v-spacer />
+  
+  <v-col cols="12" md="3" class="d-flex justify-end">
+    <v-btn>ボタン</v-btn>
+  </v-col>
+</v-row>
+```
+
+**使用例:**
+- UserList: 検索 / 作成
+
+### 10.3 グリッドレイアウト
+
+#### パターン1: 均等な列（カード一覧）
+
+```vue
+<v-row>
+  <v-col
+    v-for="item in items"
+    :key="item.id"
+    cols="12"
+    sm="6"
+    md="4"
+    lg="3"
+  >
+    <v-card>{{ item.title }}</v-card>
+  </v-col>
+</v-row>
+```
+
+**使用例:**
+- MenuCardGrid: メニューカード
+- AdminMenu: 管理者メニュー
+
+#### パターン2: 2列フォーム
+
+```vue
+<v-row>
+  <v-col cols="12" md="6">
+    <v-text-field label="左フィールド" />
+  </v-col>
+  
+  <v-col cols="12" md="6">
+    <v-text-field label="右フィールド" />
+  </v-col>
+</v-row>
+```
+
+**使用例:**
+- UserUpdate: ユーザー名 / 社員番号
+
+#### パターン3: 詳細画面の項目表示
+
+```vue
+<v-row class="mb-3">
+  <v-col cols="4" class="font-weight-bold">
+    ラベル
+  </v-col>
+  <v-col cols="8">
+    値
+  </v-col>
+</v-row>
+```
+
+**使用例:**
+- UserDetail: ID / ユーザー名 / 社員番号など
+
+### 10.4 レスポンシブパターン
+
+#### パターン1: フォーム幅の調整
+
+```vue
+<v-col cols="12" sm="10" md="6" lg="5" xl="4">
+  <v-card>
+    <!-- フォーム -->
+  </v-card>
+</v-col>
+```
+
+**解説:**
+```
+画面サイズに応じて最適な幅に調整
+- xs: 全幅（スマホ）
+- sm: 83%（タブレット）
+- md: 50%（PC小）
+- lg: 42%（PC）
+- xl: 33%（大型）
+```
+
+#### パターン2: 検索バーの幅調整
+
+```vue
+<v-col cols="12" sm="10" md="6" lg="5" xl="4">
+  <v-text-field />
+</v-col>
+```
+
+**解説:**
+```
+大きい画面ほど検索バーを狭める
+→ 他のコンテンツにスペースを確保
+```
+
+#### パターン3: 縦並び ↔ 横並び切り替え
+
+```vue
+<div class="d-flex flex-column flex-sm-row">
+  <div>要素1</div>
+  <div>要素2</div>
+</div>
+```
+
+**解説:**
+```
+xs: 縦並び
+sm以上: 横並び
+```
+
+**使用例:**
+- Footer: コピーライト / バージョン情報
+
+### 10.5 余白パターン
+
+#### パターン1: コンテナの余白
+
+```vue
+<!-- 標準的な余白 -->
+<v-container class="pa-4">
+  ...
+</v-container>
+
+<!-- 大きめの余白 -->
+<v-container class="pa-6">
+  ...
+</v-container>
+
+<!-- 余白なし -->
+<v-container class="pa-0">
+  ...
+</v-container>
+```
+
+#### パターン2: カード内の余白
+
+```vue
+<v-card>
+  <v-card-text class="pa-6">
+    <!-- コンテンツ -->
+  </v-card-text>
+</v-card>
+```
+
+**解説:**
+```
+pa-6（24px）が標準的
+→ 見やすく、適度な余白
+```
+
+#### パターン3: フィールド間の余白
+
+```vue
+<!-- 標準的な間隔 -->
+<v-text-field class="mb-4" />
+
+<!-- 少し狭い間隔 -->
+<v-text-field class="mb-2" />
+
+<!-- チェックボックス（余白なし） -->
+<v-checkbox class="mb-0" />
+```
+
+#### パターン4: セクション区切り
+
+```vue
+<v-divider class="my-4" />
+```
+
+**解説:**
+```
+my-4（上下16px）
+→ セクション間の明確な区切り
+```
+
+#### パターン5: 要素間の余白（gap）
+
+```vue
+<!-- フレックス要素 -->
+<div class="d-flex ga-4">
+  <v-btn>ボタン1</v-btn>
+  <v-btn>ボタン2</v-btn>
+</div>
+
+<!-- グリッド要素 -->
+<v-row class="ga-0">
+  <v-col>...</v-col>
+</v-row>
+```
+
+### 10.6 データテーブルパターン
+
+#### 基本構造
+
+```vue
+<v-container fluid class="pa-4">
+  <!-- 検索・フィルタ -->
+  <v-row class="mb-1 align-center">
+    <v-col cols="12" md="6">
+      <v-text-field v-model="search" />
+    </v-col>
+    
+    <v-col cols="12" md="3">
+      <div>{{ itemCount }}</div>
+    </v-col>
+    
+    <v-spacer />
+    
+    <v-col cols="12" md="3" class="d-flex justify-end">
+      <v-btn>アクション</v-btn>
+    </v-col>
+  </v-row>
+
+  <!-- テーブル -->
+  <v-data-table-server
+    :headers="headers"
+    :items="items"
+  />
+
+  <!-- ページネーション -->
+  <v-row class="mt-1">
+    <v-col cols="12" class="d-flex justify-center">
+      <v-pagination v-model="page" />
+    </v-col>
+  </v-row>
+</v-container>
+```
+
+**使用例:**
+- UserList
+
+### 10.7 ダイアログパターン
+
+#### 確認ダイアログ
+
+```vue
+<v-dialog v-model="dialog" persistent max-width="500">
+  <v-card>
+    <v-toolbar color="error">
+      <v-toolbar-title>
+        <v-icon icon="warning" />
+        警告
+      </v-toolbar-title>
+    </v-toolbar>
+
+    <v-card-text class="pa-6">
+      <p>削除してもよろしいですか？</p>
+    </v-card-text>
+
+    <v-divider />
+
+    <v-card-actions class="pa-4">
+      <v-btn color="error" @click="confirm">削除</v-btn>
+      <v-spacer />
+      <v-btn @click="cancel">キャンセル</v-btn>
+    </v-card-actions>
+  </v-card>
+</v-dialog>
+```
+
+**使用例:**
+- ConfirmDialog
+
+**ポイント:**
+```
+1. max-width="500"
+   → 適度な幅に制限
+
+2. persistent
+   → 外側クリックで閉じない
+
+3. pa-6
+   → カード内に十分な余白
+
+4. pa-4
+   → ボタンエリアの余白
+```
+
+### 10.8 ナビゲーションパターン
+
+#### サイドバー
+
+```vue
+<v-navigation-drawer
+  v-model="drawer"
+  :rail="ui.isDesktop && ui.rail"
+  :temporary="!ui.isDesktop"
+  :permanent="ui.isDesktop"
+>
+  <v-list nav>
+    <v-list-item
+      v-for="item in navItems"
+      :key="item.to"
+      :to="item.to"
+    >
+      <template #prepend>
+        <v-icon>{{ item.icon }}</v-icon>
+      </template>
+      <v-list-item-title>{{ item.title }}</v-list-item-title>
+    </v-list-item>
+  </v-list>
+
+  <template #append>
+    <div class="pa-2">
+      <v-btn block>ボタン</v-btn>
+    </div>
+  </template>
+</v-navigation-drawer>
+```
+
+**使用例:**
+- SideBar
+
+**ポイント:**
+```
+1. rail
+   → デスクトップでミニモード
+
+2. temporary / permanent
+   → モバイル/デスクトップで切り替え
+
+3. append スロット
+   → 下部に固定コンテンツ
+```
+
+---
+
+## 11. トラブルシューティング
+
+### 11.1 よくある問題と解決方法
+
+#### 問題1: 列が12列を超えて折り返される
+
+```vue
+<!-- ❌ 悪い例（12列を超える） -->
+<v-row>
+  <v-col cols="8">A</v-col>
+  <v-col cols="6">B</v-col> <!-- 8 + 6 = 14列 -->
+</v-row>
+```
+
+**表示:**
+```
+┌──────────┐
+│    A     │ 8列
+├──────┐   │
+│  B   │   │ 6列（次の行に折り返される）
+└──────┘   │
+```
+
+**解決:**
+```vue
+<!-- ✅ 良い例（12列以内） -->
+<v-row>
+  <v-col cols="6">A</v-col>
+  <v-col cols="6">B</v-col> <!-- 6 + 6 = 12列 -->
+</v-row>
+```
+
+#### 問題2: v-col の外にコンテンツを配置
+
+```vue
+<!-- ❌ 悪い例 -->
+<v-row>
+  コンテンツ <!-- v-col の外 -->
+  <v-col>A</v-col>
+</v-row>
+```
+
+**解決:**
+```vue
+<!-- ✅ 良い例 -->
+<v-row>
+  <v-col>
+    コンテンツ
+  </v-col>
+  <v-col>A</v-col>
+</v-row>
+```
+
+#### 問題3: v-spacer が効かない
+
+```vue
+<!-- ❌ 悪い例（v-row内で使用） -->
+<v-row>
+  <v-col>A</v-col>
+  <v-spacer /> <!-- v-row内では効かない -->
+  <v-col>B</v-col>
+</v-row>
+```
+
+**解決:**
+```vue
+<!-- ✅ 良い例1（justify を使用） -->
+<v-row justify="space-between">
+  <v-col>A</v-col>
+  <v-col>B</v-col>
+</v-row>
+
+<!-- ✅ 良い例2（d-flex 内で使用） -->
+<v-row>
+  <v-col>
+    <div class="d-flex">
+      <span>A</span>
+      <v-spacer />
+      <span>B</span>
+    </div>
+  </v-col>
+</v-row>
+```
+
+#### 問題4: 余白が効かない
+
+```vue
+<!-- ❌ 悪い例（クラス名のスペルミス） -->
+<v-container class="pa4"> <!-- ハイフンなし -->
+  ...
+</v-container>
+```
+
+**解決:**
+```vue
+<!-- ✅ 良い例 -->
+<v-container class="pa-4">
+  ...
+</v-container>
+```
+
+#### 問題5: レスポンシブが効かない
+
+```vue
+<!-- ❌ 悪い例（継承が理解できていない） -->
+<v-col sm="6" md="12">
+  <!-- md以上で全幅にしたいが、sm="6"が継承される -->
+</v-col>
+```
+
+**解決:**
+```vue
+<!-- ✅ 良い例 -->
+<v-col cols="12" sm="6" md="12">
+  <!-- 明示的にcols="12"を指定 -->
+</v-col>
+```
+
+### 11.2 デバッグのコツ
+
+#### 方法1: ブラウザの開発者ツール
+
+```
+1. 要素を右クリック → 検証
+2. Computed タブで実際のスタイルを確認
+3. flex-direction, justify-content などを確認
+```
+
+#### 方法2: 一時的に border を追加
+
+```vue
+<v-row style="border: 1px solid red;">
+  <v-col style="border: 1px solid blue;">
+    コンテンツ
+  </v-col>
+</v-row>
+```
+
+**解説:**
+```
+レイアウトの構造が視覚的に分かる
+→ 問題の特定が容易
+```
+
+#### 方法3: Vuetify Devtools（ブラウザ拡張機能）
+
+```
+Vue Devtools をインストール
+→ コンポーネントツリーで構造を確認
+→ props, data, computed を確認
+```
+
+---
+
+## 12. ベストプラクティス
+
+### 12.1 レスポンシブ設計
+
+```vue
+<!-- ✅ 推奨: モバイルファースト -->
+<v-col cols="12" sm="6" md="4">
+  <!-- デフォルトは全幅、画面が大きくなるにつれて狭くなる -->
+</v-col>
+
+<!-- ❌ 非推奨: すべて指定 -->
+<v-col xs="12" sm="6" md="4" lg="3" xl="2">
+  <!-- 冗長で管理が大変 -->
+</v-col>
+```
+
+### 12.2 余白の統一
+
+```vue
+<!-- ✅ 推奨: 4の倍数を使用 -->
+class="pa-4"  <!-- 16px -->
+class="mb-4"  <!-- 16px -->
+class="ga-4"  <!-- 16px -->
+
+<!-- ❌ 非推奨: ランダムな値 -->
+class="pa-3"  <!-- 12px -->
+class="mb-5"  <!-- 20px -->
+```
+
+**理由:**
+```
+4の倍数（4, 8, 16, 24...）を使用
+→ デザインの一貫性
+→ 視覚的なリズム
+```
+
+### 12.3 コンテナの使い分け
+
+```vue
+<!-- フォーム・詳細画面 -->
+<v-container class="pa-4">
+  <v-row justify="center">
+    <v-col cols="12" md="6">
+      <v-card>...</v-card>
+    </v-col>
+  </v-row>
+</v-container>
+
+<!-- データテーブル・一覧画面 -->
+<v-container fluid class="pa-4">
+  <v-row>
+    <v-col cols="12">
+      <v-data-table />
+    </v-col>
+  </v-row>
+</v-container>
+```
+
+### 12.4 ボタン配置の統一
+
+```vue
+<!-- ✅ 推奨: 主要なアクションを左、キャンセルを右 -->
+<div class="d-flex ga-2">
+  <v-btn color="primary">保存</v-btn>
+  <v-spacer />
+  <v-btn>キャンセル</v-btn>
+</div>
+
+<!-- ✅ 推奨: 破壊的なアクションは色で区別 -->
+<div class="d-flex ga-2">
+  <v-btn color="error">削除</v-btn>
+  <v-spacer />
+  <v-btn>キャンセル</v-btn>
+</div>
+```
+
+### 12.5 アクセシビリティ
+
+```vue
+<!-- ✅ 推奨: セマンティックなHTML -->
+<v-row>
+  <v-col>
+    <h1>タイトル</h1>
+    <p>本文</p>
+  </v-col>
+</v-row>
+
+<!-- ✅ 推奨: フォーカス管理 -->
+<v-text-field
+  ref="firstField"
+  @mounted="$refs.firstField?.focus()"
+/>
+```
+
+---
+
+## 13. まとめ
+
+### 13.1 重要なポイント
+
+1. **基本構造を守る**
+   ```
+   v-container → v-row → v-col → コンテンツ
+   ```
+
+2. **12列グリッドを理解する**
+   ```
+   cols="6"  → 半分（50%）
+   cols="4"  → 1/3（33%）
+   cols="3"  → 1/4（25%）
+   ```
+
+3. **レスポンシブを活用する**
+   ```
+   cols="12" sm="6" md="4"
+   → 画面サイズに応じて自動調整
+   ```
+
+4. **余白を統一する**
+   ```
+   pa-4, mb-4, ga-4
+   → 4の倍数で統一（16px）
+   ```
+
+5. **フレックスボックスを活用する**
+   ```
+   d-flex justify-center align-center
+   → 柔軟なレイアウト
+   ```
+
+### 13.2 学習のステップ
+
+1. **基本を理解する**
+   - v-container, v-row, v-col の役割
+   - 12列グリッドの仕組み
+
+2. **レスポンシブを学ぶ**
+   - ブレイクポイント（xs, sm, md, lg, xl）
+   - cols, sm, md の使い方
+
+3. **余白を使いこなす**
+   - padding（pa-, pt-, pb-, pl-, pr-, px-, py-）
+   - margin（ma-, mt-, mb-, ml-, mr-, mx-, my-）
+   - gap（ga-, gx-, gy-）
+
+4. **フレックスボックスを使う**
+   - d-flex, justify-, align-
+   - flex-row, flex-column, flex-wrap
+
+5. **実践する**
+   - あなたのコードを参考に実装
+   - パターン集を活用
+
+### 13.3 参考リンク
+
+- [Vuetify 3 公式ドキュメント](https://vuetifyjs.com/)
+- [Grid system](https://vuetifyjs.com/en/components/grids/)
+- [Display helpers](https://vuetifyjs.com/en/styles/display/)
+- [Spacing](https://vuetifyjs.com/en/styles/spacing/)
+- [Flex](https://vuetifyjs.com/en/styles/flex/) appTitle }}
+    </span>
+  </div>
+
+  <!-- パンくずリスト -->
+  <div class="flex-grow-1 d-flex justify-center">
+    <v-breadcrumbs :items="displayBreadcrumbs" />
+  </div>
+
+  <v-spacer />
+
+  <!-- ボタン -->
+  <div class="d-flex align-center ga-4 mr-4 flex-shrink-0">
+    <v-btn v-for="button in pageButtons" />
+  </div>
+</v-app-bar>
+```
+
+**解説:**
+
+```
+flex-shrink-1
+  ↓
+必要に応じて縮小可能
+
+flex-grow-1
+  ↓
+余白を埋めて拡大
+
+d-flex justify-center
+  ↓
+パンくずリストを中央に配置
+
+ga-4
+  ↓
+ボタン間の余白: 16px
+```
+
+#### 例4: Footer.vue（コピーライト + バージョン）
+
+```vue
+<v-footer app class="bg-grey-lighten-4 py-1 px-4">
+  <v-container fluid class="pa-0">
+    <div class="d-flex flex-column flex-sm-row justify-space-between align-center ga-0">
+      <div class="text-caption text-grey-darken-1">
+        {{ copyrightText }}
+      </div>
+
+      <div v-if="isAdmin" class="text-caption text-grey">
+        {{ versionText }}
+      </div>
+    </div>
+  </v-container>
+</v-footer>
+```
+
+**解説:**
+
+```
+flex-column
+  ↓
+スマホでは縦並び
+
+flex-sm-row
+  ↓
+sm以上（600px～）で横並び
+
+justify-space-between
+  ↓
+両端に配置
+
+align-center
+  ↓
+縦方向を中央揃え
+```
+
+#### 例5: Login.vue（フォーム）
+
+```vue
+<v-form @submit.prevent="onSubmit" ref="form" class="d-flex flex-column ga-4">
+  <v-text-field v-model="employeeId" />
+  <v-text-field v-model="password" />
+  <v-btn type="submit">ログイン</v-btn>
+</v-form>
+```
+
+**解説:**
+
+```
+d-flex flex-column
+  ↓
+フォーム要素を縦に並べる
+
+ga-4
+  ↓
+フィールド間の余白: 16px
+```
+
+---
+
+## 7. 余白（Spacing）
+
+### 7.1 余白の種類
+
+```
+p = padding（内側の余白）
+m = margin（外側の余白）
+```
+
+**方向:**
+
+```
+t = top（上）
+b = bottom（下）
+l = left（左）
+r = right（右）
+x = left + right（左右）
+y = top + bottom（上下）
+a = all（すべて）
+```
+
+**サイズ:**
+
+```
+0 = 0px
+1 = 4px
+2 = 8px
+3 = 12px
+4 = 16px
+5 = 20px
+6 = 24px
+...
+16 = 64px
+```
+
+### 7.2 クラス名の構成
+
+```
+{プロパティ}{方向}-{サイズ}
+
+例:
+pa-4  → padding: 16px（すべての方向）
+mt-2  → margin-top: 8px
+px-6  → padding-left: 24px, padding-right: 24px
+my-0  → margin-top: 0, margin-bottom: 0
+```
+
+### 7.3 よく使うパターン
+
+```vue
+<!-- カード全体に余白 -->
+<v-card class="pa-6">
+  内容
+</v-card>
+
+<!-- 上下のマージン -->
+<v-row class="my-4">
+  ...
+</v-row>
+
+<!-- 下だけマージン -->
+<v-text-field class="mb-4" />
+
+<!-- 左右のパディング -->
+<div class="px-4">
+  内容
+</div>
+```
+
+**表示例:**
+
+```
+【pa-4（padding: 16px）】
+┌────────────────┐
+│ ←16px→        │
+│   ┌────────┐  │
+│ ↑ │ 内容   │  │
+│16px└────────┘  │
+│ ↓             │
+└────────────────┘
+
+【ma-4（margin: 16px）】
+        ↑ 16px
+      ┌────────┐
+←16px→│  内容  │←16px→
+      └────────┘
+        ↓ 16px
+```
+
+### 7.4 あなたのコードの例
+
+#### 例1: UserList.vue（コンテナの余白）
+
+```vue
+<v-container fluid class="pa-4">
+  ...
+</v-container>
+```
+
+**解説:**
+
+```
+pa-4
+  ↓
+padding: 16px（すべての方向）
+  ↓
+┌─────────────────────────┐
+│ ←16px→                  │
+│   ┌─────────────────┐   │
+│ ↑ │   コンテンツ     │   │
+│16px└─────────────────┘   │
+│ ↓                       │
+└─────────────────────────┘
+```
+
+#### 例2: UserCreate.vue（フィールド間の余白）
+
+```vue
+<v-text-field
+  v-model="formData.username"
+  class="mb-4"
+/>
+
+<v-text-field
+  v-model="formData.employee_id"
+  class="mb-4"
+/>
+```
+
+**解説:**
+
+```
+mb-4
+  ↓
+margin-bottom: 16px
+
+┌─────────────┐
+│ ユーザー名   │
+└─────────────┘
+     ↓ 16px
+┌─────────────┐
+│ 社員番号     │
+└─────────────┘
+```
+
+#### 例3: UserDetail.vue（カード内の余白）
+
+```vue
+<v-card elevation="2">
+  <v-card-text class="pa-6">
+    <!-- 詳細情報 -->
+  </v-card-text>
+</v-card>
+```
+
+**解説:**
+
+```
+pa-6
+  ↓
+padding: 24px
+
+┌──────────────────┐
+│ ←24px→          │
+│   ┌──────────┐  │
+│ ↑ │ 詳細情報  │  │
+│24px└──────────┘  │
+│ ↓               │
+└──────────────────┘
+```
+
+#### 例4: UserUpdate.vue（フィールドの余白調整）
+
+```vue
+<v-row>
+  <v-col cols="12" md="6" class="pb-0">
+    <v-text-field v-model="formData.username" class="mb-2" />
+  </v-col>
+
+  <v-col cols="12" md="6" class="pb-0">
+    <v-text-field v-model="formData.employee_id" class="mb-4" />
+  </v-col>
+
+  <v-col cols="12" md="6" class="pt-0">
+    <v-checkbox class="mb-0" />
+  </v-col>
+</v-row>
+```
+
+**解説:**
+
+```
+pb-0
+  ↓
+padding-bottom: 0
+v-col のデフォルト余白を削除
+
+pt-0
+  ↓
+padding-top: 0
+上の要素との余白を削除
+
+mb-2, mb-4, mb-0
+  ↓
+要素ごとに細かく余白を調整
+```
+
+#### 例5: UserList.vue（行の余白）
+
+```vue
+<v-row class="mb-1 align-center">
+  ...
+</v-row>
+```
+
+**解説:**
+
+```
+mb-1
+  ↓
+margin-bottom: 4px
+
+検索バーとテーブルの間に少しだけ余白
+```
+
+#### 例6: Header.vue（左右の余白）
+
+```vue
+<div class="d-flex align-center flex-shrink-1 ml-4">
+  <span>{{ appTitle }}</span>
+</div>
+
+<div class="d-flex align-center ga-4 mr-4 flex-shrink-0">
+  <v-btn v-for="button in pageButtons" />
+</div>
+```
+
+**解説:**
+
+```
+ml-4
+  ↓
+margin-left: 16px
+
+mr-4
+  ↓
+margin-right: 16px
+
+ヘッダー内の要素に適度な余白
+```
+
+#### 例7: UserDelete.vue（警告メッセージ）
+
+```vue
+<v-alert type="warning" variant="tonal" class="mb-6">
+  {{ t('pages.users.delete.warning') }}
+</v-alert>
+
+<v-card variant="outlined" class="mb-4">
+  <!-- ユーザー情報 -->
+</v-card>
+```
+
+**解説:**
+
+```
+mb-6
+  ↓
+margin-bottom: 24px
+警告メッセージとカードの間に大きめの余白
+
+mb-4
+  ↓
+margin-bottom: 16px
+カードとボタンの間に余白
+```
+
+### 7.5 gap（要素間の余白）
+
+```vue
+<!-- フレックス要素の間隔 -->
+<div class="d-flex ga-4">
+  <div>A</div>
+  <div>B</div>
+  <div>C</div>
+</div>
+```
+
+**gap の種類:**
+
+```
+ga-{n}  → gap（すべて）
+gx-{n}  → column-gap（横）
+gy-{n}  → row-gap（縦）
+```
+
+**表示:**
+
+```
+【ga-4（gap: 16px）】
+┌──┐    ┌──┐    ┌──┐
+│A │ 16px│B │ 16px│C │
+└──┘    └──┘    └──┘
+```
+
+#### あなたのコードの例
+
+```vue
+<!-- UserDelete.vue -->
+<div class="d-flex ga-2">
+  <v-btn>削除する</v-btn>
+  <v-spacer />
+  <v-btn>戻る</v-btn>
+</div>
+
+<!-- Header.vue -->
+<div class="d-flex align-center ga-4 mr-4">
+  <v-btn v-for="button in pageButtons" />
+</div>
+
+<!-- Login.vue -->
+<v-form class="d-flex flex-column ga-4">
+  <v-text-field />
+  <v-text-field />
+  <v-btn>ログイン</v-btn>
+</v-form>
+```
+
+**解説:**
+
+```
+ga-2  → gap: 8px（小さめの間隔）
+ga-4  → gap: 16px（標準的な間隔）
+
+margin を使うより簡潔で直感的
+```
+
+---
+
+## 8. 横幅・縦幅の制御
+
+### 8.1 幅のクラス
+
+```vue
+<div class="w-100">100%</div>
+<div class="w-75">75%</div>
+<div class="w-50">50%</div>
+<div class="w-25">25%</div>
+<div class="w-auto">自動</div>
+```
+
+**表示:**
+
+```
+【w-100】
+┌────────────────┐
+│    100%        │
+└────────────────┘
+
+【w-50】
+┌────────┐
+│  50%   │
+└────────┘
+
+【w-25】
+┌────┐
+│25% │
+└────┘
+```
+
+### 8.2 高さのクラス
+
+```vue
+<div class="h-100">100%</div>
+<div class="h-75">75%</div>
+<div class="h-50">50%</div>
+<div class="h-auto">自動</div>
+```
+
+### 8.3 最大幅・最小幅
+
+```vue
+<!-- 最大幅 -->
+<v-card max-width="600">
+  最大600pxまで
+</v-card>
+
+<!-- 最小幅 -->
+<v-card min-width="300">
+  最小300px
+</v-card>
+```
+
+### 8.4 あなたのコードの例
+
+#### 例1: ConfirmDialog.vue（ダイアログ幅）
+
+```vue
+<v-dialog v-model="dialog" persistent max-width="500">
+  <v-card>
+    ...
+  </v-card>
+</v-dialog>
+```
+
+**解説:**
+
+```
+max-width="500"
+  ↓
+ダイアログの最大幅を500pxに制限
+  ↓
+スマホでは画面幅に合わせて縮小
+PCでは500pxまで
+```
+
+#### 例2: Login.vue（ログインカード）
+
+```vue
+<v-card rounded="lg" :elevation="12" class="login-card" max-width="480">
+  ...
+</v-card>
+```
+
+**解説:**
+
+```
+max-width="480"
+  ↓
+ログインカードの最大幅を480pxに制限
+
+スマホでは画面幅いっぱい
+PCでは480pxで固定
+```
+
+#### 例3: Header.vue（パンくずリスト）
+
+```vue
+<div class="flex-grow-1 d-flex justify-center">
+  <v-breadcrumbs :items="displayBreadcrumbs" />
+</div>
+```
+
+**解説:**
+
+```
+flex-grow-1
+  ↓
+余白を埋めて横幅を拡大
+
+パンくずリストが中央に配置される
+```
+
+#### 例4: Notification.vue（通知の幅）
+
+```vue
+<v-snackbar
+  v-model="notification.show"
+  max-width="600"
+  min-width="300"
+>
+  ...
+</v-snackbar>
+```
+
+**解説:**
+
+```
+max-width="600"
+  ↓
+通知の最大幅を600pxに制限
+
+min-width="300"
+  ↓
+最小でも300pxを確保
+
+メッセージが長くても短くても適切な幅
+```
+
+---
+
+## 9. 実践例：あなたのコードから学ぶ
+
+### 9.1 ユーザー一覧画面（UserList.vue）
+
+#### 全体構造
+
+```vue
+<v-container fluid class="pa-4">
+  <!-- 検索バー + ボタン -->
+  <v-row class="mb-1 align-center">
+    <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+      <v-text-field v-model="searchQuery" />
+    </v-col>
+    
+    <v-col cols="12" sm="4" md="3">
+      <div>{{ itemCountText }}</div>
+    </v-col>
+    
+    <v-spacer />
+    
+    <v-col cols="12" sm="3" md="3" class="d-flex justify-end">
+      <v-btn @click="goToCreate">作成</v-btn>
+    </v-col>
+  </v-row>
+
+  <!-- データテーブル -->
+  <v-data-table-server :items="users" />
+
+  <!-- ページネーション -->
+  <v-row class="mt-1">
+    <v-col cols="12" class="d-flex justify-center">
+      <v-pagination v-model="currentPage" />
+    </v-col>
+  </v-row>
+</v-container>
+```
+
+#### レスポンシブ動作の詳細
+
+```
+【スマホ（xs）】
+┌───────────────────────┐
+│ 検索フィールド（全幅） │
+├───────────────────────┤
+│ 件数表示（全幅）       │
+├───────────────────────┤
+│ 作成ボタン（右寄せ）   │
+├───────────────────────┤
+│ データテーブル         │
+├───────────────────────┤
+│ ページネーション       │
+└───────────────────────┘
+
+【タブレット（sm）】
+┌──────────┬────┬─────┐
+│ 検索(10列)│件数│作成  │
+│          │(4列)│(3列) │
+├──────────┴────┴─────┤
+│ データテーブル         │
+├───────────────────────┤
+│ ページネーション       │
+└───────────────────────┘
+
+【PC（md以上）】
+┌──────┬──┬───┬──────┐
+│検索  │件数│余白│作成   │
+│(6列) │(3列)│   │(3列)  │
+├──────┴──┴───┴──────┤
+│ データテーブル         │
+├───────────────────────┤
+│ ページネーション       │
+└───────────────────────┘
+```
+
+#### ポイント解説
+
+```
+1. fluid
+   → データテーブルは横に広い方が見やすい
+
+2. mb-1, mt-1
+   → 検索バーとテーブルの間に少しだけ余白
+
+3. align-center
+   → 高さが違う要素（検索・件数・ボタン）を揃える
+
+4. <v-spacer />
+   → 件数表示とボタンの間に余白を自動挿入
+
+5. justify-end
+   → ボタンを右寄せ
+
+6. justify-center
+   → ページネーションを中央配置
+```
+
+### 9.2 ユーザー作成画面（UserCreate.vue）
+
+#### 全体構造
+
+```vue
+<v-container class="pa-4">
+  <v-row justify="center">
+    <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+      <v-card elevation="2">
+        <v-card-text class="pa-6">
+          <v-form ref="form">
+            <v-text-field v-model="formData.username" class="mb-4" />
+            <v-text-field v-model="formData.employee_id" class="mb-4" />
+            <v-text-field v-model="formData.password" class="mb-4" />
+            <v-checkbox v-model="formData.is_admin" class="mb-2" />
+
+            <v-divider class="my-4" />
+
+            <div class="d-flex">
+              <v-btn type="submit">作成</v-btn>
+              <v-spacer />
+              <v-btn @click="goBack">戻る</v-btn>
+            </div>
+          </v-form>
+        </v-card-text>
+      </v-card>
+    </v-col>
+  </v-row>
+</v-container>
+```
+
+#### レスポンシブ動作の詳細
+
+```
+【スマホ】
+画面全体にフォーム
+┌─────────────┐
+│ ユーザー名   │
+│ 社員番号     │
+│ パスワード   │
+│ ☑ 管理者権限│
+│─────────────│
+│ 作成    戻る│
+└─────────────┘
+
+【PC】
+中央に絞ったフォーム
+┌──────┬───────┬──────┐
+│      │ユーザー名│      │
+│      │社員番号  │      │
+│ 余白 │パスワード│ 余白 │
+│      │☑管理者権限│      │
+│      │─────────│      │
+│      │作成   戻る│      │
+└──────┴───────┴──────┘
+```
+
+#### ポイント解説
+
+```
+1. fluid なし
+   → フォームは狭い方が見やすい
+
+2. justify="center"
+   → カードを中央配置
+
+3. cols="12" sm="10" md="6" lg="5" xl="4"
+   → 画面サイズに応じて最適な幅に調整
+
+4. pa-6
+   → カード内に十分な余白
+
+5. mb-4
+   → フィールド間に標準的な余白
+
+6. my-4
+   → 区切り線の上下に余白
+
+7. d-flex + v-spacer
+   → ボタンを左右に配置
+```
+
+### 9.3 ユーザー更新画面（UserUpdate.vue）
+
+#### 全体構造（特徴的な部分のみ）
+
+```vue
+<v-form ref="form">
+  <v-row>
+    <v-col cols="12" md="6" class="pb-0">
+      <v-text-field v-model="formData.username" class="mb-2" />
+    </v-col>
+
+    <v-col cols="12" md="6" class="pb-0">
+      <v-text-field v-model="formData.employee_id" class="mb-4" />
+    </v-col>
+
+    <v-col cols="12" md="6" class="pt-0">
+      <v-checkbox v-model="changePassword" class="mb-2" />
+      
+      <v-expand-transition>
+        <div v-if="changePassword">
+          <v-text-field v-model="formData.password" class="mb-3" />
+          <v-text-field v-model="passwordConfirm" />
+        </div>
+      </v-expand-transition>
+    </v-col>
+  </v-row>
+
+  <v-row>
+    <v-col cols="12" md="6" class="pt-0">
+      <v-checkbox v-model="formData.is_admin" class="mb-2" />
+    </v-col>
+
+    <v-col cols="12" md="6" class="pt-0">
+      <v-checkbox v-model="formData.is_active" class="mb-2" />
+    </v-col>
+  </v-row>
+</v-form>
+```
+
+#### レスポンシブ動作の詳細
+
+```
+【スマホ】
+┌─────────────┐
+│ ユーザー名   │
+├─────────────┤
+│ 社員番号     │
+├─────────────┤
+│ ☑パスワード変更│
+│ 新パスワード  │
+│ 確認用       │
+├─────────────┤
+│ ☑管理者権限  │
+├─────────────┤
+│ ☑有効       │
+└─────────────┘
+
+【PC】
+┌───────────┬───────────┐
+│ ユーザー名 │ 社員番号   │
+├───────────┴───────────┤
+│ ☑パスワード変更         │
+│ 新パスワード            │
+│ 確認用                 │
+├───────────┬───────────┤
+│ ☑管理者権限│ ☑有効     │
+└───────────┴───────────┘
+```
+
+#### ポイント解説
+
+```
+1. v-row で行を分割
+   → セクションごとにグループ化
+
+2. cols="12" md="6"
+   → PC では 2列、スマホでは 1列
+
+3. pb-0 / pt-0
+   → v-col のデフォルト余白を削除
+   → フィールド間の余白を細かく制御
+
+4. mb-2 / mb-3 / mb-4
+   → 要素ごとに適切な余白
+
+5. v-expand-transition
+   → パスワード変更時にスムーズに展開
+```
+
+### 9.4 ユーザー詳細画面（UserDetail.vue）
+
+#### 全体構造
+
+```vue
+<v-container class="pa-4">
+  <v-row justify="center">
+    <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+      <v-card elevation="2">
+        <v-card-text class="pa-6">
+          <v-row class="mb-3">
+            <v-col cols="4" class="font-weight-bold">ID</v-col>
+            <v-col cols="8">{{ user.id }}</v-col>
+          </v-row>
+
+          <v-divider class="my-3" />
+
+          <v-row class="mb-3">
+            <v-col cols="4" class="font-weight-bold">ユーザー名</v-col>
+            <v-col cols="8">{{ user.username }}</v-col>
+          </v-row>
+
+          <v-divider class="my-3" />
+
+          <!-- 他のフィールド -->
+
+          <v-divider class="my-4" />
+
+          <div class="d-flex ga-2">
+            <v-btn color="primary">更新</v-btn>
+            <v-spacer />
+            <v-btn color="error">削除</v-btn>
+            <v-spacer />
+            <v-btn>戻る</v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-col>
+  </v-row>
+</v-container>
+```
+
+#### レイアウトの詳細
+
+```
+【カード内のレイアウト】
+┌──────────────────┐
+│  ID:        123  │ ← v-row で左右に分割
+│──────────────────│
+│  ユーザー名: 太郎 │
+│──────────────────│
+│  社員番号:   001  │
+│──────────────────│
+│  管理者権限: ✓   │
+│──────────────────│
+│  有効:      はい  │
+│──────────────────│
+│                  │
+│ 更新  削除  戻る  │ ← d-flex で配置
+└──────────────────┘
+```
+
+#### ポイント解説
+
+```
+1. v-row で各フィールドを構成
+   → cols="4" でラベル
+   → cols="8" で値
+
+2. my-3
+   → 区切り線の上下に余白
+
+3. my-4
+   → ボタン前の区切り線は余白を大きめに
+
+4. d-flex ga-2
+   → ボタンを横並び
+   → 間隔: 8px
+
+5. v-spacer（2つ）
+   → 3つのボタンを均等に配置
+```
+
+### 9.5 メニューカードグリッド（MenuCardGrid.vue）
+
+#### 全体構造
+
+```vue
+<v-container fluid class="pa-4">
+  <v-row class="ga-0">
+    <v-col
+      v-for="item in items"
+      :key="item.id"
+      cols="12"
+      sm="6"
+      md="4"
+      lg="3"
+      xl="2"
+    >
+      <MenuCard
+        :icon="item.icon"
+        :title="item.title"
+        :to="item.to"
+      />
+    </v-col>
+  </v-row>
+</v-container>
+```
+
+#### レスポンシブ動作の詳細
+
+```
+【スマホ（xs）】
+┌────────────┐
+│   カード1   │
+├────────────┤
+│   カード2   │
+├────────────┤
+│   カード3   │
+└────────────┘
+
+【タブレット（sm）】
+┌──────┬──────┐
+│カード1│カード2│
+├──────┼──────┤
+│カード3│カード4│
+└──────┴──────┘
+
+【PC小（md）】
+┌────┬────┬────┐
+│カード1│カード2│カード3│
+├────┼────┼────┤
+│カード4│カード5│カード6│
+└────┴────┴────┘
+
+【PC（lg）】
+┌───┬───┬───┬───┐
+│カード1│カード2│カード3│カード4│
+└───┴───┴───┴───┘
+
+【超大型（xl）】
+┌──┬──┬──┬──┬──┬──┐
+│カード1│カード2│カード3│カード4│カード5│カード6│
+└──┴──┴──┴──┴──┴──┘
+```
+
+#### ポイント解説
+
+```
+1. fluid
+   → 画面いっぱいにカードを表示
+
+2. ga-0
+   → グリッド間の余白をなくす
+   → MenuCard 自体に余白を持たせる設計
+
+3. cols="12" sm="6" md="4" lg="3" xl="2"
+   → 画面サイズに応じて最適な列数
+   → 1列 → 2列 → 3列 → 4列 → 6列
+
+4. v-for
+   → 動的にカードを生成
+```
+
+### 9.6 ヘッダー（Header.vue）
+
+#### 全体構造
+
+```vue
+<v-app-bar :color="surfaceColor" :elevation="headerElevation" :height="headerHeight">
+  <!-- アプリタイトル -->
+  <div class="d-flex align-center flex-shrink-1 ml-4">
+    <span class="text-h6 font-weight-bold text-truncate">
+      {{
+
+```
+┌────┬────┬────┐
+│ A  │ B  │ C  │ ← 各4列（12 ÷ 3 = 4）
+└────┴────┴────┘
+```
+
+### 4.2 幅を指定する
+
+```vue
+<v-row>
+  <v-col cols="12">全幅</v-col>
+  <v-col cols="6">半分</v-col>
+  <v-col cols="6">半分</v-col>
+  <v-col cols="4">1/3</v-col>
+  <v-col cols="4">1/3</v-col>
+  <v-col cols="4">1/3</v-col>
+</v-row>
+```
+
+**表示:**
+
+```
+┌────────────────────────┐
+│      全幅（12列）       │
+├───────────┬───────────┤
+│  半分（6列）│  半分（6列）│
+├───────┬───────┬───────┤
+│1/3(4列)│1/3(4列)│1/3(4列)│
+└───────┴───────┴───────┘
+```
+
+### 4.3 オフセット（左に余白）
+
+```vue
+<v-row>
+  <v-col cols="6" offset="3">
+    中央寄せ
+  </v-col>
+</v-row>
+```
+
+**表示:**
+
+```
+┌───┬───────────┬───┐
+│余白│ 中央寄せ   │余白│
+│3列│   6列     │3列│
+└───┴───────────┴───┘
+```
+
+### 4.4 あなたのコードの例
+
+#### 例1: UserCreate.vue / UserUpdate.vue（フォーム）
+
+```vue
+<v-row justify="center">
+  <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+    <v-card>
+      <!-- フォーム -->
+    </v-card>
+  </v-col>
+</v-row>
+```
+
+**レスポンシブ動作:**
+
+```
+【スマホ（xs: ～599px）】
+┌─────────────┐
+│             │
+│   フォーム   │ cols="12"（全幅）
+│             │
+└─────────────┘
+
+【タブレット（sm: 600～959px）】
+┌─┬─────────┬─┐
+│余│         │余│
+│白│ フォーム │白│ sm="10"（10/12 = 83%）
+│ │         │ │
+└─┴─────────┴─┘
+
+【PC小（md: 960～1279px）】
+┌───┬───────┬───┐
+│   │       │   │
+│余白│フォーム│余白│ md="6"（50%）
+│   │       │   │
+└───┴───────┴───┘
+
+【PC大（lg: 1280～1919px）】
+┌────┬─────┬────┐
+│    │     │    │
+│ 余白│フォーム│余白 │ lg="5"（42%）
+│    │     │    │
+└────┴─────┴────┘
+
+【超大型（xl: 1920px～）】
+┌─────┬───┬─────┐
+│     │   │     │
+│  余白 │フォーム│余白  │ xl="4"（33%）
+│     │   │     │
+└─────┴───┴─────┘
+```
+
+**なぜこうするのか:**
+
+```
+スマホ: 全幅（狭いから）
+タブレット: 83%（少し余白）
+PC小: 50%（フォームは狭い方が見やすい）
+PC大: 42%（さらに絞る）
+超大型: 33%（中央に集中）
+```
+
+#### 例2: UserDetail.vue / UserDelete.vue（詳細表示）
+
+```vue
+<v-row justify="center">
+  <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+    <v-card>
+      <!-- 詳細情報 -->
+    </v-card>
+  </v-col>
+</v-row>
+```
+
+**解説:**
+
+```
+フォーム画面と同じレスポンシブ設定
+  ↓
+一貫性のあるUI
+```
+
+#### 例3: UserUpdate.vue（チェックボックス配置）
+
+```vue
+<v-row>
+  <v-col cols="12" md="6" class="pt-0">
+    <v-checkbox v-model="formData.is_admin" />
+  </v-col>
+
+  <v-col cols="12" md="6" class="pt-0">
+    <v-checkbox v-model="formData.is_active" />
+  </v-col>
+</v-row>
+```
+
+**レスポンシブ動作:**
+
+```
+【PC（md以上）】
+┌─────────────┬─────────────┐
+│ 管理者権限   │ 有効        │
+└─────────────┴─────────────┘
+
+【スマホ（xs）】
+┌─────────────┐
+│ 管理者権限   │
+├─────────────┤
+│ 有効        │
+└─────────────┘
+```
+
+---
+
+## 5. ブレイクポイント（レスポンシブ）
+
+### 5.1 ブレイクポイント一覧
+
+| 名前 | サイズ | デバイス | cols の指定 |
+|------|--------|---------|------------|
+| **xs** | 0～599px | スマホ縦 | `cols="12"` |
+| **sm** | 600～959px | スマホ横・小タブレット | `sm="6"` |
+| **md** | 960～1279px | タブレット・小型PC | `md="4"` |
+| **lg** | 1280～1919px | PC | `lg="3"` |
+| **xl** | 1920px～ | 大型ディスプレイ | `xl="2"` |
+
+### 5.2 指定方法
+
+```vue
+<v-col 
+  cols="12"   ← すべてのサイズ（デフォルト）
+  sm="6"      ← 600px以上
+  md="4"      ← 960px以上
+  lg="3"      ← 1280px以上
+  xl="2"      ← 1920px以上
+>
+```
+
+**継承ルール:**
+
+```
+指定したブレイクポイント以上で有効
+
+例: sm="6" を指定
+  ↓
+xs: cols="12" を使用
+sm以上: sm="6" を使用
+```
+
+### 5.3 実践例
+
+```vue
+<!-- メニューカード -->
+<v-col 
+  cols="12"   ← スマホ: 1列（全幅）
+  sm="6"      ← タブレット横: 2列（半分）
+  md="4"      ← PC小: 3列（1/3）
+  lg="3"      ← PC: 4列（1/4）
+  xl="2"      ← 大型: 6列（1/6）
+>
+  <MenuCard />
+</v-col>
+```
+
+**表示例:**
+
+```
+【スマホ（xs）】
+┌──────┐
+│カード1│
+├──────┤
+│カード2│
+├──────┤
+│カード3│
+└──────┘
+
+【タブレット（sm）】
+┌─────┬─────┐
+│カード1│カード2│
+├─────┼─────┤
+│カード3│カード4│
+└─────┴─────┘
+
+【PC（md）】
+┌────┬────┬────┐
+│カード1│カード2│カード3│
+├────┼────┼────┤
+│カード4│カード5│カード6│
+└────┴────┴────┘
+
+【PC大（lg）】
+┌───┬───┬───┬───┐
+│カード1│カード2│カード3│カード4│
+└───┴───┴───┴───┘
+
+【超大型（xl）】
+┌──┬──┬──┬──┬──┬──┐
+│カード1│カード2│カード3│カード4│カード5│カード6│
+└──┴──┴──┴──┴──┴──┘
+```
+
+### 5.4 あなたのコードの例
+
+#### 例1: MenuCardGrid.vue（カード一覧）
+
+```vue
+<v-col
+  v-for="item in items"
+  :key="item.id"
+  cols="12"
+  sm="6"
+  md="4"
+  lg="3"
+  xl="2"
+>
+  <MenuCard />
+</v-col>
+```
+
+**解説:**
+
+```
+レスポンシブ動作:
+xs: 1列表示（スマホ）
+sm: 2列表示（タブレット横）
+md: 3列表示（PC小）
+lg: 4列表示（PC）
+xl: 6列表示（大型ディスプレイ）
+
+画面サイズに応じて最適な列数に自動調整
+```
+
+#### 例2: UserList.vue（検索バー）
+
+```vue
+<v-col cols="12" sm="10" md="6" lg="5" xl="4">
+  <v-text-field
+    v-model="searchQuery"
+    :label="t('pages.users.list.searchPlaceholder')"
+  />
+</v-col>
+```
+
+**レスポンシブ動作:**
+
+```
+xs: 12列（全幅）
+sm: 10列（83%）
+md: 6列（50%）
+lg: 5列（42%）
+xl: 4列（33%）
+
+画面が大きくなるほど検索バーの幅を狭める
+```
+
+---
+
+## 6. フレックスボックス
+
+### 6.1 フレックスの基本
+
+Vuetify はフレックスボックスを使った配置クラスを提供します。
+
+```vue
+<!-- 横並び -->
+<div class="d-flex">
+  <div>A</div>
+  <div>B</div>
+  <div>C</div>
+</div>
+```
+
+**表示:**
+
+```
+┌──┬──┬──┐
+│A │B │C │ ← 横並び
+└──┴──┴──┘
+```
+
+### 6.2 主な配置クラス
+
+#### 横方向の配置
+
+```vue
+<div class="d-flex justify-start">      <!-- 左寄せ -->
+<div class="d-flex justify-center">     <!-- 中央 -->
+<div class="d-flex justify-end">        <!-- 右寄せ -->
+<div class="d-flex justify-space-between"> <!-- 両端 -->
+<div class="d-flex justify-space-around">  <!-- 均等配置 -->
+```
+
+**表示例:**
+
+```
+【justify-start】
+┌──┬──┬──┐              
+│A │B │C │              
+└──┴──┴──┘              
+
+【justify-center】
+      ┌──┬──┬──┐        
+      │A │B │C │        
+      └──┴──┴──┘        
+
+【justify-end】
+            ┌──┬──┬──┐  
+            │A │B │C │  
+            └──┴──┴──┘  
+
+【justify-space-between】
+┌──┐      ┌──┐      ┌──┐
+│A │      │B │      │C │
+└──┘      └──┘      └──┘
+
+【justify-space-around】
+  ┌──┐    ┌──┐    ┌──┐  
+  │A │    │B │    │C │  
+  └──┘    └──┘    └──┘  
+```
+
+#### 縦方向の配置
+
+```vue
+<div class="d-flex align-start">    <!-- 上寄せ -->
+<div class="d-flex align-center">   <!-- 中央 -->
+<div class="d-flex align-end">      <!-- 下寄せ -->
+```
+
+**表示例:**
+
+```
+【align-start】
+┌──┬──┬──┐
+│A │B │C │ ← 上寄せ
+│  │  │  │
+│  │  │  │
+└──┴──┴──┘
+
+【align-center】
+│  │  │  │
+┌──┬──┬──┐
+│A │B │C │ ← 中央
+└──┴──┴──┘
+│  │  │  │
+
+【align-end】
+│  │  │  │
+│  │  │  │
+┌──┬──┬──┐
+│A │B │C │ ← 下寄せ
+└──┴──┴──┘
+```
+
+### 6.3 方向の制御
+
+```vue
+<div class="d-flex flex-row">       <!-- 横並び -->
+<div class="d-flex flex-column">    <!-- 縦並び -->
+<div class="d-flex flex-wrap">      <!-- 折り返し -->
+```
+
+### 6.4 あなたのコードの例
+
+#### 例1: UserDelete.vue（ボタン配置）
+
+```vue
+<div class="d-flex ga-2">
+  <v-btn color="error">削除する</v-btn>
+  <v-spacer />
+  <v-btn>戻る</v-btn>
+</div>
+```
+
+**表示:**
+
+```
+┌────────┐                ┌────┐
+│削除する │  ← 余白 →      │戻る│
+└────────┘                └────┘
+
+d-flex
+  ↓
+横並び
+
+ga-2
+  ↓
+gap: 8px（要素間の余白）
+
+<v-spacer />
+  ↓
+残りのスペースを埋める
+```
+
+#### 例2: UserDetail.vue（ボタン配置）
+
+```vue
+<div class="d-flex ga-2">
+  <v-btn color="primary">更新</v-btn>
+  <v-spacer />
+  <v-btn color="error">削除</v-btn>
+  <v-spacer />
+  <v-btn>戻る</v-btn>
+</div>
+```
+
+**表示:**
