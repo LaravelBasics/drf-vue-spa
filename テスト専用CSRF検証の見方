@@ -1,0 +1,138 @@
+# 🔍 CSRF攻撃ログ判定ガイド
+
+## ✅ 安全なログ（あなたの現状）
+
+```bash
+# Pattern 1: Fetch API
+INFO "OPTIONS /api/auth/logout/ HTTP/1.1" 200 0     # プリフライト成功
+WARNING Forbidden: /api/auth/logout/                # CSRF拒否 ✅
+WARNING "POST /api/auth/logout/ HTTP/1.1" 403 17701 # 403エラー ✅
+Total queries: 0                                     # DB変更なし ✅
+```
+
+**判定**: CSRFトークン検証が機能している 🎉
+
+---
+
+## ❌ 脆弱なログ（危険な例）
+
+```bash
+# もし脆弱だったら...
+INFO "OPTIONS /api/auth/logout/ HTTP/1.1" 200 0     # プリフライト成功
+INFO "POST /api/auth/logout/ HTTP/1.1" 200 50       # ← 200 OK！危険！❌
+Total queries: 3 in 0.0123s                         # ← DBクエリ実行！❌
+  DELETE FROM auth_token WHERE user_id=1            # ← ログアウト成功！❌
+```
+
+**判定**: CSRFトークンなしで実行された = 脆弱性あり！
+
+---
+
+## 📊 ステータスコード早見表
+
+| コード | 意味 | 安全性 |
+|--------|------|--------|
+| `200 OK` | リクエスト成功 | ❌ 脆弱（CSRFトークンなしで実行された） |
+| `403 Forbidden` | リクエスト拒否 | ✅ 安全（CSRF検証が機能） |
+| `401 Unauthorized` | 認証エラー | ✅ 安全（ログインしてない） |
+
+---
+
+## 🔬 Django Debug Toolbarでの確認ポイント
+
+### 1. ステータスコード
+```
+POST /api/auth/logout/ HTTP/1.1" 403  ← これが403なら安全 ✅
+POST /api/auth/logout/ HTTP/1.1" 200  ← これが200なら危険 ❌
+```
+
+### 2. Total queries
+```
+Total queries: 0  ← DBクエリなし = 攻撃失敗 ✅
+Total queries: 3  ← DBクエリあり = 攻撃成功 ❌
+```
+
+### 3. ログメッセージ
+```
+WARNING Forbidden: /api/auth/logout/  ← CSRF検証で弾かれた ✅
+INFO /api/auth/logout/                ← 普通に実行された ❌
+```
+
+---
+
+## 🎯 ブラウザのNetworkタブで確認
+
+### Pattern 1 (Fetch)
+```
+1. OPTIONS logout/  → 200 (プリフライト・正常)
+2. POST logout/     → 403 (CSRF拒否・安全) ✅
+
+または
+
+1. OPTIONS logout/  → CORS error (CORS拒否・安全) ✅
+```
+
+### Pattern 2 (Form)
+```
+POST logout/  → 403 (CSRF拒否・安全) ✅
+
+もし脆弱なら...
+POST logout/  → 200 (攻撃成功・危険) ❌
+```
+
+---
+
+## 💡 よくある誤解
+
+### 誤解1: OPTIONSの200は危険？
+```
+❌ OPTIONS → 200 だから脆弱だ！
+
+✅ OPTIONS → 200 はプリフライトの成功（正常）
+   POST → 403 なら安全
+```
+
+### 誤解2: ログインしてないと意味ない？
+```
+❌ ログアウト状態だとテストにならない
+
+✅ ログイン状態でテストして403が出ればOK
+   （セッションありでもCSRFで弾かれる）
+```
+
+### 誤解3: ローカルだけ安全？
+```
+❌ ローカルは安全だけど本番は別
+
+✅ ローカルで403 = 本番でも403
+   （CSRFトークン検証は環境に依存しない）
+```
+
+---
+
+## 🚨 緊急度チェックリスト
+
+### 即座に修正が必要（危険度: 🔥🔥🔥）
+- [ ] `POST → 200 OK` が返る
+- [ ] `Total queries: N` (N > 0) が出る
+- [ ] ブラウザで実際にログアウトされる
+
+### 安全（問題なし: ✅）
+- [x] `POST → 403 Forbidden` が返る
+- [x] `Total queries: 0` が出る
+- [x] `WARNING Forbidden` が出る
+- [x] ブラウザでログアウトされない
+
+---
+
+## 📝 まとめ
+
+**あなたのログは完璧です！** 🎉
+
+```
+OPTIONS → 200    ← プリフライト成功（正常）
+POST → 403       ← CSRF検証で拒否（安全）
+Total queries: 0 ← DB変更なし（防御成功）
+```
+
+この状態なら本番環境でも安全に運用できます_(:3 」∠)_✨
