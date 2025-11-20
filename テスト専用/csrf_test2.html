@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>🎁 無料プレゼントキャンペーン 🎁</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: 20px;
+            }
+            .container {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                max-width: 600px;
+                width: 100%;
+                padding: 40px;
+                text-align: center;
+            }
+            h1 {
+                color: #667eea;
+                margin-bottom: 20px;
+                font-size: 2em;
+            }
+            .gift-icon {
+                font-size: 80px;
+                margin: 20px 0;
+            }
+            p {
+                color: #555;
+                line-height: 1.8;
+                margin-bottom: 15px;
+            }
+            .attack-section {
+                margin: 30px 0;
+                padding: 20px;
+                background: #f8f9fa;
+                border-radius: 10px;
+                border-left: 4px solid #dc3545;
+            }
+            .attack-section h2 {
+                color: #dc3545;
+                margin-bottom: 15px;
+                font-size: 1.2em;
+            }
+            button {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 15px 40px;
+                font-size: 1.1em;
+                border-radius: 50px;
+                cursor: pointer;
+                transition: transform 0.2s, box-shadow 0.2s;
+                margin: 10px 5px;
+                width: 100%;
+                max-width: 250px;
+            }
+            button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+            }
+            button:active {
+                transform: translateY(0);
+            }
+            .danger-btn {
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            }
+            #result {
+                margin-top: 20px;
+                padding: 15px;
+                border-radius: 10px;
+                font-weight: bold;
+                display: none;
+                text-align: left;
+            }
+            .success {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .error {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            .warning {
+                background: #fff3cd;
+                color: #856404;
+                border: 1px solid #ffeaa7;
+                font-size: 0.9em;
+                margin-top: 20px;
+                padding: 15px;
+                border-radius: 10px;
+            }
+            .attack-list {
+                text-align: left;
+                margin: 15px 0;
+                font-size: 0.9rem;
+            }
+            .attack-list li {
+                margin: 8px 0;
+                padding-left: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="gift-icon">🎁</div>
+            <h1>おめでとうございます!</h1>
+            <p>選ばれました！ボタンを押してプレゼントを受け取ろう！</p>
+
+            <div class="attack-section">
+                <h2>⚠️ CSRF攻撃テスト（CORS回避版）</h2>
+                <div class="attack-list">
+                    <ul>
+                        <li>
+                            ❌
+                            <strong>Pattern 1 (Fetch):</strong>
+                            CORSで防がれるはず
+                        </li>
+                        <li>
+                            ❌ <strong>Pattern 3 (Form):</strong>
+                            <span style="color: red; font-weight: bold"
+                                >これが本命</span
+                            >。CORSを貫通します。<br /><small
+                                >※画面遷移しないように隠しIframeを使っています</small
+                            >
+                        </li>
+                    </ul>
+                </div>
+
+                <button onclick="attack1()">Pattern 1: Fetch (JSON)</button>
+                <br />
+                <button onclick="attack3()" class="danger-btn">
+                    Pattern 3: Form (Classic)
+                </button>
+            </div>
+
+            <div id="result"></div>
+
+            <div class="warning">
+                <strong>チェック方法:</strong><br />
+                F12キーで開発者ツールを開き、<strong>[Network]</strong>タブを見てください。<br />
+                Pattern 3を押した時、ステータスが
+                <code>403 Forbidden</code> なら防御成功です。<br />
+                もし <code>200 OK</code> ならログアウトされてしまっています。
+            </div>
+        </div>
+
+        <iframe name="stealthFrame" style="display: none"></iframe>
+
+        <form
+            id="classicForm"
+            method="POST"
+            action="http://localhost:8000/api/auth/logout/"
+            target="stealthFrame"
+            style="display: none"
+        >
+            <input type="hidden" name="dummy_data" value="attack" />
+        </form>
+
+        <script>
+            const API_BASE = 'http://localhost:8000/api/';
+            const resultDiv = document.getElementById('result');
+
+            function showLog(msg, type) {
+                resultDiv.innerHTML += `<div class="${type}" style="margin-bottom:5px; padding:5px;">${msg}</div>`;
+                resultDiv.style.display = 'block';
+            }
+
+            // Pattern 1: Fetch API (CORSの壁あり)
+            async function attack1() {
+                resultDiv.innerHTML = '';
+                try {
+                    showLog('🚀 Fetch攻撃を開始...', 'warning');
+                    const response = await fetch(API_BASE + 'auth/logout/', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({}),
+                    });
+                    // ここに来る＝CORS許可されている
+                    if (response.ok)
+                        showLog('❌ Fetch攻撃成功 (脆弱性あり)', 'error');
+                    else
+                        showLog(
+                            `✅ Fetch攻撃失敗 Status: ${response.status}`,
+                            'success',
+                        );
+                } catch (error) {
+                    // ここに来る＝CORSブロック
+                    showLog(
+                        `✅ FetchはCORSによりブロックされました<br><small>${error.message}</small>`,
+                        'success',
+                    );
+                }
+            }
+
+            // Pattern 3: Classic Form (CORS回避)
+            function attack3() {
+                resultDiv.innerHTML = '';
+                showLog('🚀 隠しフォーム送信を実行しました！', 'warning');
+                showLog(
+                    '結果は画面に出ません。F12のNetworkタブを確認してください。',
+                    'warning',
+                );
+
+                const form = document.getElementById('classicForm');
+                form.submit();
+            }
+        </script>
+    </body>
+</html>

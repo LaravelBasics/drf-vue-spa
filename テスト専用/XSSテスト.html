@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>🔍 XSS脆弱性テストツール</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                min-height: 100vh;
+                padding: 20px;
+            }
+            .container {
+                max-width: 900px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 20px;
+                padding: 40px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            }
+            h1 {
+                color: #f5576c;
+                text-align: center;
+                margin-bottom: 30px;
+            }
+            .test-section {
+                margin: 20px 0;
+                padding: 20px;
+                background: #f8f9fa;
+                border-radius: 10px;
+                border-left: 4px solid #f5576c;
+            }
+            .test-section h2 {
+                color: #f5576c;
+                margin-bottom: 15px;
+                font-size: 1.2em;
+            }
+            .payload-list {
+                list-style: none;
+                margin: 15px 0;
+            }
+            .payload-list li {
+                padding: 10px;
+                margin: 5px 0;
+                background: white;
+                border-radius: 5px;
+                font-family: 'Courier New', monospace;
+                font-size: 0.9em;
+                cursor: pointer;
+                transition: background 0.2s;
+            }
+            .payload-list li:hover {
+                background: #ffe0e6;
+            }
+            input,
+            textarea {
+                width: 100%;
+                padding: 10px;
+                margin: 10px 0;
+                border: 2px solid #ddd;
+                border-radius: 5px;
+                font-family: 'Courier New', monospace;
+            }
+            textarea {
+                min-height: 100px;
+                resize: vertical;
+            }
+            button {
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+                color: white;
+                border: none;
+                padding: 12px 30px;
+                border-radius: 50px;
+                cursor: pointer;
+                font-size: 1em;
+                margin: 5px;
+                transition: transform 0.2s;
+            }
+            button:hover {
+                transform: translateY(-2px);
+            }
+            .warning {
+                background: #fff3cd;
+                color: #856404;
+                padding: 15px;
+                border-radius: 10px;
+                border: 1px solid #ffeaa7;
+                margin: 20px 0;
+            }
+            #result {
+                margin-top: 20px;
+                padding: 15px;
+                border-radius: 10px;
+                display: none;
+            }
+            .success {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .error {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔍 XSS脆弱性テストツール</h1>
+
+            <div class="warning">
+                <strong>⚠️ 警告:</strong><br />
+                このツールは教育目的のみで使用してください。<br />
+                自分が所有・管理しているサイトでのみテストを実行してください。
+            </div>
+
+            <div class="test-section">
+                <h2>よく使われるXSSペイロード</h2>
+                <p>クリックでコピー:</p>
+                <ul class="payload-list">
+                    <li onclick="copyPayload(this)">
+                        &lt;script&gt;alert('XSS')&lt;/script&gt;
+                    </li>
+                    <li onclick="copyPayload(this)">
+                        &lt;img src=x onerror="alert('XSS')"&gt;
+                    </li>
+                    <li onclick="copyPayload(this)">
+                        &lt;svg onload="alert('XSS')"&gt;
+                    </li>
+                    <li onclick="copyPayload(this)">
+                        &lt;body onload="alert('XSS')"&gt;
+                    </li>
+                    <li onclick="copyPayload(this)">
+                        &lt;iframe src="javascript:alert('XSS')"&gt;
+                    </li>
+                    <li onclick="copyPayload(this)">
+                        " onmouseover="alert('XSS')
+                    </li>
+                    <li onclick="copyPayload(this)">javascript:alert('XSS')</li>
+                    <li onclick="copyPayload(this)">
+                        &lt;input type="text" value="test"
+                        onfocus="alert('XSS')" autofocus&gt;
+                    </li>
+                </ul>
+            </div>
+
+            <div class="test-section">
+                <h2>カスタムペイロードテスト</h2>
+                <label>テストURL:</label>
+                <input
+                    type="text"
+                    id="testUrl"
+                    value="http://localhost:5173"
+                    placeholder="http://example.com"
+                />
+
+                <label>ペイロード:</label>
+                <textarea
+                    id="payload"
+                    placeholder="<script>alert('XSS')</script>"
+                ></textarea>
+
+                <button onclick="testStored()">Stored XSS テスト</button>
+                <button onclick="testReflected()">Reflected XSS テスト</button>
+                <button onclick="testDOM()">DOM-based XSS テスト</button>
+            </div>
+
+            <div class="test-section">
+                <h2>Cookie盗難シミュレーション</h2>
+                <p>現在のCookie:</p>
+                <textarea id="currentCookies" readonly></textarea>
+                <button onclick="showCookies()">Cookie表示</button>
+                <button onclick="testCookieSteal()">
+                    盗難シミュレーション
+                </button>
+            </div>
+
+            <div id="result"></div>
+        </div>
+
+        <script>
+            const API_BASE = 'http://localhost:8000/api/';
+
+            function copyPayload(element) {
+                const text = element.textContent;
+                navigator.clipboard.writeText(text).then(() => {
+                    showResult('✅ ペイロードをコピーしました: ' + text, true);
+                });
+            }
+
+            function showResult(message, isSuccess) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.textContent = message;
+                resultDiv.className = isSuccess ? 'success' : 'error';
+                resultDiv.style.display = 'block';
+            }
+
+            function showCookies() {
+                document.getElementById('currentCookies').value =
+                    document.cookie || '(Cookieなし)';
+                showResult('✅ Cookieを表示しました', true);
+            }
+
+            async function testStored() {
+                const url = document.getElementById('testUrl').value;
+                const payload = document.getElementById('payload').value;
+
+                if (!payload) {
+                    showResult('❌ ペイロードを入力してください', false);
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${url}/api/comments/`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            text: payload,
+                        }),
+                    });
+
+                    if (response.ok) {
+                        showResult(
+                            '⚠️ Stored XSSテスト送信完了。コメント一覧ページで確認してください。',
+                            true,
+                        );
+                    } else {
+                        showResult(
+                            `✅ サーバーが拒否: ${response.status}`,
+                            true,
+                        );
+                    }
+                } catch (error) {
+                    showResult(`✅ エラー: ${error.message}`, true);
+                }
+            }
+
+            function testReflected() {
+                const url = document.getElementById('testUrl').value;
+                const payload = document.getElementById('payload').value;
+
+                if (!payload) {
+                    showResult('❌ ペイロードを入力してください', false);
+                    return;
+                }
+
+                const testUrl = `${url}/search?q=${encodeURIComponent(
+                    payload,
+                )}`;
+                showResult(
+                    `🔗 Reflected XSSテスト用URL:\n${testUrl}\n\n新しいタブで開いてテストしてください。`,
+                    true,
+                );
+
+                // オプション: 自動で開く
+                // window.open(testUrl, '_blank');
+            }
+
+            function testDOM() {
+                const payload = document.getElementById('payload').value;
+
+                if (!payload) {
+                    showResult('❌ ペイロードを入力してください', false);
+                    return;
+                }
+
+                // DOM-based XSSのシミュレーション
+                const testDiv = document.createElement('div');
+                testDiv.style.display = 'none';
+
+                try {
+                    // 危険な操作（テスト目的）
+                    testDiv.innerHTML = payload;
+                    document.body.appendChild(testDiv);
+
+                    showResult(
+                        '⚠️ DOM-based XSSテスト: ペイロードを挿入しました（非表示）',
+                        false,
+                    );
+
+                    // すぐに削除
+                    setTimeout(() => {
+                        document.body.removeChild(testDiv);
+                    }, 1000);
+                } catch (error) {
+                    showResult('✅ ブラウザがブロック: ' + error.message, true);
+                }
+            }
+
+            function testCookieSteal() {
+                const cookies = document.cookie;
+
+                if (!cookies) {
+                    showResult(
+                        '✅ Cookieが存在しないか、HTTPOnlyで保護されています',
+                        true,
+                    );
+                    return;
+                }
+
+                // シミュレーション（実際には送信しない）
+                showResult(
+                    `⚠️ Cookie盗難シミュレーション:\n` +
+                        `もし攻撃者のサイトだった場合、以下が送信されます:\n\n` +
+                        `${cookies}\n\n` +
+                        `対策: SESSION_COOKIE_HTTPONLY = True`,
+                    false,
+                );
+
+                console.log('盗難シミュレーション - Cookie:', cookies);
+            }
+
+            // ページ読み込み時
+            window.onload = () => {
+                console.log(
+                    '%c⚠️ XSS脆弱性テストツール',
+                    'color: red; font-size: 20px; font-weight: bold;',
+                );
+                console.log('このツールは教育目的のみで使用してください');
+                showCookies();
+            };
+        </script>
+    </body>
+</html>

@@ -14,6 +14,7 @@ from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from common.context import get_client_ip
+from django.views.decorators.csrf import csrf_protect
 
 from .serializers import LoginSerializer, UserSerializer
 
@@ -30,6 +31,7 @@ class CSRFView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@method_decorator(csrf_protect, name="dispatch")
 class LoginAPIView(APIView):
     """ログインAPI(ブルートフォース攻撃対策)"""
 
