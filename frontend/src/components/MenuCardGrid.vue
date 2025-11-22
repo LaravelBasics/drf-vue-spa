@@ -28,7 +28,7 @@ defineProps({
                     :title="item.title"
                     :to="item.to"
                     :href="item.href"
-                    :color="item.color || 'primary'"
+                    :color="item.color || primary"
                     :icon-size="item.iconSize"
                 />
             </v-col>

@@ -1,12 +1,10 @@
 <!-- src/components/Header.vue -->
 <script setup>
 import { computed } from 'vue';
-import { useTheme } from 'vuetify';
 import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
 import { ICONS } from '@/constants/icons';
-import { ICON_SIZES, THEME_CONFIG } from '@/constants/theme';
+import { ICON_SIZES } from '@/constants/theme';
 
-const theme = useTheme();
 const { breadcrumbs: autoBreadcrumbs } = useBreadcrumbs();
 
 const props = defineProps({
@@ -25,6 +23,42 @@ const props = defineProps({
     pageButtons: {
         type: Array,
         default: () => [],
+        validator: (buttons) => {
+            // 全てのボタンにidとtypeが必須
+            const isValid = buttons.every((btn) => {
+                const hasId = btn.id && typeof btn.id === 'string';
+                const hasValidType =
+                    btn.type &&
+                    [
+                        'primary',
+                        'secondary',
+                        'error',
+                        'warning',
+                        'info',
+                        'success',
+                    ].includes(btn.type);
+
+                // 開発環境で詳細エラー出力
+                if (import.meta.env.DEV) {
+                    if (!hasId) {
+                        console.error(
+                            '[Header] Button missing required "id" field:',
+                            btn,
+                        );
+                    }
+                    if (!hasValidType) {
+                        console.error(
+                            '[Header] Button missing or invalid "type" field:',
+                            btn,
+                        );
+                    }
+                }
+
+                return hasId && hasValidType;
+            });
+
+            return isValid;
+        },
     },
     breadcrumbs: {
         type: Array,
@@ -32,12 +66,7 @@ const props = defineProps({
     },
 });
 
-const surfaceColor = computed(
-    () =>
-        theme.global.current.value?.colors?.surface ||
-        THEME_CONFIG.colors.light.surface,
-);
-
+// computedが必要なもの: 条件分岐ロジックあり
 const displayBreadcrumbs = computed(() => {
     if (props.breadcrumbs !== null) {
         return props.breadcrumbs;
@@ -48,7 +77,7 @@ const displayBreadcrumbs = computed(() => {
 
 <template>
     <v-app-bar
-        :color="surfaceColor"
+        color="surface"
         :elevation="headerElevation"
         :height="headerHeight"
     >
@@ -89,12 +118,13 @@ const displayBreadcrumbs = computed(() => {
 
         <v-spacer v-else />
 
+        <!-- ボタン群 -->
         <div class="d-flex align-center ga-4 mr-4 flex-shrink-0">
             <v-btn
-                v-for="(button, index) in pageButtons"
-                :key="button.id || `btn-${index}`"
+                v-for="button in pageButtons"
+                :key="button.id"
                 variant="outlined"
-                :color="button.type || 'primary'"
+                :color="button.type"
                 :prepend-icon="button.icon"
                 :loading="button.loading"
                 :disabled="button.disabled"

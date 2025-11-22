@@ -1,29 +1,21 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { useTheme } from 'vuetify';
 import { useUiStore } from '@/stores/ui';
 import { useAuthStore } from '@/stores/auth';
 import { useApiError } from '@/composables/useApiError';
 import { routes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
-import { ICON_SIZES, THEME_CONFIG } from '@/constants/theme';
+import { ICON_SIZES } from '@/constants/theme';
 
 const router = useRouter();
 const { t } = useI18n();
 const ui = useUiStore();
 const auth = useAuthStore();
-const theme = useTheme();
 const { handleApiError } = useApiError();
 
 const loggingOut = ref(false);
-
-const primaryColor = computed(
-    () =>
-        theme.global.current.value?.colors?.primary ||
-        THEME_CONFIG.colors.light.primary,
-);
 
 async function handleLogout() {
     if (loggingOut.value) return;
@@ -78,7 +70,7 @@ function goToHome() {
         <!-- ユーザーメニュー -->
         <v-menu location="bottom end">
             <template #activator="{ props }">
-                <v-chip v-bind="props" :color="primaryColor" class="me-2">
+                <v-chip v-bind="props" color="primary" class="me-2">
                     <v-icon :size="ICON_SIZES.sm" class="me-2">
                         {{ ICONS.nav.profile }}
                     </v-icon>

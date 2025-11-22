@@ -1,20 +1,17 @@
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue';
+import { ref, onMounted, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { useTheme } from 'vuetify';
 import { useAuthStore } from '@/stores/auth';
 import { useValidation } from '@/composables/useValidation';
 import { useApiError } from '@/composables/useApiError';
 import { routes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
-import { THEME_CONFIG } from '@/constants/theme';
 
 const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
 const { t } = useI18n();
-const theme = useTheme();
 const { createRules } = useValidation();
 const { showInfo, handleApiError } = useApiError();
 
@@ -26,12 +23,6 @@ const form = ref(null);
 
 const employeeIdRules = createRules.loginEmployeeId();
 const passwordRules = createRules.loginPassword();
-
-const primaryColor = computed(
-    () =>
-        theme.global.current.value?.colors?.primary ||
-        THEME_CONFIG.colors.light.primary,
-);
 
 onMounted(async () => {
     await nextTick();
@@ -81,7 +72,7 @@ async function onSubmit() {
                         class="login-card"
                         max-width="480"
                     >
-                        <v-toolbar :color="primaryColor" flat>
+                        <v-toolbar color="primary" flat>
                             <div
                                 class="d-flex w-100 justify-center align-center"
                             >
@@ -132,7 +123,7 @@ async function onSubmit() {
                                 <v-btn
                                     type="submit"
                                     :loading="loading"
-                                    :color="primaryColor"
+                                    color="primary"
                                     block
                                     size="large"
                                     rounded
