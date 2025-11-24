@@ -1,0 +1,658 @@
+# Vue Router ルート分割ガイド - モジュール別管理
+
+## 🎯 なぜルート分割が必要？
+
+大規模プロジェクトでは`router/index.js`が肥大化し、以下の問題が発生します：
+
+- ❌ 数百行のルート定義で可読性が低下
+- ❌ 特定のモジュールのルートを探すのが困難
+- ❌ 複数人で編集するとコンフリクトが頻発
+- ❌ 関連するルートがファイル全体に散在
+
+**解決策：モジュール別にルートを分割！** ✅
+
+---
+
+## 📂 推奨ファイル構造
+
+### パターン1：router/modules配下に分割（推奨）
+
+```
+src/
+├── router/
+│   ├── index.js              # メインルーター（統合）
+│   ├── auth-guard.js
+│   ├── admin-guard.js
+│   └── modules/              # ★モジュール別ルート
+│       ├── auth.js           # 認証関連ルート
+│       ├── admin.js          # 管理画面トップ
+│       ├── users.js          # ユーザー管理ルート
+│       ├── products.js       # 商品管理ルート（将来）
+│       └── orders.js         # 注文管理ルート（将来）
+├── views/
+│   ├── Home.vue
+│   ├── Login.vue
+│   ├── Settings.vue
+│   ├── admin/
+│   │   └── AdminMenu.vue
+│   └── users/
+│       ├── UserWrapper.vue
+│       ├── UserList.vue
+│       ├── UserDetail.vue
+│       ├── UserUpdate.vue
+│       └── UserDelete.vue
+└── constants/
+    └── routes.js
+```
+
+---
+
+## 📝 実装コード
+
+### 1. router/modules/auth.js（認証ルート）
+
+```javascript
+// src/router/modules/auth.js - 認証関連ルート
+import { routes } from '@/constants/routes';
+import i18n from '@/plugins/i18n';
+
+const { t } = i18n.global;
+
+export default [
+    {
+        path: routes.LOGIN,
+        name: 'Login',
+        component: () => import('@/views/Login.vue'),
+        meta: {
+            hideForAuth: true,
+            transition: 'fade',
+            breadcrumb: false,
+            title: t('auth.loginTitle'),
+        },
+    },
+    // 将来的に追加する認証関連ルート
+    // {
+    //     path: routes.REGISTER,
+    //     name: 'Register',
+    //     component: () => import('@/views/Register.vue'),
+    // },
+    // {
+    //     path: routes.FORGOT_PASSWORD,
+    //     name: 'ForgotPassword',
+    //     component: () => import('@/views/ForgotPassword.vue'),
+    // },
+];
+```
+
+---
+
+### 2. router/modules/admin.js（管理画面トップ）
+
+```javascript
+// src/router/modules/admin.js - 管理画面トップ
+import { routes } from '@/constants/routes';
+import i18n from '@/plugins/i18n';
+
+const { t } = i18n.global;
+
+export default {
+    path: routes.ADMIN.INDEX,
+    name: 'AdminMenu',
+    component: () => import('@/views/admin/AdminMenu.vue'),
+    meta: {
+        title: t('pages.admin.title'),
+    },
+};
+```
+
+---
+
+### 3. router/modules/users.js（ユーザー管理ルート）
+
+```javascript
+// src/router/modules/users.js - ユーザー管理ルート
+import { routes } from '@/constants/routes';
+import i18n from '@/plugins/i18n';
+
+const { t } = i18n.global;
+
+/**
+ * ユーザー管理モジュールのルート定義
+ * 
+ * 構造:
+ * /admin/users        - 一覧
+ * /admin/users/create - 新規作成
+ * /admin/users/:id    - 詳細（Wrapper）
+ *   ├─ (empty)        - 詳細表示
+ *   ├─ update         - 編集
+ *   └─ delete         - 削除確認
+ */
+export default {
+    path: routes.ADMIN.USERS.SEGMENT, // 'users'
+    meta: {
+        breadcrumb: 'breadcrumbs.users.list',
+    },
+    children: [
+        // ① ユーザー一覧
+        {
+            path: routes.ADMIN.USERS.INDEX, // ''
+            name: 'UserList',
+            component: () => import('@/views/users/UserList.vue'),
+            meta: {
+                title: t('pages.users.list.title'),
+            },
+        },
+        
+        // ② 新規作成
+        {
+            path: routes.ADMIN.USERS.CREATE, // 'create'
+            name: 'UserCreate',
+            component: () => import('@/views/users/UserCreate.vue'),
+            meta: {
+                breadcrumb: 'breadcrumbs.users.create',
+                title: t('pages.users.create.title'),
+            },
+        },
+        
+        // ③ 特定ユーザーのコンテキスト（Wrapper）
+        {
+            path: routes.ADMIN.USERS.DETAIL, // ':id'
+            component: () => import('@/views/users/UserWrapper.vue'),
+            meta: {
+                breadcrumb: 'breadcrumbs.users.detail',
+            },
+            children: [
+                // ③-a: 詳細画面
+                {
+                    path: '', // /admin/users/:id
+                    name: 'UserDetail',
+                    component: () => import('@/views/users/UserDetail.vue'),
+                    meta: {
+                        breadcrumb: false,
+                        title: t('pages.users.detail.title'),
+                    },
+                    props: true,
+                },
+                
+                // ③-b: 編集画面
+                {
+                    path: routes.ADMIN.USERS.UPDATE, // 'update'
+                    name: 'UserUpdate',
+                    component: () => import('@/views/users/UserUpdate.vue'),
+                    meta: {
+                        breadcrumb: 'breadcrumbs.users.update',
+                        title: t('pages.users.update.title'),
+                    },
+                    props: true,
+                },
+                
+                // ③-c: 削除確認画面
+                {
+                    path: routes.ADMIN.USERS.DELETE, // 'delete'
+                    name: 'UserDelete',
+                    component: () => import('@/views/users/UserDelete.vue'),
+                    meta: {
+                        breadcrumb: 'breadcrumbs.users.delete',
+                        title: t('pages.users.delete.title'),
+                    },
+                    props: true,
+                },
+            ],
+        },
+    ],
+};
+```
+
+---
+
+### 4. router/index.js（メインルーター・統合版）
+
+```javascript
+// src/router/index.js - メインルーター（モジュール統合版）
+
+import { createRouter, createWebHistory } from 'vue-router';
+import { authGuard } from './auth-guard.js';
+import { adminGuard } from './admin-guard.js';
+import { routes } from '@/constants/routes';
+import { ROUTE_NAMES } from '@/constants/routes';
+import i18n from '@/plugins/i18n';
+
+// ★ モジュール別ルートをインポート
+import authRoutes from './modules/auth.js';
+import adminRoutes from './modules/admin.js';
+import usersRoutes from './modules/users.js';
+
+const { t } = i18n.global;
+
+const router = createRouter({
+    history: createWebHistory(),
+    routes: [
+        // ===== 基本ルート =====
+        {
+            path: routes.HOME,
+            name: 'Home',
+            component: () => import('@/views/Home.vue'),
+            meta: {
+                requiresAuth: true,
+                transition: 'slide-left',
+                breadcrumb: 'breadcrumbs.home',
+                title: t('pages.home.title'),
+            },
+        },
+        {
+            path: routes.SETTINGS,
+            name: 'Settings',
+            component: () => import('@/views/Settings.vue'),
+            meta: {
+                requiresAuth: true,
+                breadcrumb: 'breadcrumbs.settings',
+                title: t('pages.settings.title'),
+            },
+        },
+
+        // ===== 認証ルート（モジュールから展開） =====
+        ...authRoutes,
+
+        // ===== 管理者ルート =====
+        {
+            path: routes.ADMIN.ROOT, // '/admin'
+            meta: {
+                requiresAuth: true,
+                requiresAdmin: true,
+                breadcrumb: 'breadcrumbs.admin',
+            },
+            children: [
+                // 管理画面トップ（モジュール）
+                adminRoutes,
+                
+                // ユーザー管理（モジュール）
+                usersRoutes,
+                
+                // ★ 将来的に追加するモジュール
+                // productsRoutes,
+                // ordersRoutes,
+            ],
+        },
+
+        // ===== 404ページ =====
+        {
+            path: '/:pathMatch(.*)*',
+            name: 'NotFound',
+            redirect: { name: ROUTE_NAMES.HOME },
+        },
+    ],
+    scrollBehavior(to, from, savedPosition) {
+        if (savedPosition) {
+            return savedPosition;
+        } else if (to.hash) {
+            return { el: to.hash, behavior: 'smooth' };
+        } else {
+            return { top: 0 };
+        }
+    },
+});
+
+// ナビゲーションガード
+router.beforeEach(async (to, from, next) => {
+    document.body.style.cursor = 'progress';
+
+    const authResult = await authGuard(to, from);
+    if (authResult !== true) {
+        document.body.style.cursor = '';
+        next(authResult);
+        return;
+    }
+
+    const adminResult = await adminGuard(to, from);
+    if (adminResult !== true) {
+        document.body.style.cursor = '';
+        next(adminResult);
+        return;
+    }
+
+    document.body.style.cursor = '';
+    next();
+});
+
+router.afterEach((to) => {
+    document.body.style.cursor = '';
+    document.title = to.meta.title || t('app.tabTitle');
+
+    const main = document.querySelector('main, [role="main"], #app');
+    if (main) {
+        main.focus();
+    }
+});
+
+export default router;
+```
+
+---
+
+## 📊 ビフォー・アフター比較
+
+### Before（1ファイル）
+
+```
+router/index.js
+└── 500行以上のルート定義 ❌
+    - 認証ルート
+    - ユーザー管理ルート
+    - 商品管理ルート
+    - 注文管理ルート
+    - その他...
+```
+
+### After（モジュール分割）
+
+```
+router/
+├── index.js              # 100行（統合のみ） ✅
+├── modules/
+│   ├── auth.js          # 50行（認証）
+│   ├── admin.js         # 20行（管理トップ）
+│   ├── users.js         # 100行（ユーザー管理）
+│   ├── products.js      # 100行（商品管理）
+│   └── orders.js        # 100行（注文管理）
+```
+
+---
+
+## 🎯 メリット
+
+### 1. 可読性の向上
+- 各モジュールのルートが独立したファイルに
+- 関連するルートが1箇所にまとまる
+
+### 2. 保守性の向上
+- モジュール単位で編集可能
+- 特定のルートを探しやすい
+
+### 3. コンフリクトの削減
+- 複数人で同時編集しやすい
+- モジュールごとに担当を分けられる
+
+### 4. スケーラビリティ
+- 新しいモジュール追加が容易
+- 既存コードへの影響が最小限
+
+### 5. テスト容易性
+- モジュール単位でテスト可能
+- 独立したルート定義をテストできる
+
+---
+
+## 🚀 新しいモジュールの追加方法
+
+### 例：商品管理（Products）を追加
+
+#### ステップ1: モジュールファイルを作成
+
+```javascript
+// src/router/modules/products.js
+import { routes } from '@/constants/routes';
+import i18n from '@/plugins/i18n';
+
+const { t } = i18n.global;
+
+export default {
+    path: 'products',  // /admin/products
+    meta: {
+        breadcrumb: 'breadcrumbs.products.list',
+    },
+    children: [
+        {
+            path: '',
+            name: 'ProductList',
+            component: () => import('@/views/products/ProductList.vue'),
+            meta: {
+                title: t('pages.products.list.title'),
+            },
+        },
+        {
+            path: 'create',
+            name: 'ProductCreate',
+            component: () => import('@/views/products/ProductCreate.vue'),
+            meta: {
+                breadcrumb: 'breadcrumbs.products.create',
+                title: t('pages.products.create.title'),
+            },
+        },
+        {
+            path: ':id',
+            component: () => import('@/views/products/ProductWrapper.vue'),
+            meta: {
+                breadcrumb: 'breadcrumbs.products.detail',
+            },
+            children: [
+                {
+                    path: '',
+                    name: 'ProductDetail',
+                    component: () => import('@/views/products/ProductDetail.vue'),
+                    meta: {
+                        breadcrumb: false,
+                        title: t('pages.products.detail.title'),
+                    },
+                    props: true,
+                },
+                {
+                    path: 'update',
+                    name: 'ProductUpdate',
+                    component: () => import('@/views/products/ProductUpdate.vue'),
+                    meta: {
+                        breadcrumb: 'breadcrumbs.products.update',
+                        title: t('pages.products.update.title'),
+                    },
+                    props: true,
+                },
+            ],
+        },
+    ],
+};
+```
+
+#### ステップ2: メインルーターにインポート
+
+```javascript
+// src/router/index.js
+import productsRoutes from './modules/products.js';  // ← 追加
+
+const router = createRouter({
+    routes: [
+        // ...
+        {
+            path: routes.ADMIN.ROOT,
+            children: [
+                adminRoutes,
+                usersRoutes,
+                productsRoutes,  // ← 追加
+            ],
+        },
+    ],
+});
+```
+
+#### ステップ3: 定数を追加
+
+```javascript
+// src/constants/routes.js
+export const routes = Object.freeze({
+    ADMIN: {
+        // ...
+        PRODUCTS: {
+            SEGMENT: 'products',
+            INDEX: '',
+            CREATE: 'create',
+            DETAIL: ':id',
+            UPDATE: 'update',
+        },
+    },
+});
+
+export const ROUTE_NAMES = Object.freeze({
+    ADMIN: {
+        // ...
+        PRODUCTS: {
+            LIST: 'ProductList',
+            CREATE: 'ProductCreate',
+            DETAIL: 'ProductDetail',
+            UPDATE: 'ProductUpdate',
+        },
+    },
+});
+```
+
+これだけ！3ステップで新しいモジュールを追加完了！✨
+
+---
+
+## ⚠️ 注意点
+
+### 1. スプレッド演算子の使い方
+
+```javascript
+// ✅ 正しい（配列のマージ）
+routes: [
+    ...authRoutes,  // authRoutes は配列
+    ...otherRoutes,
+]
+
+// ✅ 正しい（オブジェクトをchildrenに追加）
+children: [
+    adminRoutes,    // adminRoutes は単一オブジェクト
+    usersRoutes,
+]
+
+// ❌ 間違い（配列に単一オブジェクトをスプレッド）
+routes: [
+    ...adminRoutes,  // adminRoutes がオブジェクトならエラー
+]
+```
+
+### 2. インポート順序
+
+```javascript
+// ✅ 正しい（依存関係を考慮）
+import authRoutes from './modules/auth.js';      // 基本
+import adminRoutes from './modules/admin.js';    // 管理
+import usersRoutes from './modules/users.js';    // 詳細
+```
+
+### 3. 循環参照に注意
+
+```javascript
+// ❌ 避ける（循環参照）
+// users.js が products.js をインポート
+// products.js が users.js をインポート
+
+// ✅ 推奨（必要なら親ルーターで統合）
+// users.js と products.js は独立
+// index.js で両方をインポート
+```
+
+---
+
+## 🔍 その他のパターン
+
+### パターン2: views配下に配置
+
+```
+src/
+├── views/
+│   ├── users/
+│   │   ├── router.js         # ユーザー管理ルート
+│   │   ├── UserWrapper.vue
+│   │   ├── UserList.vue
+│   │   └── UserDetail.vue
+│   └── products/
+│       ├── router.js         # 商品管理ルート
+│       └── ProductList.vue
+└── router/
+    └── index.js              # メインルーター
+```
+
+**メリット:** 関連ファイルが1箇所にまとまる  
+**デメリット:** ルート定義がプロジェクト全体に散在
+
+### パターン3: 自動ルート生成（unplugin-vue-router）
+
+unplugin-vue-routerを使用すると、ファイル名に基づいて自動的にルートが生成され、routesファイルを手動で管理する必要がなくなります。
+
+```
+src/
+└── pages/              # ファイル名がそのままルートに
+    ├── index.vue       # → /
+    ├── about.vue       # → /about
+    └── users/
+        ├── index.vue   # → /users
+        └── [id].vue    # → /users/:id
+```
+
+**メリット:** ルート定義不要、ファイル追加だけでルート追加  
+**デメリット:** 細かい制御が難しい、学習コスト
+
+---
+
+## 🎓 推奨：パターン1（router/modules）
+
+テンプレートプロジェクトとしては**パターン1（router/modules）**を推奨します。
+
+**理由:**
+- ✅ ルート定義が1箇所（router/）にまとまる
+- ✅ モジュール単位で管理しやすい
+- ✅ 細かい制御が可能
+- ✅ Vue Router標準の書き方
+- ✅ 学習コストが低い
+
+---
+
+## 📋 マイグレーション手順
+
+### ステップ1: modulesディレクトリを作成
+
+```bash
+mkdir src/router/modules
+```
+
+### ステップ2: モジュールファイルを作成
+
+```bash
+touch src/router/modules/auth.js
+touch src/router/modules/admin.js
+touch src/router/modules/users.js
+```
+
+### ステップ3: 既存のルートを移動
+
+現在の`router/index.js`から該当部分をコピー＆ペーストして各モジュールファイルに移動。
+
+### ステップ4: メインルーターを更新
+
+上記の`router/index.js（統合版）`に置き換え。
+
+### ステップ5: 動作確認
+
+```bash
+npm run dev
+```
+
+### ステップ6: バックアップを削除
+
+問題なければ旧ファイルを削除。
+
+---
+
+## ✅ 最終チェックリスト
+
+- [ ] `src/router/modules/`ディレクトリを作成
+- [ ] `auth.js`を作成（認証ルート）
+- [ ] `admin.js`を作成（管理トップ）
+- [ ] `users.js`を作成（ユーザー管理）
+- [ ] `router/index.js`を更新（モジュールインポート）
+- [ ] 動作確認（全ルートにアクセス可能か）
+- [ ] パンくずリストが正しく表示されるか確認
+- [ ] 将来的なモジュール追加の準備完了
+
+---
+
+これで大規模プロジェクトでも管理しやすいルート構造が完成です！🎉
