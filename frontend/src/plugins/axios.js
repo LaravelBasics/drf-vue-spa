@@ -1,22 +1,38 @@
-// src/plugins/axios.js - Axios設定とCSRF管理
+// src/plugins/axios.js - Axios設定とCSRF管理（環境別対応版）
 
 import axios from 'axios';
-import Cookies from 'js-cookie';
 import { useLocaleStore } from '@/stores/locale';
 
-const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/';
-const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT || '10000', 10);
+// 環境変数の取得
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT, 10) || 10000;
 
+// 開発環境でのバリデーション
+if (import.meta.env.DEV && !API_BASE_URL) {
+    console.error(
+        '⚠️ VITE_API_BASE_URL is not defined. Please check your .env file.',
+    );
+}
+
+// Axiosインスタンス作成
 const api = axios.create({
     baseURL: API_BASE_URL,
     withCredentials: true,
     timeout: API_TIMEOUT,
+    // Axios組み込みのCSRF保護機能を活用
+    xsrfCookieName: 'csrftoken',
+    xsrfHeaderName: 'X-CSRFToken',
+    /**
+     * withXSRFToken設定:
+     * - 開発環境: true（localhost:5173 → localhost:8000 はクロスオリジン）
+     * - 本番環境: undefined（リバースプロキシで同一オリジン）
+     */
+    withXSRFToken: import.meta.env.DEV ? true : undefined,
 });
 
 /**
  * CSRFトークン管理クラス
- * 重複リクエストを防ぎ、トークン取得を一度だけ実行
+ * 初回リクエスト前にトークンを取得し、重複リクエストを防ぐ
  */
 class CSRFManager {
     constructor() {
@@ -24,6 +40,10 @@ class CSRFManager {
         this.fetchingPromise = null;
     }
 
+    /**
+     * CSRFトークンの取得を保証
+     * 既に取得済み、または取得中の場合は重複リクエストを防ぐ
+     */
     async ensureToken() {
         if (this.tokenFetched) return;
 
@@ -32,34 +52,21 @@ class CSRFManager {
         }
 
         this.fetchingPromise = this._fetchToken();
-        try {
-            await this.fetchingPromise;
-        } finally {
-            this.fetchingPromise = null;
-        }
+        await this.fetchingPromise;
+        this.fetchingPromise = null;
     }
 
+    /**
+     * CSRFトークン取得API呼び出し
+     */
     async _fetchToken() {
-        try {
-            await api.get('auth/csrf/');
-
-            // Cookie反映待ち（ブラウザのタイミング差対策）
-            let token = Cookies.get('csrftoken');
-            if (!token) {
-                await new Promise((resolve) => setTimeout(resolve, 100));
-                token = Cookies.get('csrftoken');
-            }
-
-            if (!token) {
-                throw new Error('CSRF cookie not set after endpoint call');
-            }
-
-            this.tokenFetched = true;
-        } catch (error) {
-            throw error;
-        }
+        await api.get('auth/csrf/');
+        this.tokenFetched = true;
     }
 
+    /**
+     * トークン状態をリセット（ログアウト時などに使用）
+     */
     reset() {
         this.tokenFetched = false;
         this.fetchingPromise = null;
@@ -68,41 +75,43 @@ class CSRFManager {
 
 const csrfManager = new CSRFManager();
 
-// リクエストインターセプター（言語ヘッダー + CSRFトークン）
+// リクエストインターセプター（言語ヘッダー + CSRF事前取得）
 api.interceptors.request.use(async (config) => {
+    // Accept-Languageヘッダーの設定
     const localeStore = useLocaleStore();
     config.headers['Accept-Language'] = localeStore.locale;
 
-    const method = (config.method || '').toLowerCase();
+    // CSRFトークンが必要なメソッドの場合、事前取得
+    const method = config.method.toLowerCase();
     const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
 
     if (methodsRequiringCsrf.includes(method)) {
         try {
             await csrfManager.ensureToken();
-            const csrfToken = Cookies.get('csrftoken');
-            if (csrfToken) {
-                config.headers['X-CSRFToken'] = csrfToken;
-            }
         } catch (error) {
-            // CSRFトークン取得失敗時はスキップ（サーバー側でエラー）
+            // CSRFトークン取得失敗時もリクエストは続行
+            // （サーバー側で403エラーとなる）
+            console.warn('Failed to fetch CSRF token:', error);
         }
     }
 
     return config;
 });
 
-// レスポンスインターセプター（認証エラー処理 + 通知）
+// レスポンスインターセプター（認証エラー処理）
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
         const { response, config } = error;
 
         if (response) {
-            // 認証エラー（401/403）時の自動ログアウト + 通知
+            // 認証エラー時の自動ログアウト処理
             if ([401, 403].includes(response.status)) {
                 const isLogoutRequest = config.url?.endsWith('auth/logout/');
 
+                // ログアウトリクエスト自体のエラーは無視
                 if (!isLogoutRequest) {
+                    // 動的importで循環依存を回避
                     const { useAuthStore } = await import('@/stores/auth');
                     const { useNotificationStore } = await import(
                         '@/stores/notification'
@@ -111,11 +120,7 @@ api.interceptors.response.use(
 
                     if (auth.isAuthenticated) {
                         const notification = useNotificationStore();
-                        const message =
-                            response.data?.detail ||
-                            'セッションの有効期限が切れました。再度ログインしてください。';
-
-                        notification.warning(message, 5000);
+                        notification.warning(response.data?.detail, 5000);
                         await auth.logout(true);
                     }
                 }
@@ -134,7 +139,10 @@ api.interceptors.response.use(
     },
 );
 
-// CSRFトークンリセット関数（ログアウト時などに使用）
+/**
+ * CSRFトークンをリセットする公開関数
+ * ログアウト時などに使用
+ */
 export const resetCSRFToken = () => {
     csrfManager.reset();
 };

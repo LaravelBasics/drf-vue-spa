@@ -63,9 +63,6 @@ const headers = computed(() => {
     return baseHeaders;
 });
 
-const noDataText = computed(() => t('dataTable.noData'));
-const loadingText = computed(() => t('dataTable.loading'));
-
 const itemCountText = computed(() => {
     if (totalItems.value === 0) {
         return t('dataTable.itemCount', {
@@ -336,8 +333,8 @@ onBeforeUnmount(() => {
             :items="users"
             :items-length="totalItems"
             :loading="loading"
-            :no-data-text="noDataText"
-            :loading-text="loadingText"
+            :no-data-text="'dataTable.noData'"
+            :loading-text="'dataTable.loading'"
             :items-per-page-options="[10, 25, 50, 100]"
             v-model:page="currentPage"
             v-model:items-per-page="itemsPerPage"

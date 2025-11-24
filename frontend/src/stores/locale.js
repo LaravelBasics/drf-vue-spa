@@ -1,26 +1,35 @@
-// src/stores/locale.js - 多言語設定管理
+// src/stores/locale.js
 import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
 import i18n from '@/plugins/i18n';
-import vuetify from '@/plugins/vuetify';
 
 export const useLocaleStore = defineStore(
     'locale',
     () => {
-        // サポートする言語リスト
         const SUPPORTED_LOCALES = ['ja', 'en'];
 
-        // デフォルト言語（vue-i18nの初期値）
-        const locale = ref(i18n.global.locale.value);
+        // 初期言語決定: 日本限定サービスのため常に'ja'
+        // ブラウザ言語検出は不要(業務用アプリ想定)
+        const getInitialLocale = () => {
+            // 日本の業務システムなので常に日本語を初期値とする
+            // ユーザーが明示的に変更した場合のみlocalStorageに保存される
+            return 'ja';
+        };
 
-        // 言語変更を監視して vue-i18n と Vuetify に反映
+        // Pinia persistがlocalStorageから自動復元
+        // 復元値がある場合: ユーザーが以前選択した言語を使用
+        // 復元値がない場合: getInitialLocale()で'ja'を設定
+        const locale = ref(getInitialLocale());
+
+        // 初回: i18nを同期(localStorage復元後に実行)
+        i18n.global.locale.value = locale.value;
+
+        // 以降の変更を監視してi18nに反映
+        // 🌟 vuetifyはadapterで自動同期されるので不要
         watch(locale, (newLocale) => {
             i18n.global.locale.value = newLocale;
-            vuetify.locale.current = newLocale;
         });
 
-        // 言語を変更する関数
-        // newLocale: 新しい言語コード ('ja' | 'en')
         function setLocale(newLocale) {
             if (SUPPORTED_LOCALES.includes(newLocale)) {
                 locale.value = newLocale;
@@ -35,7 +44,6 @@ export const useLocaleStore = defineStore(
         };
     },
     {
-        // Piniaの永続化プラグインで自動的にlocalStorageに保存
-        persist: true,
+        persist: true, // localStorage自動永続化
     },
 );

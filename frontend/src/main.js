@@ -17,7 +17,6 @@ import { useLocaleStore } from '@/stores/locale';
 const app = createApp(App);
 
 // ==================== プラグイン登録 ====================
-// 順序重要: Pinia → Router → Vuetify → i18n
 const pinia = createPinia();
 pinia.use(piniaPluginPersistedstate);
 
@@ -27,10 +26,8 @@ app.use(vuetify);
 app.use(i18n);
 
 // ==================== アプリ状態管理 ====================
-// ✅ マウント状態を管理（app._container の代替）
 let isAppMounted = false;
 
-// エラー通知を安全に表示するヘルパー関数
 const showErrorNotification = (messageKey) => {
     if (!isAppMounted) return;
 
@@ -44,7 +41,6 @@ const showErrorNotification = (messageKey) => {
 };
 
 // ==================== エラーハンドリング ====================
-// グローバルエラーハンドラー
 app.config.errorHandler = (err, instance, info) => {
     if (import.meta.env.DEV) {
         console.error('Global error:', err);
@@ -54,11 +50,9 @@ app.config.errorHandler = (err, instance, info) => {
         console.error('Error:', err.message);
     }
 
-    // ✅ マウント後のみ通知表示
     showErrorNotification('notifications.error.unknown');
 };
 
-// 未処理のPromise拒否をキャッチ
 window.addEventListener('unhandledrejection', (event) => {
     if (import.meta.env.DEV) {
         console.error('Unhandled promise rejection:', event.reason);
@@ -66,39 +60,30 @@ window.addEventListener('unhandledrejection', (event) => {
         console.error('Promise rejection:', event.reason?.message);
     }
 
-    // ✅ マウント後のみ通知表示
     showErrorNotification('notifications.error.unknown');
-
     event.preventDefault();
 });
 
 // ==================== アプリケーション初期化 ====================
-// 初期化処理
-// 1. 認証状態の復元
-// 2. 言語設定の適用
-// 3. アプリのマウント
-// 初期化失敗時もアプリを起動（Graceful degradation）
 const initializeApp = async () => {
     let initializationError = null;
 
     try {
         const authStore = useAuthStore();
-        const localeStore = useLocaleStore();
+        useLocaleStore(); // ← これでlocalStorage自動復元+i18n同期
 
-        // 認証状態を初期化（セッション復元）
+        // 認証状態を初期化
         await authStore.initialize();
 
-        // Vuetifyの初期言語を設定（locale.jsのwatchで自動同期）
-        vuetify.locale.current = localeStore.locale;
+        // ✅ 削除: vuetify.locale.current の手動設定は不要!
+        // createVueI18nAdapterが自動的にi18nと同期する
     } catch (error) {
         console.error('Initialization error:', error);
         initializationError = error;
     } finally {
-        // 初期化の成否に関わらずアプリを起動
         app.mount('#app');
-        isAppMounted = true; // ✅ マウント完了フラグ
+        isAppMounted = true;
 
-        // マウント後に初期化エラーを通知
         if (initializationError) {
             await nextTick();
             try {
@@ -114,5 +99,4 @@ const initializeApp = async () => {
     }
 };
 
-// アプリ起動
 initializeApp();

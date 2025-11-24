@@ -1,0 +1,505 @@
+# CSRF完全フロー図解（ログインから通常POST まで）
+
+🤝 最終確認：Axiosとブラウザの役割設定項目誰の機能？
+目的xsrfCookieNameAxios (JavaScript)Cookieのどこを探せばトークンがあるか教える。
+（例: csrftoken）xsrfHeaderNameAxios (JavaScript)見つけたトークンをHeaderのどこに貼り付けるか教える。
+（例: X-CSRFToken）withXSRFTokenAxios (JavaScript)クロスオリジンでも、この Headerの貼り付け作業を実行して良いか の許可スイッチ。
+withCredentialsブラウザCookie自体をリクエストに 同封して良いか の許可スイッチ。
+
+## 🎯 Phase 1: ログイン処理（初回）
+
+```
+【フロントエンド】
+ユーザーがログインボタンクリック
+  ↓
+POST /api/auth/login/
+  employee_id: "12345"
+  password: "password123"
+  ↓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【Axiosインターセプター（リクエスト前）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ method が "post" か確認 → ✅ YES
+  ↓
+2️⃣ csrfManager.ensureToken() 実行
+  ↓
+3️⃣ tokenFetched の状態チェック
+  
+  ┌─────────────────────────────┐
+  │ tokenFetched = false        │ ← 初回なので false
+  └─────────────────────────────┘
+  ↓
+4️⃣ GET /api/auth/csrf/ を実行
+  ↓
+  【Django側】
+  CSRFView.get() が実行
+    ↓
+  @ensure_csrf_cookie デコレーターが動作
+    ↓
+  新しいCSRFトークンを生成: "abc123xyz"
+    ↓
+  Response:
+    Status: 204 No Content
+    Set-Cookie: csrftoken=abc123xyz; Max-Age=31449600（1年）
+  ↓
+  【ブラウザ】
+  Cookieに保存:
+    csrftoken=abc123xyz
+  ↓
+5️⃣ CSRFManager: tokenFetched = true にセット
+  ↓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【Axiosの自動処理（xsrfCookieName, xsrfHeaderName）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+6️⃣ Axiosが内部で以下を実行:
+
+  // 疑似コード
+  const csrfToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrftoken='))
+    ?.split('=')[1];  // "abc123xyz" を取得
+  
+  config.headers['X-CSRFToken'] = csrfToken;
+  
+  ↓
+  ✅ ヘッダーに自動追加完了:
+    X-CSRFToken: abc123xyz
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【リクエスト送信】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+POST /api/auth/login/
+Headers:
+  Cookie: csrftoken=abc123xyz         ← ブラウザが自動送信
+  X-CSRFToken: abc123xyz              ← Axiosが自動追加
+  Content-Type: application/json
+Body:
+  {
+    "employee_id": "12345",
+    "password": "password123"
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【バックエンド（Django）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ リクエストがDjangoに到達
+  ↓
+2️⃣ ミドルウェア処理（順番通り）:
+
+  ┌──────────────────────────────┐
+  │ CorsMiddleware               │
+  │ → CORS検証                   │
+  │   - Origin: http://localhost:5173 ← 開発環境
+  │   - withCredentials: true    │
+  │   ✅ CORS_ALLOWED_ORIGINS に含まれる → OK
+  └──────────────────────────────┘
+  ↓
+  ┌──────────────────────────────┐
+  │ SessionMiddleware            │
+  │ → セッションCookieを読み込み  │
+  │   （ログイン前なので sessionid なし）
+  └──────────────────────────────┘
+  ↓
+  ┌──────────────────────────────┐
+  │ CsrfViewMiddleware           │
+  │ → CSRF検証                   │
+  └──────────────────────────────┘
+  ↓
+3️⃣ @csrf_protect デコレーターが process_view() を実行:
+  
+  Cookie のトークン: abc123xyz
+  Header のトークン: abc123xyz
+  ↓
+  比較: abc123xyz == abc123xyz
+  ↓
+  ✅ 一致！CSRF検証成功
+  ↓
+4️⃣ LoginAPIView.post() 実行:
+  
+  authenticate(username="12345", password="password123")
+  ↓
+  ✅ 認証成功
+  ↓
+  login(request, user)  ← ここが超重要！
+  ↓
+  【Django内部で自動実行】
+  rotate_token(request)
+  ↓
+  🔄 新しいCSRFトークンを生成: "def456uvw"
+  ↓
+  Response:
+    Status: 200 OK
+    Set-Cookie: sessionid=xyz789abc; HttpOnly   ← セッションID
+    Set-Cookie: csrftoken=def456uvw             ← 新しいトークン！
+    Body: {
+      "detail": "logged_in",
+      "user": {...}
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【ブラウザ】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Application タブの Cookie:
+  sessionid=xyz789abc    ← 新規追加
+  csrftoken=def456uvw    ← 上書き（abc123xyz → def456uvw）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【フロントエンド】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ログイン成功
+  ↓
+router.push({ name: 'home' })
+  ↓
+CSRFManager の状態:
+  tokenFetched = true （そのまま）
+```
+
+---
+
+## 🎯 Phase 2: ログイン後の通常POST（ユーザー作成）
+
+```
+【フロントエンド】
+Home画面でユーザー作成ボタンクリック
+  ↓
+POST /api/users/
+Body: {
+  "username": "newuser",
+  "employee_id": "67890"
+}
+  ↓
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【Axiosインターセプター（リクエスト前）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ method が "post" か確認 → ✅ YES
+  ↓
+2️⃣ csrfManager.ensureToken() 実行
+  ↓
+3️⃣ tokenFetched の状態チェック
+  
+  ┌─────────────────────────────┐
+  │ tokenFetched = true         │ ← ログイン時に true になった
+  └─────────────────────────────┘
+  ↓
+4️⃣ 【重要】すぐに return!
+  
+  if (this.tokenFetched) return;  ← ここで終了！
+  
+  ✅ /auth/csrf/ は叩かない
+  ✅ 何もせずスキップ
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【Axiosの自動処理（毎回実行される）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+5️⃣ Axiosが内部で以下を実行:
+
+  // xsrfCookieName と xsrfHeaderName の設定による
+  const csrfToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrftoken='))
+    ?.split('=')[1];  // "def456uvw" を取得（ログイン時に更新された値）
+  
+  config.headers['X-CSRFToken'] = csrfToken;
+  
+  ↓
+  ✅ ヘッダーに自動追加:
+    X-CSRFToken: def456uvw
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【リクエスト送信】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+POST /api/users/
+Headers:
+  Cookie: sessionid=xyz789abc; csrftoken=def456uvw  ← ブラウザが自動送信
+  X-CSRFToken: def456uvw                            ← Axiosが自動追加
+  Content-Type: application/json
+Body:
+  {
+    "username": "newuser",
+    "employee_id": "67890"
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【バックエンド（Django）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1️⃣ ミドルウェア処理:
+
+  ┌──────────────────────────────┐
+  │ SessionMiddleware            │
+  │ → sessionid を検証           │
+  │   sessionid=xyz789abc        │
+  │   ✅ 有効なセッション → OK   │
+  └──────────────────────────────┘
+  ↓
+  ┌──────────────────────────────┐
+  │ CsrfViewMiddleware           │
+  │ → CSRF検証                   │
+  └──────────────────────────────┘
+  ↓
+2️⃣ process_view() 実行:
+  
+  Cookie のトークン: def456uvw
+  Header のトークン: def456uvw
+  ↓
+  比較: def456uvw == def456uvw
+  ↓
+  ✅ 一致！CSRF検証成功
+  ↓
+3️⃣ IsAuthenticated チェック:
+  
+  request.user.is_authenticated
+  ↓
+  ✅ ログイン済み → OK
+  ↓
+4️⃣ UserCreateAPIView.post() 実行
+  ↓
+  ユーザー作成処理
+  ↓
+  Response:
+    Status: 201 Created
+    Body: { "id": 1, "username": "newuser", ... }
+  
+  【重要】
+  CSRFトークンは再発行されない！
+  Set-Cookie: csrftoken=... は返されない
+```
+
+---
+
+## 🔍 withXSRFToken の役割
+
+```javascript
+withXSRFToken: import.meta.env.DEV ? true : undefined
+```
+
+### 開発環境（DEV = true）
+
+```
+withXSRFToken: true
+
+【意味】
+「クロスオリジンでもCSRFトークンをヘッダーに追加しろ」
+
+【理由】
+開発環境:
+  Frontend: http://localhost:5173
+  Backend:  http://localhost:8000
+  
+  → 異なるポート = クロスオリジン
+  → デフォルトではトークンを送信しない
+  → true にすることで強制的に送信
+```
+
+### 本番環境（DEV = false）
+
+```
+withXSRFToken: undefined（デフォルト）
+
+【意味】
+「same-originのみCSRFトークンをヘッダーに追加しろ」
+
+【理由】
+本番環境（リバースプロキシ）:
+  Frontend: https://example.com/
+  Backend:  https://example.com/api/
+  
+  → 同一オリジン
+  → デフォルトで自動的にトークンを送信
+  → undefined でOK
+```
+
+---
+
+## 📊 xsrfCookieName と xsrfHeaderName の役割
+
+```javascript
+xsrfCookieName: 'csrftoken',
+xsrfHeaderName: 'X-CSRFToken',
+```
+
+### Axiosの内部処理（毎回実行）
+
+```javascript
+// POSTリクエストが送信される直前に実行される
+
+// 1. xsrfCookieName で指定されたCookieを探す
+const cookieValue = document.cookie
+  .split('; ')
+  .find(row => row.startsWith('csrftoken='))  // ← xsrfCookieName
+  ?.split('=')[1];
+
+// 2. xsrfHeaderName で指定されたヘッダーにセット
+if (cookieValue) {
+  config.headers['X-CSRFToken'] = cookieValue;  // ← xsrfHeaderName
+}
+```
+
+**重要:**
+- この処理は**毎回POSTリクエストの直前に実行される**
+- Cookieから読み取った値をヘッダーにコピーするだけ
+- `/auth/csrf/` を叩くわけではない
+
+---
+
+## 🔄 tokenFetched の役割（超重要）
+
+```javascript
+class CSRFManager {
+    constructor() {
+        this.tokenFetched = false;  // ← これが核心
+    }
+
+    async ensureToken() {
+        if (this.tokenFetched) return;  // ← ここでスキップ
+        
+        // tokenFetched が false の場合のみ実行
+        await this._fetchToken();
+    }
+}
+```
+
+### 状態遷移
+
+```
+初期状態: tokenFetched = false
+  ↓
+1回目のPOST: ensureToken() → /auth/csrf/ を叩く
+  ↓
+  tokenFetched = true に変更
+  ↓
+2回目のPOST: ensureToken() → すぐ return（何もしない）
+  ↓
+3回目のPOST: ensureToken() → すぐ return（何もしない）
+  ↓
+...永遠にスキップ
+
+ログアウト: resetCSRFToken() → tokenFetched = false に戻す
+  ↓
+次回のPOST: ensureToken() → 再び /auth/csrf/ を叩く
+```
+
+---
+
+## 🎯 まとめ
+
+| 項目 | タイミング | 動作 |
+|------|-----------|------|
+| `/auth/csrf/` 呼び出し | 最初のPOSTのみ | トークンをCookieに保存 |
+| トークン再発行 | ログイン時のみ | rotate_token() 自動実行 |
+| Cookieからヘッダーへコピー | 毎回のPOST | Axiosが自動実行 |
+| tokenFetched チェック | 毎回のPOST | true ならスキップ |
+| CSRF検証 | 毎回のPOST | Django middleware |
+
+**重要な事実:**
+1. `/auth/csrf/` は最初の1回だけ
+2. ログイン時に新しいトークンに変わる
+3. 通常のPOSTでは同じトークンを使い続ける
+4. Axiosは毎回Cookieからヘッダーにコピー（自動）
+
+==========================================================================================
+
+# settings.py - Django Cookie設定（本番推奨版）
+
+# ==================== セッションCookie設定 ====================
+# セッションIDは絶対にJavaScriptからアクセスさせない
+
+SESSION_COOKIE_HTTPONLY = True  # ✅ 必須！XSS攻撃からセッションIDを保護
+SESSION_COOKIE_SECURE = True  # ✅ HTTPS接続でのみ送信
+SESSION_COOKIE_SAMESITE = 'Lax'  # ✅ CSRF攻撃を防ぐ（Lax または Strict）
+SESSION_COOKIE_AGE = 1209600  # 2週間（秒単位）
+SESSION_COOKIE_NAME = 'sessionid'  # デフォルト名
+
+# ==================== CSRFトークンCookie設定 ====================
+# CSRFトークンはJavaScriptから読み取る必要がある
+
+CSRF_COOKIE_HTTPONLY = False  # ⚠️ False推奨！Axiosが読み取る必要がある
+CSRF_COOKIE_SECURE = True  # ✅ HTTPS接続でのみ送信
+CSRF_COOKIE_SAMESITE = 'Lax'  # ✅ CSRF攻撃を防ぐ
+CSRF_COOKIE_AGE = 31449600  # 1年間（秒単位）
+CSRF_COOKIE_NAME = 'csrftoken'  # デフォルト名
+
+# ==================== その他のセキュリティ設定 ====================
+SECURE_BROWSER_XSS_FILTER = True  # XSSフィルターを有効化
+SECURE_CONTENT_TYPE_NOSNIFF = True  # MIMEタイプスニッフィングを防ぐ
+X_FRAME_OPTIONS = 'DENY'  # クリックジャッキング防止
+
+# 本番環境のみ
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True  # HTTPをHTTPSにリダイレクト
+    SECURE_HSTS_SECONDS = 31536000  # HSTSヘッダー（1年）
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+
+# ==================== CORS設定 ====================
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",  # 開発環境
+    "https://yoursite.com",  # 本番環境
+]
+CORS_ALLOW_CREDENTIALS = True  # withCredentials: true に対応
+
+
+# ==================== 設定の説明 ====================
+
+"""
+📌 なぜCSRF_COOKIE_HTTPONLYをFalseにするのか？
+
+【理由】
+Axiosが以下の処理を行うため、JavaScriptからCookieを読み取る必要がある:
+
+1. document.cookie から 'csrftoken' を読み取る
+2. 読み取った値を X-CSRFToken ヘッダーに自動追加
+3. POSTリクエストで送信
+
+【Django公式の見解】
+https://docs.djangoproject.com/en/stable/ref/settings/#csrf-cookie-httponly
+
+「Designating the CSRF cookie as HttpOnly doesn't offer any practical 
+protection because CSRF is only to protect against cross-domain attacks. 
+If an attacker can read the cookie via JavaScript, they're already on 
+the same domain as far as the browser knows, so they can do anything 
+they like anyway. (XSS is a much bigger hole than CSRF.)」
+
+【要約】
+- HttpOnlyにしてもCSRF保護は強化されない
+- XSS攻撃があればCSRFトークンを隠しても無意味
+- セキュリティ監査で指摘される場合があるが、実質的な効果はない
+
+
+📌 セッションIDは必ずHttpOnly = True
+
+【理由】
+- セッションIDはJavaScriptから読み取る必要がない
+- XSS攻撃でセッションIDを盗まれると、なりすましが可能
+- HttpOnlyにすることでXSS攻撃の被害を軽減
+
+
+📌 SameSiteの設定
+
+Lax（推奨）:
+- トップレベルナビゲーション（リンククリック）では送信
+- クロスサイトのPOSTリクエストでは送信しない
+- バランスが良い
+
+Strict:
+- 同一サイトからのリクエストのみ送信
+- より厳格だが、UXが悪化する可能性
+
+
+📌 本番環境での追加設定
+
+SECURE_SSL_REDIRECT = True
+→ HTTPをHTTPSにリダイレクト
+
+SECURE_HSTS_SECONDS = 31536000
+→ ブラウザに「このサイトは1年間HTTPS必須」と通知
+"""

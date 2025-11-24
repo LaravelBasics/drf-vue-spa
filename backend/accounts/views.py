@@ -1,5 +1,5 @@
 """
-認証関連API
+認証関連API（DRF + CSRF 完全対応版）
 """
 
 import logging
@@ -14,28 +14,56 @@ from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from common.context import get_client_ip
-from django.views.decorators.csrf import csrf_protect
+
+# ✅ カスタムSessionAuthenticationを作成
+from rest_framework.authentication import SessionAuthentication
 
 from .serializers import LoginSerializer, UserSerializer
 
 audit_logger = logging.getLogger("audit")
 
 
+class CSRFEnforcedSessionAuthentication(SessionAuthentication):
+    """
+    CSRF保護を強制するSessionAuthentication
+
+    DRFのデフォルトSessionAuthenticationは未認証ユーザーのCSRFをスキップするため、
+    ログインAPIなどで脆弱性が発生する。このクラスは常にCSRFをチェックする。
+    """
+
+    def authenticate(self, request):
+        """
+        常にCSRFをチェック（未認証ユーザーも含む）
+        """
+        # 常にCSRF検証を実行
+        self.enforce_csrf(request)
+
+        # 通常の認証処理
+        return super().authenticate(request)
+
+
 class CSRFView(APIView):
     """CSRFトークン取得API"""
 
     permission_classes = [AllowAny]
+    authentication_classes = []  # 認証不要
 
     @method_decorator(ensure_csrf_cookie)
     def get(self, request):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@method_decorator(csrf_protect, name="dispatch")
 class LoginAPIView(APIView):
-    """ログインAPI(ブルートフォース攻撃対策)"""
+    """
+    ログインAPI（ブルートフォース攻撃対策 + CSRF保護）
+
+    Note:
+        - CSRFEnforcedSessionAuthenticationで常にCSRF検証
+        - @csrf_protect デコレーターは不要（authentication_classesで制御）
+    """
 
     permission_classes = [AllowAny]
+    authentication_classes = [CSRFEnforcedSessionAuthentication]  # ← これが重要
 
     @staticmethod
     def _get_cache_key(employee_id):
@@ -141,9 +169,15 @@ class LoginAPIView(APIView):
 
 
 class LogoutAPIView(APIView):
-    """ログアウトAPI"""
+    """
+    ログアウトAPI
+
+    Note:
+        - IsAuthenticated + SessionAuthenticationでCSRF保護
+    """
 
     permission_classes = [IsAuthenticated]
+    authentication_classes = [CSRFEnforcedSessionAuthentication]  # ← これが重要
 
     def post(self, request):
         """

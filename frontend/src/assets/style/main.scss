@@ -1,26 +1,11 @@
 // frontend/src/assets/style/main.scss
-// Vuetifyのデフォルトスタイルをカスタマイズ
+// Vuetifyのデフォルトスタイルをカスタマイズ（本番最適化版）
 
 // ==================== グローバルフォント設定 ====================
-// ✅ パフォーマンス対策: * セレクタではなく body と .v-application のみに指定
 body,
 .v-application {
-    font-family:
-        'Noto Sans JP',
-        // 日本語フォント（優先）
-        'Roboto',
-        // Vuetify標準の英語フォント
-        -apple-system,
-        // macOSシステムフォント
-        BlinkMacSystemFont,
-        // macOS Chrome用
-        'Segoe UI',
-        // Windowsシステムフォント
-        'Helvetica Neue',
-        // macOS旧バージョン
-        Arial,
-        // フォールバック
-        sans-serif; // 最終フォールバック
+    // ✅ system-ui で各OSの最適フォントを自動選択
+    font-family: 'Noto Sans JP', system-ui, sans-serif;
 }
 
 // Material Symbolsアイコンは専用フォントを維持
@@ -28,22 +13,19 @@ body,
     font-family: 'Material Symbols Outlined' !important;
 }
 
-// 日本語の可読性向上のため文字間隔を調整
+// 基本レイアウト設定
 body {
-    letter-spacing: 0.05em; // 0.05emの字間で読みやすく
     margin: 0;
     padding: 0;
     overflow-x: hidden; // 横スクロール防止（モバイル対応）
 }
 
-// ボタンのフォントウェイトと字間を統一
+// ボタンのフォントウェイトを統一
 .v-btn {
-    font-weight: 500; // Medium（400=Regular, 700=Bold の中間）
-    letter-spacing: 0.05em;
+    font-weight: 500; // Medium（Vuetify標準）
 }
 
 // ==================== ページ遷移アニメーション ====================
-// 通常のページ遷移（ホーム、管理画面など）
 .page-transition-enter-active,
 .page-transition-leave-active {
     // Material Design Easing（標準加速曲線）
@@ -68,16 +50,4 @@ body {
     flex: 1 0 auto; // flexコンテナで残りのスペースを占有
     min-height: 0; // Flexboxのバグ回避
     background-color: #fafafa; // 薄いグレーの背景
-}
-
-// レイアウトシフト防止（Core Web Vitals対策）
-*,
-*::before,
-*::after {
-    box-sizing: border-box; // padding/borderを幅に含める
-}
-
-// ルーターリンクのホバー効果
-.router-link-active {
-    transition: all 0.2s ease; // アクティブ状態の変化をスムーズに
 }

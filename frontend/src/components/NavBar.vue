@@ -47,7 +47,7 @@ function goToHome() {
 <template>
     <v-app-bar>
         <v-app-bar-nav-icon @click="ui.toggleRail" :icon="ICONS.nav.menu" />
-        <v-toolbar-title>
+        <v-toolbar-title class="ml-3">
             <div class="d-flex align-center h-100">
                 <span
                     class="d-flex align-center"

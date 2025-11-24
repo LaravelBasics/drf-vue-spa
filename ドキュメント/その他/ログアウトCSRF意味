@@ -1,0 +1,183 @@
+# ログアウトCSRF攻撃シナリオ（完全版）
+
+## 🎭 攻撃シナリオ1: フィッシング攻撃
+
+### 攻撃の流れ
+
+```
+【ユーザー】銀行サイトにログイン中
+    ↓
+【攻撃者】メールで悪意あるリンクを送信:
+    「無料ギフトカードが当たりました！」
+    ↓
+【ユーザー】リンクをクリック → evil.com を訪問
+    ↓
+【evil.com】隠れたコード:
+    <img src="https://yourbank.com/api/auth/logout/" />
+    ↓
+【ブラウザ】自動的にGETリクエスト送信:
+    Cookie: sessionid=abc123 （自動付与）
+    ↓
+【銀行サイト】❌ CSRF保護なし → ログアウト成功
+    ↓
+【ユーザー】気づかないうちにログアウト
+    ↓
+【evil.com】偽のログインページを表示:
+    「セッションが切れました。再度ログインしてください」
+    （見た目は本物そっくり）
+    ↓
+【ユーザー】ID・パスワードを入力
+    ↓
+【攻撃者】認証情報を取得！💀
+```
+
+### 影響
+- **個人情報の漏洩**
+- **金銭的被害**（不正送金等）
+- **企業の信頼失墜**
+
+---
+
+## 🔄 攻撃シナリオ2: DoS攻撃（サービス妨害）
+
+### 攻撃の流れ
+
+```
+【攻撃者】人気掲示板に投稿:
+
+<img src="https://yoursite.com/api/auth/logout/" 
+     style="display:none" />
+
+【ユーザー】掲示板を閲覧
+    ↓
+【ブラウザ】自動的にログアウトリクエスト送信
+    ↓
+【yoursite.com】❌ CSRF保護なし → ログアウト成功
+    ↓
+【ユーザー】「あれ？ログアウトされてる？」
+    ↓
+【ユーザー】再ログイン
+    ↓
+【掲示板】また同じページを見る
+    ↓
+【ブラウザ】また自動ログアウト
+    ↓
+（無限ループ）
+```
+
+### 影響
+- **ユーザー体験の破壊**
+- **サイトからの離脱率上昇**
+- **ビジネス機会の損失**
+
+---
+
+## 🎯 攻撃シナリオ3: セッション固定攻撃
+
+### 攻撃の流れ
+
+```
+【攻撃者】YouTubeで自分のアカウント作成
+    ↓
+【攻撃者】CSRFでユーザーをログアウトさせる:
+    <img src="https://youtube.com/logout" />
+    ↓
+【ユーザー】気づかずログアウトされる
+    ↓
+【攻撃者】Login CSRFで攻撃者のアカウントにログインさせる:
+    <form action="https://youtube.com/login" method="POST">
+        <input name="user" value="attacker" />
+        <input name="pass" value="attackerpass" />
+    </form>
+    ↓
+【ユーザー】攻撃者のアカウントでログイン（気づかない）
+    ↓
+【ユーザー】動画を視聴
+    ↓
+【視聴履歴】攻撃者のアカウントに記録される
+    ↓
+【攻撃者】ユーザーの趣味嗜好・個人情報を取得！💀
+```
+
+**実例:** YouTubeが過去にこの脆弱性を持っていた
+
+---
+
+## 🛡️ CSRF保護がある場合
+
+### 攻撃が失敗する理由
+
+```
+【攻撃者】evil.comから攻撃:
+    <form action="https://yoursite.com/api/auth/logout/" method="POST">
+        <button>クリック！</button>
+    </form>
+    ↓
+【ブラウザ】POSTリクエスト送信:
+    Cookie: sessionid=abc123      ← 自動送信
+    X-CSRFToken: （なし）          ← evil.comからは設定不可
+    ↓
+【Django】CsrfViewMiddleware が検証:
+    Cookie: あり
+    Header: なし
+    → 不一致！
+    ↓
+【Django】403 Forbidden を返す
+    ↓
+【攻撃失敗】✅
+```
+
+### なぜ攻撃者はトークンを設定できないのか？
+
+1. **Same-Origin Policy**
+   - evil.comから yoursite.com のCookieを読めない
+   - ブラウザがクロスオリジンアクセスをブロック
+
+2. **カスタムヘッダーの制限**
+   - `<form>` タグでは X-CSRFToken ヘッダーを送信できない
+   - JavaScript fetch() も CORS制限でブロックされる
+
+---
+
+## ⚖️ IsAuthenticated vs CSRF保護
+
+| 項目 | IsAuthenticated | CSRF保護 |
+|------|-----------------|----------|
+| 検証内容 | **誰が**送信したか | **どこから**送信されたか |
+| チェック対象 | セッションCookie | Cookie + Header の一致 |
+| 防げる攻撃 | 未認証ユーザー | 偽装リクエスト |
+| 攻撃者の能力 | セッションなし | セッションあり（ユーザーのブラウザ経由） |
+
+### 重要な事実
+
+✅ IsAuthenticated があっても、攻撃者はユーザーのブラウザを経由してリクエストを送信できる
+
+❌ IsAuthenticated だけではCSRF攻撃を防げない
+
+✅ CSRF保護により、攻撃者が「どこから」リクエストを送っているかを検証できる
+
+---
+
+## 🔐 結論
+
+### ログアウトにCSRF保護が必要な理由
+
+1. **フィッシング攻撃の入り口になる**
+   - 強制ログアウト → 偽ログインページ → 認証情報窃取
+
+2. **DoS攻撃の手段になる**
+   - 繰り返しログアウトさせてサービスを妨害
+
+3. **セッション固定攻撃の前準備**
+   - ログアウト → 攻撃者のセッションでログイン
+
+4. **セキュリティの一貫性**
+   - すべてのPOSTリクエストを保護することがベストプラクティス
+
+### Django公式の推奨
+
+> "Adding CSRF will update the LogoutFilter to only use HTTP POST. 
+> This ensures that log out requires a CSRF token and that a malicious 
+> user cannot forcibly log out your users."
+
+**すべてのstate-changing操作（ログアウト含む）にCSRF保護は必須！**

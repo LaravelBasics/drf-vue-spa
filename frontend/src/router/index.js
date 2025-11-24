@@ -19,6 +19,7 @@ const router = createRouter({
                 requiresAuth: true,
                 transition: 'slide-left',
                 breadcrumb: 'breadcrumbs.home',
+                title: t('pages.home.title'),
             },
         },
         {
@@ -28,6 +29,7 @@ const router = createRouter({
             meta: {
                 requiresAuth: true,
                 breadcrumb: 'breadcrumbs.settings',
+                title: t('pages.settings.title'),
             },
         },
         {
@@ -38,6 +40,7 @@ const router = createRouter({
                 hideForAuth: true,
                 transition: 'fade',
                 breadcrumb: false,
+                title: t('auth.loginTitle'),
             },
         },
 
@@ -48,6 +51,7 @@ const router = createRouter({
                 requiresAuth: true,
                 requiresAdmin: true,
                 breadcrumb: 'breadcrumbs.admin',
+                title: t('pages.admin.title'),
             },
             children: [
                 {
@@ -66,6 +70,9 @@ const router = createRouter({
                             name: 'UserList',
                             component: () =>
                                 import('@/views/users/UserList.vue'),
+                            meta: {
+                                title: t('pages.users.list.title'), // ✅ 子ルートで明示
+                            },
                         },
                         {
                             path: routes.ADMIN.USERS.CREATE, // 'create'
@@ -74,6 +81,7 @@ const router = createRouter({
                                 import('@/views/users/UserCreate.vue'),
                             meta: {
                                 breadcrumb: 'breadcrumbs.users.create',
+                                title: t('pages.users.create.title'),
                             },
                         },
                         {
@@ -83,6 +91,7 @@ const router = createRouter({
                                 import('@/views/users/UserDetail.vue'),
                             meta: {
                                 breadcrumb: 'breadcrumbs.users.detail',
+                                title: t('pages.users.detail.title'),
                             },
                             props: true,
                         },
@@ -94,6 +103,7 @@ const router = createRouter({
                             meta: {
                                 breadcrumb: 'breadcrumbs.users.update',
                                 breadcrumbParent: 'UserDetail', // ✅ 詳細画面を親として指定
+                                title: t('pages.users.update.title'),
                             },
                             props: true,
                         },
@@ -105,6 +115,7 @@ const router = createRouter({
                             meta: {
                                 breadcrumb: 'breadcrumbs.users.delete',
                                 breadcrumbParent: 'UserDetail', // ✅ 詳細画面を親として指定
+                                title: t('pages.users.delete.title'),
                             },
                             props: true,
                         },
