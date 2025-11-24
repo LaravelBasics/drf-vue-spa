@@ -6,10 +6,8 @@ import App from './App.vue';
 import router from './router';
 import vuetify from './plugins/vuetify';
 import i18n from './plugins/i18n';
-
 import 'material-symbols/outlined.css';
 import './assets/style/main.scss';
-
 import { useAuthStore } from '@/stores/auth';
 import { useNotificationStore } from '@/stores/notification';
 import { useLocaleStore } from '@/stores/locale';
@@ -75,7 +73,6 @@ const initializeApp = async () => {
         // 認証状態を初期化
         await authStore.initialize();
 
-        // ✅ 削除: vuetify.locale.current の手動設定は不要!
         // createVueI18nAdapterが自動的にi18nと同期する
     } catch (error) {
         console.error('Initialization error:', error);

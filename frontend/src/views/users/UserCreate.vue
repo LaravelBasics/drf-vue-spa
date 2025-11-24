@@ -1,12 +1,12 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
+import { ROUTE_NAMES } from '@/constants/routes';
 import { useI18n } from 'vue-i18n';
 import { useValidation } from '@/composables/useValidation';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { userRoutes } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
@@ -47,7 +47,7 @@ async function submitForm() {
         showSuccess('pages.users.create.success', {
             username: formData.value.username,
         });
-        router.replace(userRoutes.list());
+        router.replace({ name: ROUTE_NAMES.ADMIN.USERS.LIST });
     } catch (error) {
         handleApiError(error);
     } finally {
@@ -56,7 +56,7 @@ async function submitForm() {
 }
 
 function goBack() {
-    router.replace(userRoutes.list());
+    router.replace({ name: ROUTE_NAMES.ADMIN.USERS.LIST });
 }
 </script>
 

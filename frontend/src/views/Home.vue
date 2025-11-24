@@ -7,7 +7,7 @@ import { usePermissions } from '@/composables/usePermissions';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import MenuCardGrid from '@/components/MenuCardGrid.vue';
-import { routes } from '@/constants/routes';
+import { ROUTE_NAMES } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 import { COLORS } from '@/constants/theme';
 
@@ -21,7 +21,7 @@ const { isAdmin } = usePermissions();
 onMounted(() => {
     if (route.query.unauthorized === 'admin') {
         showWarning('notifications.unauthorized.admin');
-        router.replace({ path: routes.HOME, query: {} });
+        router.replace({ name: ROUTE_NAMES.HOME, query: {} });
     }
 });
 
@@ -30,7 +30,7 @@ const menuItems = computed(() => [
         id: 'admin',
         icon: ICONS.nav.management,
         title: t('pages.admin.title'),
-        to: routes.ADMIN.ROOT,
+        to: { name: ROUTE_NAMES.ADMIN.MENU },
         color: 'secondary',
         requiresAdmin: true,
     },
@@ -38,7 +38,7 @@ const menuItems = computed(() => [
         id: 'settings',
         icon: ICONS.nav.settings,
         title: t('pages.settings.title'),
-        to: routes.SETTINGS,
+        to: { name: ROUTE_NAMES.SETTINGS },
         color: COLORS.neutral.medium,
     },
 ]);

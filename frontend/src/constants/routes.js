@@ -1,9 +1,9 @@
-// src/constants/routes.js - シンプルなパス定義 + ヘルパー関数
+// src/constants/routes.js - Vue Routerのpath定義 + 名前ベースナビゲーション用の定数
 
 /**
- * ルートパス定義
+ * ルートパス定義（router/index.jsで使用）
+ * - children構造用のセグメント定義
  * - パラメータなしのパスは直接使用
- * - パラメータありのパスはヘルパー関数を使用
  */
 export const routes = Object.freeze({
     // 認証関連
@@ -25,32 +25,24 @@ export const routes = Object.freeze({
             INDEX: '', // /admin/users のインデックス
             CREATE: 'create', // /admin/users/create
             DETAIL: ':id', // /admin/users/:id (動的パラメータ)
-            UPDATE: ':id/update', // /admin/users/:id/update
-            DELETE: ':id/delete', // /admin/users/:id/delete
+            UPDATE: 'update', // ⚠️ 修正: ':id/update' → 'update' (Wrapperの子なので:id不要)
+            DELETE: 'delete', // ⚠️ 修正: ':id/delete' → 'delete'
         },
     },
 });
 
-// ✅ 汎用化したヘルパー関数
-function createResourceRoutes(basePath) {
-    return {
-        list: () => basePath,
-        create: () => `${basePath}/create`,
-        detail: (id) => `${basePath}/${id}`,
-        update: (id) => `${basePath}/${id}/update`,
-        delete: (id) => `${basePath}/${id}/delete`,
-    };
-}
-
-export const userRoutes = createResourceRoutes('/admin/users');
-
-// 将来的に追加する場合（例）
-// export const productRoutes = createResourceRoutes('/admin/products');
-// export const orderRoutes = createResourceRoutes('/admin/orders');
-
 /**
- * ルート名定義（router.push({ name }) 用）
- * router/index.js の name と一致させる
+ * ルート名定義（名前ベースナビゲーション用）
+ *
+ * 使用例:
+ *   router.push({ name: ROUTE_NAMES.ADMIN.USERS.UPDATE, params: { id: 123 } })
+ *   <router-link :to="{ name: ROUTE_NAMES.ADMIN.USERS.DETAIL, params: { id: user.id } }">
+ *
+ * 利点:
+ *   - パス変更に強い（一箇所修正すればOK）
+ *   - IDEの自動補完が効く
+ *   - タイポを防げる
+ *   - params継承が自動
  */
 export const ROUTE_NAMES = Object.freeze({
     HOME: 'Home',
@@ -62,6 +54,7 @@ export const ROUTE_NAMES = Object.freeze({
     ADMIN: {
         MENU: 'AdminMenu',
         USERS: {
+            DETAIL_WRAPPER: 'UserDetailWrapper',
             LIST: 'UserList',
             CREATE: 'UserCreate',
             DETAIL: 'UserDetail',

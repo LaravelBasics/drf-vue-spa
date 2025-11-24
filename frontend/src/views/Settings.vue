@@ -10,7 +10,7 @@ const headerButtons = computed(() => [
     {
         id: 'setting.search',
         name: t('buttons.search'),
-        type: 'primary', // ← 追加！
+        type: 'primary', // ← 追加
         action: openOrderSearch,
         icon: ICONS.buttons.search,
     },

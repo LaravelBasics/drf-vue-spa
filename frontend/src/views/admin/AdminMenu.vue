@@ -1,11 +1,11 @@
 <!-- src/views/admin/AdminMenu.vue - 管理者メニュー画面 -->
 <script setup>
 import { computed } from 'vue';
-import { userRoutes } from '@/constants/routes';
 import { useI18n } from 'vue-i18n';
 import Header from '@/components/Header.vue';
 import MenuCardGrid from '@/components/MenuCardGrid.vue';
 import { ICONS } from '@/constants/icons';
+import { ROUTE_NAMES } from '@/constants/routes';
 
 const { t } = useI18n();
 
@@ -15,7 +15,7 @@ const adminMenuItems = computed(() => [
         id: 'users',
         icon: ICONS.menu.users,
         title: t('pages.users.list.title'),
-        to: userRoutes.list(),
+        to: { name: ROUTE_NAMES.ADMIN.USERS.LIST },
         color: 'primary',
     },
 ]);

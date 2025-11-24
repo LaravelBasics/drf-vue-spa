@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { userRoutes } from '@/constants/routes';
+import { ROUTE_NAMES } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
@@ -41,7 +41,7 @@ async function fetchUser() {
         adminCount.value = adminCountResponse.data.count;
     } catch (error) {
         handleApiError(error);
-        router.push(userRoutes.list());
+        router.push({ name: ROUTE_NAMES.ADMIN.USERS.LIST });
     } finally {
         loading.value = false;
     }
@@ -57,15 +57,21 @@ function formatDate(dateString) {
 }
 
 function goToUpdate() {
-    router.push(userRoutes.update(userId.value));
+    router.push({
+        name: ROUTE_NAMES.ADMIN.USERS.UPDATE,
+        params: { id: userId.value },
+    });
 }
 
 function goToDelete() {
-    router.push(userRoutes.delete(userId.value));
+    router.push({
+        name: ROUTE_NAMES.ADMIN.USERS.DELETE,
+        params: { id: userId.value },
+    });
 }
 
 function goBack() {
-    router.push(userRoutes.list());
+    router.push({ name: ROUTE_NAMES.ADMIN.USERS.LIST });
 }
 
 onMounted(() => {

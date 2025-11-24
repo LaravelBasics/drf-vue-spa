@@ -1,7 +1,7 @@
 // src/router/admin-guard.js - 管理者権限チェック
 
 import { useAuthStore } from '@/stores/auth';
-import { routes } from '@/constants/routes';
+import { ROUTE_NAMES } from '@/constants/routes';
 
 export const adminGuard = async (to, from) => {
     // 管理者権限が不要なページはスキップ
@@ -20,7 +20,7 @@ export const adminGuard = async (to, from) => {
     if (!auth.user.is_admin) {
         // ホームにリダイレクト + 通知用フラグを設定
         return {
-            path: routes.HOME,
+            name: ROUTE_NAMES.HOME,
             replace: true,
             query: {
                 unauthorized: 'admin',

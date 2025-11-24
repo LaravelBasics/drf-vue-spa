@@ -5,7 +5,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { userRoutes } from '@/constants/routes';
+import { ROUTE_NAMES } from '@/constants/routes';
 import { ICONS } from '@/constants/icons.js';
 import { useDisplay } from 'vuetify';
 import { useApiError } from '@/composables/useApiError';
@@ -245,11 +245,14 @@ function formatDate(dateString) {
 }
 
 function goToCreate() {
-    router.push(userRoutes.create());
+    router.push({ name: ROUTE_NAMES.ADMIN.USERS.CREATE });
 }
 
 function handleRowClick(event, { item }) {
-    router.push(userRoutes.detail(item.id));
+    router.push({
+        name: ROUTE_NAMES.ADMIN.USERS.DETAIL,
+        params: { id: item.id },
+    });
 }
 
 onMounted(() => {
@@ -346,10 +349,12 @@ onBeforeUnmount(() => {
             @update:options="loadItems"
             @click:row="handleRowClick"
         >
-            <!-- ✅ IDカラムのリンクもヘルパー関数を使用 -->
             <template #item.id="{ item }">
                 <RouterLink
-                    :to="userRoutes.detail(item.id)"
+                    :to="{
+                        name: ROUTE_NAMES.ADMIN.USERS.DETAIL,
+                        params: { id: item.id },
+                    }"
                     class="font-weight-medium text-decoration-none text-primary"
                     @click.stop
                 >
@@ -372,6 +377,7 @@ onBeforeUnmount(() => {
                 {{ formatDate(item.created_at) }}
             </template>
         </v-data-table-server>
+
         <!-- 外部ページネーション -->
         <v-row class="mt-1">
             <v-col cols="12" class="d-flex justify-center">

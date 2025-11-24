@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useUiStore } from '@/stores/ui';
 import { useAuthStore } from '@/stores/auth';
 import { useApiError } from '@/composables/useApiError';
-import { routes } from '@/constants/routes';
+import { ROUTE_NAMES } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 import { ICON_SIZES } from '@/constants/theme';
 
@@ -25,7 +25,7 @@ async function handleLogout() {
     try {
         await auth.logout(false);
         router.push({
-            path: routes.LOGIN,
+            name: ROUTE_NAMES.LOGIN,
             query: { logout: 'success' },
         });
     } catch (error) {
@@ -36,11 +36,11 @@ async function handleLogout() {
 }
 
 function goToSettings() {
-    router.push(routes.SETTINGS);
+    router.push({ name: ROUTE_NAMES.SETTINGS });
 }
 
 function goToHome() {
-    router.push(routes.HOME);
+    router.push({ name: ROUTE_NAMES.HOME });
 }
 </script>
 

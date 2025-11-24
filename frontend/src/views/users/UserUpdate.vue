@@ -7,7 +7,7 @@ import { useValidation } from '@/composables/useValidation';
 import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import { usersAPI } from '@/api/users';
-import { userRoutes } from '@/constants/routes';
+import { ROUTE_NAMES } from '@/constants/routes';
 import { ICONS } from '@/constants/icons.js';
 
 const router = useRouter();
@@ -19,7 +19,6 @@ const { showSuccess, handleApiError } = useApiError();
 const loading = ref(false);
 const submitting = ref(false);
 const form = ref(null);
-
 const changePassword = ref(false);
 const showPassword = ref(false);
 const showPasswordConfirm = ref(false);
@@ -64,7 +63,7 @@ async function fetchUser() {
         };
     } catch (error) {
         handleApiError(error, 'pages.users.detail.error');
-        router.push(userRoutes.list());
+        router.push({ name: ROUTE_NAMES.ADMIN.USERS.LIST });
     } finally {
         loading.value = false;
     }
@@ -98,7 +97,7 @@ async function submitForm() {
             username: formData.value.username,
         });
 
-        router.replace(userRoutes.list());
+        router.replace({ name: ROUTE_NAMES.ADMIN.USERS.LIST });
     } catch (error) {
         handleApiError(error);
     } finally {

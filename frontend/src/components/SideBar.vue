@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n';
 import { useLocaleStore } from '@/stores/locale';
 import { useUiStore } from '@/stores/ui';
 import { usePermissions } from '@/composables/usePermissions';
-import { routes } from '@/constants/routes';
+import { ROUTE_NAMES } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 import { ICON_SIZES } from '@/constants/theme';
 
@@ -15,17 +15,21 @@ const { isAdmin } = usePermissions();
 
 // ナビゲーション項目の定義
 const navItems = computed(() => [
-    { title: t('pages.home.title'), icon: ICONS.nav.home, to: routes.HOME },
+    {
+        title: t('pages.home.title'),
+        icon: ICONS.nav.home,
+        to: { name: ROUTE_NAMES.HOME },
+    },
     {
         title: t('pages.admin.title'),
         icon: ICONS.nav.management,
-        to: routes.ADMIN.ROOT,
+        to: { name: ROUTE_NAMES.ADMIN.MENU },
         requiresAdmin: true,
     },
     {
         title: t('pages.settings.title'),
         icon: ICONS.nav.settings,
-        to: routes.SETTINGS,
+        to: { name: ROUTE_NAMES.SETTINGS },
     },
 ]);
 

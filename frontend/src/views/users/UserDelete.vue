@@ -7,7 +7,7 @@ import { useApiError } from '@/composables/useApiError';
 import Header from '@/components/Header.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import { usersAPI } from '@/api/users';
-import { userRoutes } from '@/constants/routes';
+import { ROUTE_NAMES } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 
 const router = useRouter();
@@ -44,7 +44,7 @@ async function fetchUser() {
         adminCount.value = adminCountResponse.data.count;
     } catch (error) {
         handleApiError(error);
-        router.push(userRoutes.list());
+        router.push({ name: ROUTE_NAMES.ADMIN.USERS.LIST });
     } finally {
         loading.value = false;
     }
@@ -60,7 +60,7 @@ async function deleteUser() {
             username: user.value.username,
         });
         showConfirmDialog.value = false;
-        router.replace(userRoutes.list());
+        router.replace({ name: ROUTE_NAMES.ADMIN.USERS.LIST });
     } catch (error) {
         handleApiError(error, 'pages.users.delete.error');
     } finally {

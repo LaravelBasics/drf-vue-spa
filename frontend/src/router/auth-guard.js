@@ -1,14 +1,14 @@
 // src/router/auth-guard.js - 認証状態チェック
 
 import { useAuthStore } from '@/stores/auth';
-import { routes } from '@/constants/routes';
+import { ROUTE_NAMES } from '@/constants/routes';
 
 export const authGuard = async (to, from) => {
     const auth = useAuthStore();
 
     // ログイン済みユーザーがログインページにアクセスした場合
     if (to.meta.hideForAuth && auth.user) {
-        return { path: routes.HOME, replace: true };
+        return { name: ROUTE_NAMES.HOME, replace: true };
     }
 
     // 認証が必要なページの場合
@@ -30,7 +30,7 @@ export const authGuard = async (to, from) => {
         // 最終的な認証チェック
         if (!auth.user) {
             return {
-                path: routes.LOGIN,
+                name: ROUTE_NAMES.LOGIN,
                 query: { next: to.fullPath },
                 replace: true,
             };

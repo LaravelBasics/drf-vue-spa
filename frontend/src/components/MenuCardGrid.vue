@@ -13,7 +13,8 @@ defineProps({
 
 <template>
     <v-container fluid class="pa-4">
-        <v-row class="ga-0">
+        <!-- デフォルトgutter(24px) + 各colにpadding -->
+        <v-row>
             <v-col
                 v-for="item in items"
                 :key="item.id"
@@ -22,6 +23,7 @@ defineProps({
                 md="4"
                 lg="3"
                 xl="2"
+                class="pa-3"
             >
                 <MenuCard
                     :icon="item.icon"

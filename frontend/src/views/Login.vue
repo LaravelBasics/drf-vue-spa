@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '@/stores/auth';
 import { useValidation } from '@/composables/useValidation';
 import { useApiError } from '@/composables/useApiError';
-import { routes } from '@/constants/routes';
+import { ROUTE_NAMES } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
 
 const auth = useAuthStore();
@@ -30,7 +30,7 @@ onMounted(async () => {
 
     if (route.query.logout === 'success') {
         showInfo('auth.logoutSuccess', {}, 3000);
-        router.replace({ path: routes.LOGIN, query: {} });
+        router.replace({ name: ROUTE_NAMES.LOGIN, query: {} });
     }
 });
 
@@ -49,7 +49,7 @@ async function onSubmit() {
         isVisible.value = false;
 
         setTimeout(async () => {
-            const redirect = route.query.next || routes.HOME;
+            const redirect = route.query.next || ROUTE_NAMES.HOME;
             await router.push(redirect);
         }, 150);
     } catch (error) {
