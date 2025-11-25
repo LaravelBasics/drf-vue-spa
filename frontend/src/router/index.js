@@ -66,7 +66,10 @@ const router = createRouter({
         {
             path: '/:pathMatch(.*)*',
             name: 'NotFound',
-            redirect: { name: ROUTE_NAMES.HOME },
+            redirect: (to) => {
+                return { name: ROUTE_NAMES.HOME, params: {} };
+            },
+            meta: { breadcrumb: false },
         },
     ],
     scrollBehavior(to, from, savedPosition) {
