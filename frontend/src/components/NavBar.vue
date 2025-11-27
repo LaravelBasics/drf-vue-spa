@@ -48,21 +48,19 @@ function goToHome() {
     <v-app-bar>
         <v-app-bar-nav-icon @click="ui.toggleRail" :icon="ICONS.nav.menu" />
         <v-toolbar-title class="ml-3">
-            <div class="d-flex align-center h-100">
-                <span
-                    class="d-flex align-center"
-                    role="button"
-                    tabindex="0"
-                    @click="goToHome"
-                    @keydown.enter="goToHome"
-                    @keydown.space.prevent="goToHome"
-                >
-                    <v-icon :size="ICON_SIZES.lg">
-                        {{ ICONS.app.title }}
-                    </v-icon>
-                    <span>{{ t('app.tabTitle') }}</span>
-                </span>
-            </div>
+            <span
+                class="d-flex align-center ga-2"
+                role="button"
+                tabindex="0"
+                @click="goToHome"
+                @keydown.enter="goToHome"
+                @keydown.space.prevent="goToHome"
+            >
+                <v-icon :size="ICON_SIZES.lg">
+                    {{ ICONS.app.title }}
+                </v-icon>
+                <span>{{ t('app.tabTitle') }}</span>
+            </span>
         </v-toolbar-title>
 
         <v-spacer />

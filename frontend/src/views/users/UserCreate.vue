@@ -61,85 +61,88 @@ function goBack() {
 </script>
 
 <template>
-    <div>
-        <Header :app-title="t('pages.users.create.title')" />
+    <Header :app-title="t('pages.users.create.title')" />
 
-        <v-container class="pa-4">
-            <v-row justify="center">
-                <v-col cols="12" sm="10" md="6" lg="5" xl="4">
-                    <v-card elevation="2">
-                        <v-card-text class="pa-6">
-                            <v-form ref="form" @submit.prevent="submitForm">
-                                <v-text-field
-                                    ref="usernameField"
-                                    v-model="formData.username"
-                                    :label="$t('form.fields.username') + ' *'"
-                                    :rules="usernameRules"
+    <!-- ✅ Grid Systemで構造 -->
+    <v-container class="pa-4">
+        <v-row justify="center">
+            <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+                <v-card elevation="2">
+                    <!-- ✅ pa-6で統一的な内部余白 -->
+                    <v-card-text class="pa-6">
+                        <!-- ✅ d-flex + flex-column + ga-4で要素間余白 (Flexboxなので安全) -->
+                        <v-form
+                            ref="form"
+                            class="d-flex flex-column ga-4"
+                            @submit.prevent="submitForm"
+                        >
+                            <v-text-field
+                                ref="usernameField"
+                                v-model="formData.username"
+                                :label="$t('form.fields.username') + ' *'"
+                                :rules="usernameRules"
+                                variant="outlined"
+                                :hint="t('form.hint.min', { min: 3 })"
+                                persistent-hint
+                            />
+
+                            <v-text-field
+                                v-model="formData.employee_id"
+                                :label="$t('form.fields.employeeId') + ' *'"
+                                :rules="employeeIdRules"
+                                variant="outlined"
+                                inputmode="numeric"
+                                :hint="t('form.hint.employeeIdFormat')"
+                                persistent-hint
+                            />
+
+                            <v-text-field
+                                v-model="formData.password"
+                                :label="$t('form.fields.password') + ' *'"
+                                :rules="passwordRules"
+                                variant="outlined"
+                                type="password"
+                                :hint="t('form.hint.passwordStrength')"
+                                persistent-hint
+                            />
+
+                            <v-checkbox
+                                v-model="formData.is_admin"
+                                :label="t('form.fields.isAdmin')"
+                                hide-details
+                            />
+
+                            <!-- ✅ <v-divider>で明確な区切り -->
+                            <v-divider />
+
+                            <!-- ✅ d-flex + <v-spacer />で両端配置 -->
+                            <div class="d-flex ga-3">
+                                <v-btn
+                                    type="submit"
+                                    color="primary"
+                                    size="large"
                                     variant="outlined"
-                                    class="mb-4"
-                                    :hint="t('form.hint.min', { min: 3 })"
-                                    persistent-hint
-                                />
+                                    :loading="submitting"
+                                    :prepend-icon="ICONS.buttons.add"
+                                >
+                                    {{ t('buttons.create') }}
+                                </v-btn>
 
-                                <v-text-field
-                                    v-model="formData.employee_id"
-                                    :label="$t('form.fields.employeeId') + ' *'"
-                                    :rules="employeeIdRules"
+                                <v-spacer />
+
+                                <v-btn
                                     variant="outlined"
-                                    inputmode="numeric"
-                                    class="mb-4"
-                                    :hint="t('form.hint.employeeIdFormat')"
-                                    persistent-hint
-                                />
-
-                                <v-text-field
-                                    v-model="formData.password"
-                                    :label="$t('form.fields.password') + ' *'"
-                                    :rules="passwordRules"
-                                    variant="outlined"
-                                    type="password"
-                                    class="mb-4"
-                                    :hint="t('form.hint.passwordStrength')"
-                                    persistent-hint
-                                />
-
-                                <v-checkbox
-                                    v-model="formData.is_admin"
-                                    :label="t('form.fields.isAdmin')"
-                                    class="mb-2"
-                                    hide-details
-                                />
-
-                                <v-divider class="my-4" />
-
-                                <div class="d-flex">
-                                    <v-btn
-                                        type="submit"
-                                        color="primary"
-                                        size="large"
-                                        variant="outlined"
-                                        :loading="submitting"
-                                        :prepend-icon="ICONS.buttons.add"
-                                    >
-                                        {{ t('buttons.create') }}
-                                    </v-btn>
-
-                                    <v-spacer />
-
-                                    <v-btn
-                                        variant="outlined"
-                                        size="large"
-                                        :prepend-icon="ICONS.buttons.arrowBack"
-                                        @click="goBack"
-                                    >
-                                        {{ t('buttons.back') }}
-                                    </v-btn>
-                                </div>
-                            </v-form>
-                        </v-card-text>
-                    </v-card>
-                </v-col>
-            </v-row>
-        </v-container>
-    </div>
+                                    size="large"
+                                    :prepend-icon="ICONS.buttons.arrowBack"
+                                    @click="goBack"
+                                >
+                                    {{ t('buttons.back') }}
+                                </v-btn>
+                            </div>
+                        </v-form>
+                    </v-card-text>
+                </v-card>
+            </v-col>
+        </v-row>
+    </v-container>
 </template>

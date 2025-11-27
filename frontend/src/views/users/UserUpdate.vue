@@ -116,7 +116,7 @@ onMounted(() => {
 
         <v-container class="pa-4">
             <v-row justify="center">
-                <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+                <v-col cols="12" sm="10" md="8" lg="8" xl="8">
                     <v-card v-if="loading" elevation="2">
                         <v-card-text class="pa-6 text-center">
                             <v-progress-circular
