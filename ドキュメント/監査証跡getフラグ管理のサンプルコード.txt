@@ -1,0 +1,1713 @@
+# 監査ログの業界標準とセキュリティガイドライン
+
+## 📚 調査結果サマリー
+
+Gemini君の指摘は**業界標準に完全合致**しています。
+
+---
+
+## 🔴 結論: auditPost は絶対NG！
+
+### あなたの理解
+- `api.get` → 監査証跡なし ✅
+- `auditGet` → 監査証跡あり ✅（条件付きOK）
+- `api.post` → 監査証跡なし ❌（危険！）
+- `auditPost` → 監査証跡あり ❌（セキュリティ上のアンチパターン）
+
+### 正しい理解
+
+| 操作 | クライアント指定 | 業界標準 | 判定 |
+|------|----------------|---------|------|
+| **POST/PUT/PATCH/DELETE**<br>（データ変更） | `auditPost`でフラグ送信 | サーバー側で**強制記録**<br>クライアントの意思は無視 | ❌ **絶対NG** |
+| **GET（閲覧）**<br>機密データ | `auditGet`でフラグ送信 | サーバー側でURLパターンを判定して**強制記録** | △ **補助的に使うならOK** |
+| **GET（閲覧）**<br>一覧・検索など | `auditGet`でフラグ送信 | UI都合で選択的に記録 | ✅ **OK** |
+
+---
+
+## 📖 1. OWASP（セキュリティ標準）
+
+### 公式見解
+
+ログ制御はサーバー側で実装し、クライアント側を信頼してはならない
+
+### 重要なポイント
+
+ログ機能はコードレビュー、アプリケーションテスト、セキュリティ検証プロセスに含める必要がある
+
+### なぜクライアント制御が危険なのか？
+
+**攻撃シナリオ**:
+```javascript
+// 悪意あるユーザーがブラウザコンソールで実行
+fetch('/api/users/123/', {
+  method: 'DELETE',
+  headers: {
+    'X-CSRFToken': getCsrfToken(),
+    // X-Audit-Log ヘッダーを送らない（または false）
+  }
+})
+```
+
+→ **データは削除されるが、ログは残らない（完全犯罪成立）**
+
+OWASPの推奨: サーバー側でユーザーの悪意ある行動を検出する。期待される数値範囲外のデータ送信や、変更不可能なデータへの変更試行を記録する
+
+---
+
+## 📖 2. Django（公式・エコシステム）
+
+### 標準的な監査ログ実装
+
+Djangoには公式の監査ログ機能はありませんが、エコシステムとして以下が標準的:
+
+#### **django-auditlog**（最も人気）
+
+django-auditlogは、Djangoの組み込み機能を最大限活用し、依存関係を最小限に抑え、高速でシンプルな使用を目指している。変更内容をJSON形式で保存し、変更を簡単に追跡できる
+
+**特徴**:
+- モデルの save/delete 時に**自動記録**（シグナルベース）
+- クライアント側のヘッダーには**一切依存しない**
+
+#### **Django標準アプローチ**
+
+Djangoのpost_saveとpost_deleteシグナルを使用して独自の監査システムを構築する方法は、外部依存なしで完全な柔軟性を提供する
+
+**結論**: Djangoの標準的な監査ログは、**サーバー側のシグナルで自動記録**が基本。
+
+---
+
+## 📖 3. HIPAA/GDPR（コンプライアンス標準）
+
+### HIPAA（医療情報）の要求事項
+
+医療コンテキストにおいて、監査ログは誰が保護された医療情報（PHI）にアクセスしたか、いつアクセスしたか、どのような操作を行ったか、どのデータを閲覧したかを追跡・記録する電子記録である
+
+#### 記録必須項目
+
+HIPAAコンプライアンスソリューションでは、監査ログは「誰が」「何の情報に」「いつ」「どこで」「どのように」アクセスしたかを記録する必要がある
+
+具体的には:
+- ユーザーID
+- タイムスタンプ
+- アクセスされた患者情報
+- アクセス元（IPアドレス、デバイス）
+- 実行された操作の種類（閲覧、編集、削除）
+
+#### **重要**: GETリクエスト（閲覧）も記録必須
+
+HIPAAはPHIへのアクセスを監視・追跡することを要求する。監査ログは、許可されたアクセスと不正なアクセスの両方を追跡し、最小必要基準の遵守を保証する
+
+**最小必要基準**: 従業員が職務範囲内の特定の目的でのみPHIにアクセスすることを要求する
+
+#### 保持期間
+
+HIPAAは監査ログを最低6年間保持することを義務付けている
+
+### GDPR（EU個人情報保護規則）
+
+GDPRはデータアクセスと処理活動のログ記録を要求する
+
+**事例**: ヨーロッパの銀行がGDPR準拠のログシステムを強化した結果、翌年のデータ侵害が30%減少した
+
+---
+
+## 📖 4. Vue.js / Axios（公式）
+
+### 公式見解
+
+Vue.jsとAxiosは**UIライブラリと通信ライブラリ**なので、監査ログに関する規定はありません。
+
+ただし、Axiosの Interceptor の標準的な用途は:
+- 認証トークンの付与
+- 共通のエラーハンドリング
+- リクエスト/レスポンスの加工
+
+**監査フラグの送信**も Interceptor の用途としては問題ありませんが、**サーバー側で強制記録すべきデータには使うべきではない**。
+
+---
+
+## 🎯 業界標準に準拠した実装
+
+### ✅ 正しい設計
+
+```
+┌─────────────────┐
+│  フロントエンド  │
+└────────┬────────┘
+         │
+         │ POST/PUT/DELETE（データ変更）
+         │ → ヘッダーなし（普通にリクエスト）
+         ↓
+┌─────────────────┐
+│  Django側       │
+│  ・シグナル     │ ← 問答無用で記録
+│  ・Middleware   │
+└─────────────────┘
+
+         │
+         │ GET（機密データ閲覧）
+         │ → ヘッダーなし
+         ↓
+┌─────────────────┐
+│  Django側       │
+│  ・Middleware   │ ← URLパターンで判定して強制記録
+└─────────────────┘
+
+         │
+         │ GET（一覧・検索）
+         │ → X-Audit-Log: true（任意）
+         ↓
+┌─────────────────┐
+│  Django側       │
+│  ・Middleware   │ ← フラグがあれば記録
+└─────────────────┘
+```
+
+### 実装例
+
+#### **バックエンド: Middleware（URLパターンベース）**
+
+```python
+class SmartAuditMiddleware:
+    # 機密情報のURLパターン（強制記録）
+    SENSITIVE_URLS = [
+        '/api/users/',       # ユーザー詳細
+        '/api/salaries/',    # 給与情報
+        '/api/medical/',     # 医療情報
+    ]
+    
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        # 1. POST/PUT/PATCH/DELETE は問答無用で記録（シグナルで処理）
+        if request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+            # シグナルで自動記録されるので、ここでは何もしない
+            return
+        
+        # 2. GET: 機密URLなら強制記録
+        if any(request.path.startswith(url) for url in self.SENSITIVE_URLS):
+            if view_kwargs:  # 詳細画面（IDあり）
+                self.log_action(request, 'READ_SENSITIVE')
+            return
+        
+        # 3. GET: フラグがあれば記録（UI都合）
+        if request.headers.get('X-Audit-Log') == 'true':
+            self.log_action(request, 'READ')
+```
+
+#### **フロントエンド: 通常のAPI呼び出し**
+
+```javascript
+// ❌ 間違い: POST用に auditPost を作る
+// const user = await auditPost('/api/users/', userData)
+
+// ✅ 正しい: 普通にPOSTすればサーバー側で自動記録される
+const user = await api.post('/api/users/', userData)
+
+// ✅ OK: 一覧表示など、UI都合で記録したい場合
+const userDetail = await auditGet(`/api/users/${userId}/`)
+```
+
+---
+
+## ⚠️ セキュリティ上の警告
+
+### Geminiの指摘（完全に正しい）
+
+> 「悪意ある従業員」や「ハッカー」が、ブラウザのコンソールやツール（Postman/Curl）を使って、`auditLog: false`（またはヘッダーなし）でPOSTリクエストを送ったらどうなるでしょうか？
+>
+> - あなたの案: ログが残らず、データだけ改ざんされる（完全犯罪成立）
+> - 業界標準: リクエストがどう来ようが、サーバー側で「データ変更があった」事実を検知してログに残す
+
+---
+
+## ✅ 最終的な推奨実装
+
+### 1. POST/PUT/PATCH/DELETE（データ変更）
+
+**実装**: Django シグナル（既存実装そのまま）
+
+```python
+# signals.py（既存コード）
+@receiver(post_save)
+def audit_post_save(sender, instance, created, **kwargs):
+    if not should_audit(sender):
+        return
+    
+    action = "CREATE" if created else "UPDATE"
+    changes = {}
+    
+    if not created and hasattr(instance, "_old_instance"):
+        changes = get_field_changes(instance._old_instance, instance)
+    
+    log_audit(action, instance, changes)
+```
+
+**フロントエンド**: 何もしない（普通にAPI呼び出し）
+
+```javascript
+// ✅ これでOK（サーバー側で自動記録）
+await api.post('/api/users/', userData)
+await api.put(`/api/users/${userId}/`, userData)
+await api.delete(`/api/users/${userId}/`)
+```
+
+---
+
+### 2. GET（機密データ閲覧）
+
+**実装**: Middleware（URLパターン判定）
+
+```python
+class SmartAuditMiddleware:
+    SENSITIVE_URLS = [
+        '/api/users/',      # ユーザー詳細
+        '/api/employees/',  # 従業員情報
+        '/api/salaries/',   # 給与
+    ]
+    
+    def process_view(self, request, view_func, view_args, view_kwargs):
+        if request.method == 'GET':
+            # URLが機密パターンに一致 かつ ID指定あり
+            if any(request.path.startswith(url) for url in self.SENSITIVE_URLS):
+                if view_kwargs.get('pk') or view_kwargs.get('id'):
+                    # 強制記録（フラグ不要）
+                    self.log_sensitive_read(request, view_kwargs)
+```
+
+**フロントエンド**: 何もしない
+
+```javascript
+// ✅ これでOK（サーバー側で自動記録）
+const user = await api.get(`/api/users/EMP001/`)
+```
+
+---
+
+### 3. GET（一覧・検索など）
+
+**実装**: Middleware（フラグチェック）
+
+```python
+def process_view(self, request, view_func, view_args, view_kwargs):
+    if request.method == 'GET':
+        # フラグがあれば記録（UI都合）
+        if request.headers.get('X-Audit-Log') == 'true':
+            self.log_optional_read(request)
+```
+
+**フロントエンド**: `auditGet` を使う
+
+```javascript
+// △ UI都合で記録したい場合のみ
+const searchResults = await auditGet('/api/users/', {
+    params: { search: 'John' }
+})
+```
+
+---
+
+## 📊 まとめ: 業界標準
+
+| 項目 | 業界標準 | 情報源 |
+|------|---------|--------|
+| **POST/PUT/DELETE** | サーバー側で強制記録 | OWASP, Django標準 |
+| **GET（機密データ）** | サーバー側でURL判定して強制記録 | HIPAA, GDPR |
+| **GET（一覧など）** | UI都合で選択的に記録してもOK | 実務上の妥協点 |
+| **クライアント指定** | データ変更には使わない | OWASP（セキュリティ）|
+| **ログ保持期間** | 最低6年（HIPAA）| 法令要求 |
+| **ログの改ざん防止** | 暗号署名、WORM storage | NIST, ISO 27001 |
+
+---
+
+## 🎓 学び
+
+**Gemini君の指摘は100%正しい**: 
+
+> 「auditPost はやめておけ。auditGet は補助的に使うなら便利だが、本当に守りたいデータの閲覧ログはサーバー側で強制的に取れ」
+
+これが**業界標準に準拠した恥ずかしくない設計**です！(｀・ω・´)ゞ
+
+======================================================================
+
+"""
+推奨: 監査ミドルウェア（業界標準準拠版）
+
+セキュリティ原則:
+1. データ変更（POST/PUT/PATCH/DELETE）は問答無用で記録（シグナルで自動）
+2. 機密データ閲覧（GET）はURLパターンで判定して強制記録
+3. 一覧・検索（GET）はUI都合でフラグ指定可能（補助的）
+"""
+
+import logging
+import json
+import uuid
+from django.utils.translation import activate
+from common.context import set_current_request, get_client_ip
+
+audit_logger = logging.getLogger("audit")
+
+
+class LanguageMiddleware:
+    """Accept-Language ヘッダーから言語を設定"""
+
+    SUPPORTED_LANGS = {"ja", "en"}
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        accept_language = request.META.get("HTTP_ACCEPT_LANGUAGE", "")
+        if accept_language:
+            lang = self._parse_language(accept_language)
+            if lang:
+                activate(lang)
+        return self.get_response(request)
+
+    def _parse_language(self, accept_language):
+        try:
+            lang = accept_language.split(",")[0].split("-")[0].strip().lower()
+            if lang in self.SUPPORTED_LANGS:
+                return lang
+        except (IndexError, AttributeError, ValueError):
+            pass
+        return None
+
+
+class SmartAuditMiddleware:
+    """
+    スマート監査ミドルウェア（業界標準準拠版）
+
+    セキュリティ原則:
+    - データ変更: サーバー側で強制記録（クライアント指定不可）
+    - 機密データ閲覧: サーバー側でURL判定して強制記録
+    - 一般データ閲覧: UI都合でフラグ指定可能（補助的）
+
+    OWASP準拠: ログ制御はサーバー側で実装し、クライアントを信頼しない
+    """
+
+    # ========================================
+    # 設定: 機密情報のURLパターン
+    # ========================================
+    
+    # 詳細閲覧を強制記録するURLパターン（HIPAA/GDPR対応）
+    SENSITIVE_URL_PATTERNS = [
+        '/api/users/',       # ユーザー詳細（個人情報）
+        '/api/employees/',   # 従業員情報
+        '/api/salaries/',    # 給与情報
+        '/api/medical/',     # 医療情報
+        '/api/contracts/',   # 契約情報
+    ]
+
+    # 監査対象外のパス
+    EXCLUDE_PATHS = {
+        '/admin/',
+        '/static/',
+        '/media/',
+        '/health/',
+        '/api/auth/csrf/',
+        '/api/auth/me/',     # 自分の情報取得は除外
+    }
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        """リクエスト処理"""
+        # リクエストIDを取得 or 生成
+        request_id = request.META.get("HTTP_X_REQUEST_ID", str(uuid.uuid4()))
+        request._request_id = request_id
+
+        # リクエストをスレッドローカルに保存
+        set_current_request(request)
+
+        # レスポンス取得
+        response = self.get_response(request)
+
+        # レスポンスヘッダーにリクエストIDを追加
+        response["X-Request-ID"] = request_id
+
+        # 監査ログ記録
+        self._log_request(request, response)
+
+        return response
+
+    def _should_skip_audit(self, request):
+        """監査をスキップすべきか判定"""
+        for path in self.EXCLUDE_PATHS:
+            if request.path.startswith(path):
+                return True
+        return False
+
+    def _is_sensitive_url(self, path):
+        """機密情報のURLかチェック"""
+        return any(path.startswith(pattern) for pattern in self.SENSITIVE_URL_PATTERNS)
+
+    def _extract_resource_id(self, path):
+        """
+        URLからリソースIDを抽出
+        
+        例:
+        - /api/users/EMP001/ → "EMP001"
+        - /api/salaries/123/ → "123"
+        - /api/users/ → None（一覧）
+        """
+        try:
+            parts = [p for p in path.split("/") if p]
+            # 最後の要素がIDっぽいならそれを返す
+            if len(parts) >= 2 and parts[-1]:
+                return parts[-1]
+        except (IndexError, AttributeError):
+            pass
+        return None
+
+    def _log_request(self, request, response):
+        """
+        リクエストを監査ログに記録
+        
+        記録ルール（業界標準準拠）:
+        1. POST/PUT/PATCH/DELETE: シグナルで自動記録（ここでは何もしない）
+        2. GET（機密URL + ID指定）: 強制記録（フラグ不要）
+        3. GET（その他 + フラグあり）: 任意記録（UI都合）
+        """
+        # スキップ判定
+        if self._should_skip_audit(request):
+            return
+
+        # ログイン/ログアウトは別処理
+        if request.path == "/api/auth/login/":
+            self._log_auth_event(request, response, "LOGIN")
+            return
+        
+        if request.path == "/api/auth/logout/":
+            # View内で記録済みなのでスキップ
+            return
+
+        # ========================================
+        # ルール1: データ変更は自動記録（スキップ）
+        # ========================================
+        if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
+            # シグナルで記録されるので、ここでは何もしない
+            return
+
+        # ========================================
+        # ルール2: GETリクエストの処理
+        # ========================================
+        if request.method == "GET":
+            self._log_get_request(request, response)
+
+    def _log_get_request(self, request, response):
+        """
+        GETリクエストの監査ログ記録
+        
+        ルール:
+        - 機密URL + ID指定 → 強制記録（HIPAA/GDPR対応）
+        - その他 + X-Audit-Log: true → 任意記録（UI都合）
+        """
+        # 認証済みユーザーのみ記録
+        if not (hasattr(request, "user") and request.user.is_authenticated):
+            return
+
+        # 成功レスポンスのみ記録
+        if response.status_code >= 400:
+            return
+
+        resource_id = self._extract_resource_id(request.path)
+        is_sensitive = self._is_sensitive_url(request.path)
+        has_audit_flag = request.META.get("HTTP_X_AUDIT_LOG", "").lower() == "true"
+
+        # ========================================
+        # 強制記録: 機密URL + ID指定（詳細閲覧）
+        # ========================================
+        if is_sensitive and resource_id:
+            self._log_sensitive_read(request, response, resource_id)
+            return
+
+        # ========================================
+        # 任意記録: フラグがある場合のみ
+        # ========================================
+        if has_audit_flag:
+            self._log_optional_read(request, response, resource_id)
+
+    def _log_sensitive_read(self, request, response, resource_id):
+        """
+        機密情報の閲覧を記録（強制）
+        
+        HIPAA/GDPR要件:
+        - 誰が（user）
+        - いつ（timestamp）
+        - 何を（path, resource_id）
+        - どこから（ip）
+        - どのように（method, status）
+        """
+        user_info = self._get_user_info(request)
+        
+        audit_logger.warning(  # WARNING レベルで記録（重要度高）
+            f"機密情報閲覧: {request.path} [ID: {resource_id}]",
+            extra={
+                "request_id": getattr(request, "_request_id", "N/A"),
+                "user": user_info,
+                "action": "READ_SENSITIVE",  # ← 機密データ閲覧を明示
+                "model": "API",
+                "object_id": resource_id,
+                "ip": get_client_ip(request),
+                "changes": json.dumps(
+                    {
+                        "path": request.path,
+                        "query_params": dict(request.GET),
+                        "status_code": response.status_code,
+                        "compliance": "HIPAA/GDPR",  # コンプライアンス要件を記録
+                    },
+                    ensure_ascii=False,
+                ),
+            },
+        )
+
+    def _log_optional_read(self, request, response, resource_id):
+        """
+        一般データの閲覧を記録（任意）
+        
+        UI都合での記録（例: 検索結果を記録したい場合）
+        """
+        user_info = self._get_user_info(request)
+        
+        audit_logger.info(  # INFO レベル（通常の記録）
+            f"データ閲覧: {request.path}",
+            extra={
+                "request_id": getattr(request, "_request_id", "N/A"),
+                "user": user_info,
+                "action": "READ",
+                "model": "API",
+                "object_id": resource_id,
+                "ip": get_client_ip(request),
+                "changes": json.dumps(
+                    {
+                        "path": request.path,
+                        "query_params": dict(request.GET),
+                        "status_code": response.status_code,
+                        "client_requested": True,  # クライアント指定であることを記録
+                    },
+                    ensure_ascii=False,
+                ),
+            },
+        )
+
+    def _log_auth_event(self, request, response, action_type):
+        """認証イベントのログ記録"""
+        user_info = self._get_user_info(request)
+        
+        if response.status_code == 200:
+            audit_logger.info(
+                f"ユーザーが{'ログイン' if action_type == 'LOGIN' else 'ログアウト'}しました",
+                extra={
+                    "request_id": getattr(request, "_request_id", "N/A"),
+                    "user": user_info,
+                    "action": action_type,
+                    "model": "Auth",
+                    "object_id": None,
+                    "ip": get_client_ip(request),
+                    "changes": "{}",
+                },
+            )
+        elif action_type == "LOGIN":
+            audit_logger.warning(
+                f"ログイン失敗(status: {response.status_code})",
+                extra={
+                    "request_id": getattr(request, "_request_id", "N/A"),
+                    "user": user_info,
+                    "action": "LOGIN_FAILED",
+                    "model": "Auth",
+                    "object_id": None,
+                    "ip": get_client_ip(request),
+                    "changes": json.dumps({"status_code": response.status_code}),
+                },
+            )
+
+    def _get_user_info(self, request):
+        """ユーザー情報を取得"""
+        if hasattr(request, "user") and request.user.is_authenticated:
+            return request.user.employee_id
+        return "anonymous"
+
+
+# ========================================
+# 使用例
+# ========================================
+
+"""
+settings.py:
+
+MIDDLEWARE = [
+    # ...
+    "common.middleware.SmartAuditMiddleware",  # ← これを追加
+]
+
+# 機密URLパターンを設定ファイルで管理する場合
+AUDIT_SENSITIVE_URLS = [
+    '/api/users/',
+    '/api/employees/',
+    '/api/salaries/',
+]
+
+フロントエンド:
+
+// ✅ POST/PUT/DELETE: 普通にリクエスト（サーバー側で自動記録）
+await api.post('/api/users/', userData)
+
+// ✅ GET（機密データ）: 普通にリクエスト（サーバー側で強制記録）
+await api.get('/api/users/EMP001/')  // 自動的に記録される
+
+// △ GET（一覧など）: UI都合で記録したい場合のみフラグを使用
+await auditGet('/api/users/', { params: { search: 'John' } })
+
+ログ出力例（機密データ閲覧）:
+
+{
+  "request_id": "550e8400-...",
+  "timestamp": "2025-01-20 15:30:45",
+  "level": "WARNING",  // 重要度高
+  "user": "EMP001",
+  "action": "READ_SENSITIVE",  // 機密データ閲覧
+  "model": "API",
+  "object_id": "EMP999",
+  "ip": "192.168.1.100",
+  "changes": "{\"path\": \"/api/users/EMP999/\", \"compliance\": \"HIPAA/GDPR\"}",
+  "message": "機密情報閲覧: /api/users/EMP999/ [ID: EMP999]"
+}
+"""
+
+======================================================================
+
+"""
+推奨: 監査ミドルウェア（業界標準準拠版）
+
+セキュリティ原則:
+1. データ変更（POST/PUT/PATCH/DELETE）は問答無用で記録（シグナルで自動）
+2. 機密データ閲覧（GET）はURLパターンで判定して強制記録
+3. 一覧・検索（GET）はUI都合でフラグ指定可能（補助的）
+"""
+
+import logging
+import json
+import uuid
+from django.utils.translation import activate
+from common.context import set_current_request, get_client_ip
+
+audit_logger = logging.getLogger("audit")
+
+
+class LanguageMiddleware:
+    """Accept-Language ヘッダーから言語を設定"""
+
+    SUPPORTED_LANGS = {"ja", "en"}
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        accept_language = request.META.get("HTTP_ACCEPT_LANGUAGE", "")
+        if accept_language:
+            lang = self._parse_language(accept_language)
+            if lang:
+                activate(lang)
+        return self.get_response(request)
+
+    def _parse_language(self, accept_language):
+        try:
+            lang = accept_language.split(",")[0].split("-")[0].strip().lower()
+            if lang in self.SUPPORTED_LANGS:
+                return lang
+        except (IndexError, AttributeError, ValueError):
+            pass
+        return None
+
+
+class SmartAuditMiddleware:
+    """
+    スマート監査ミドルウェア（業界標準準拠版）
+
+    セキュリティ原則:
+    - データ変更: サーバー側で強制記録（クライアント指定不可）
+    - 機密データ閲覧: サーバー側でURL判定して強制記録
+    - 一般データ閲覧: UI都合でフラグ指定可能（補助的）
+
+    OWASP準拠: ログ制御はサーバー側で実装し、クライアントを信頼しない
+    """
+
+    # ========================================
+    # 設定: 機密情報のURLパターン
+    # ========================================
+    
+    # 詳細閲覧を強制記録するURLパターン（HIPAA/GDPR対応）
+    SENSITIVE_URL_PATTERNS = [
+        '/api/users/',       # ユーザー詳細（個人情報）
+        '/api/employees/',   # 従業員情報
+        '/api/salaries/',    # 給与情報
+        '/api/medical/',     # 医療情報
+        '/api/contracts/',   # 契約情報
+    ]
+
+    # 監査対象外のパス
+    EXCLUDE_PATHS = {
+        '/admin/',
+        '/static/',
+        '/media/',
+        '/health/',
+        '/api/auth/csrf/',
+        '/api/auth/me/',     # 自分の情報取得は除外
+    }
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        """リクエスト処理"""
+        # リクエストIDを取得 or 生成
+        request_id = request.META.get("HTTP_X_REQUEST_ID", str(uuid.uuid4()))
+        request._request_id = request_id
+
+        # リクエストをスレッドローカルに保存
+        set_current_request(request)
+
+        # レスポンス取得
+        response = self.get_response(request)
+
+        # レスポンスヘッダーにリクエストIDを追加
+        response["X-Request-ID"] = request_id
+
+        # 監査ログ記録
+        self._log_request(request, response)
+
+        return response
+
+    def _should_skip_audit(self, request):
+        """監査をスキップすべきか判定"""
+        for path in self.EXCLUDE_PATHS:
+            if request.path.startswith(path):
+                return True
+        return False
+
+    def _is_sensitive_url(self, path):
+        """機密情報のURLかチェック"""
+        return any(path.startswith(pattern) for pattern in self.SENSITIVE_URL_PATTERNS)
+
+    def _extract_resource_id(self, path):
+        """
+        URLからリソースIDを抽出
+        
+        例:
+        - /api/users/EMP001/ → "EMP001"
+        - /api/salaries/123/ → "123"
+        - /api/users/ → None（一覧）
+        """
+        try:
+            parts = [p for p in path.split("/") if p]
+            # 最後の要素がIDっぽいならそれを返す
+            if len(parts) >= 2 and parts[-1]:
+                return parts[-1]
+        except (IndexError, AttributeError):
+            pass
+        return None
+
+    def _log_request(self, request, response):
+        """
+        リクエストを監査ログに記録
+        
+        記録ルール（業界標準準拠）:
+        1. POST/PUT/PATCH/DELETE: シグナルで自動記録（ここでは何もしない）
+        2. GET（機密URL + ID指定）: 強制記録（フラグ不要）
+        3. GET（その他 + フラグあり）: 任意記録（UI都合）
+        """
+        # スキップ判定
+        if self._should_skip_audit(request):
+            return
+
+        # ログイン/ログアウトは別処理
+        if request.path == "/api/auth/login/":
+            self._log_auth_event(request, response, "LOGIN")
+            return
+        
+        if request.path == "/api/auth/logout/":
+            # View内で記録済みなのでスキップ
+            return
+
+        # ========================================
+        # ルール1: データ変更は自動記録（スキップ）
+        # ========================================
+        if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
+            # シグナルで記録されるので、ここでは何もしない
+            return
+
+        # ========================================
+        # ルール2: GETリクエストの処理
+        # ========================================
+        if request.method == "GET":
+            self._log_get_request(request, response)
+
+    def _log_get_request(self, request, response):
+        """
+        GETリクエストの監査ログ記録
+        
+        ルール:
+        - 機密URL + ID指定 → 強制記録（HIPAA/GDPR対応）
+        - その他 + X-Audit-Log: true → 任意記録（UI都合）
+        """
+        # 認証済みユーザーのみ記録
+        if not (hasattr(request, "user") and request.user.is_authenticated):
+            return
+
+        # 成功レスポンスのみ記録
+        if response.status_code >= 400:
+            return
+
+        resource_id = self._extract_resource_id(request.path)
+        is_sensitive = self._is_sensitive_url(request.path)
+        has_audit_flag = request.META.get("HTTP_X_AUDIT_LOG", "").lower() == "true"
+
+        # ========================================
+        # 強制記録: 機密URL + ID指定（詳細閲覧）
+        # ========================================
+        if is_sensitive and resource_id:
+            self._log_sensitive_read(request, response, resource_id)
+            return
+
+        # ========================================
+        # 任意記録: フラグがある場合のみ
+        # ========================================
+        if has_audit_flag:
+            self._log_optional_read(request, response, resource_id)
+
+    def _log_sensitive_read(self, request, response, resource_id):
+        """
+        機密情報の閲覧を記録（強制）
+        
+        HIPAA/GDPR要件:
+        - 誰が（user）
+        - いつ（timestamp）
+        - 何を（path, resource_id）
+        - どこから（ip）
+        - どのように（method, status）
+        """
+        user_info = self._get_user_info(request)
+        
+        audit_logger.warning(  # WARNING レベルで記録（重要度高）
+            f"機密情報閲覧: {request.path} [ID: {resource_id}]",
+            extra={
+                "request_id": getattr(request, "_request_id", "N/A"),
+                "user": user_info,
+                "action": "READ_SENSITIVE",  # ← 機密データ閲覧を明示
+                "model": "API",
+                "object_id": resource_id,
+                "ip": get_client_ip(request),
+                "changes": json.dumps(
+                    {
+                        "path": request.path,
+                        "query_params": dict(request.GET),
+                        "status_code": response.status_code,
+                        "compliance": "HIPAA/GDPR",  # コンプライアンス要件を記録
+                    },
+                    ensure_ascii=False,
+                ),
+            },
+        )
+
+    def _log_optional_read(self, request, response, resource_id):
+        """
+        一般データの閲覧を記録（任意）
+        
+        UI都合での記録（例: 検索結果を記録したい場合）
+        """
+        user_info = self._get_user_info(request)
+        
+        audit_logger.info(  # INFO レベル（通常の記録）
+            f"データ閲覧: {request.path}",
+            extra={
+                "request_id": getattr(request, "_request_id", "N/A"),
+                "user": user_info,
+                "action": "READ",
+                "model": "API",
+                "object_id": resource_id,
+                "ip": get_client_ip(request),
+                "changes": json.dumps(
+                    {
+                        "path": request.path,
+                        "query_params": dict(request.GET),
+                        "status_code": response.status_code,
+                        "client_requested": True,  # クライアント指定であることを記録
+                    },
+                    ensure_ascii=False,
+                ),
+            },
+        )
+
+    def _log_auth_event(self, request, response, action_type):
+        """認証イベントのログ記録"""
+        user_info = self._get_user_info(request)
+        
+        if response.status_code == 200:
+            audit_logger.info(
+                f"ユーザーが{'ログイン' if action_type == 'LOGIN' else 'ログアウト'}しました",
+                extra={
+                    "request_id": getattr(request, "_request_id", "N/A"),
+                    "user": user_info,
+                    "action": action_type,
+                    "model": "Auth",
+                    "object_id": None,
+                    "ip": get_client_ip(request),
+                    "changes": "{}",
+                },
+            )
+        elif action_type == "LOGIN":
+            audit_logger.warning(
+                f"ログイン失敗(status: {response.status_code})",
+                extra={
+                    "request_id": getattr(request, "_request_id", "N/A"),
+                    "user": user_info,
+                    "action": "LOGIN_FAILED",
+                    "model": "Auth",
+                    "object_id": None,
+                    "ip": get_client_ip(request),
+                    "changes": json.dumps({"status_code": response.status_code}),
+                },
+            )
+
+    def _get_user_info(self, request):
+        """ユーザー情報を取得"""
+        if hasattr(request, "user") and request.user.is_authenticated:
+            return request.user.employee_id
+        return "anonymous"
+
+
+# ========================================
+# 使用例
+# ========================================
+
+"""
+settings.py:
+
+MIDDLEWARE = [
+    # ...
+    "common.middleware.SmartAuditMiddleware",  # ← これを追加
+]
+
+# 機密URLパターンを設定ファイルで管理する場合
+AUDIT_SENSITIVE_URLS = [
+    '/api/users/',
+    '/api/employees/',
+    '/api/salaries/',
+]
+
+フロントエンド:
+
+// ✅ POST/PUT/DELETE: 普通にリクエスト（サーバー側で自動記録）
+await api.post('/api/users/', userData)
+
+// ✅ GET（機密データ）: 普通にリクエスト（サーバー側で強制記録）
+await api.get('/api/users/EMP001/')  // 自動的に記録される
+
+// △ GET（一覧など）: UI都合で記録したい場合のみフラグを使用
+await auditGet('/api/users/', { params: { search: 'John' } })
+
+ログ出力例（機密データ閲覧）:
+
+{
+  "request_id": "550e8400-...",
+  "timestamp": "2025-01-20 15:30:45",
+  "level": "WARNING",  // 重要度高
+  "user": "EMP001",
+  "action": "READ_SENSITIVE",  // 機密データ閲覧
+  "model": "API",
+  "object_id": "EMP999",
+  "ip": "192.168.1.100",
+  "changes": "{\"path\": \"/api/users/EMP999/\", \"compliance\": \"HIPAA/GDPR\"}",
+  "message": "機密情報閲覧: /api/users/EMP999/ [ID: EMP999]"
+}
+"""
+
+=======================================================
+
+// src/plugins/axios.js - 最小限の修正
+
+import axios from 'axios';
+import { useLocaleStore } from '@/stores/locale';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT, 10) || 10000;
+
+const api = axios.create({
+    baseURL: API_BASE_URL,
+    withCredentials: true,
+    timeout: API_TIMEOUT,
+    xsrfCookieName: 'csrftoken',
+    xsrfHeaderName: 'X-CSRFToken',
+    withXSRFToken: import.meta.env.DEV ? true : undefined,
+});
+
+class CSRFManager {
+    constructor() {
+        this.tokenFetched = false;
+        this.fetchingPromise = null;
+    }
+
+    async ensureToken() {
+        if (this.tokenFetched) return;
+        if (this.fetchingPromise) return this.fetchingPromise;
+        this.fetchingPromise = this._fetchToken();
+        await this.fetchingPromise;
+        this.fetchingPromise = null;
+    }
+
+    async _fetchToken() {
+        await api.get('auth/csrf/');
+        this.tokenFetched = true;
+    }
+
+    reset() {
+        this.tokenFetched = false;
+        this.fetchingPromise = null;
+    }
+}
+
+const csrfManager = new CSRFManager();
+
+// ==========================================
+// リクエストインターセプター
+// ==========================================
+api.interceptors.request.use(async (config) => {
+    // 言語ヘッダー
+    const localeStore = useLocaleStore();
+    config.headers['Accept-Language'] = localeStore.locale;
+
+    // ★監査フラグ（任意記録用のみ）★
+    // 注意: これは一覧・検索などのUI都合での記録にのみ使用
+    // 機密データはサーバー側で自動記録されるのでフラグ不要
+    if (config.auditLog === true) {
+        config.headers['X-Audit-Log'] = 'true';
+    }
+
+    // CSRF トークン
+    const method = config.method.toLowerCase();
+    const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
+    if (methodsRequiringCsrf.includes(method)) {
+        try {
+            await csrfManager.ensureToken();
+        } catch (error) {
+            console.warn('Failed to fetch CSRF token:', error);
+        }
+    }
+
+    return config;
+});
+
+// レスポンスインターセプター（既存）
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const { response, config } = error;
+        if (response) {
+            if ([401, 403].includes(response.status)) {
+                const isLogoutRequest = config.url?.endsWith('auth/logout/');
+                if (!isLogoutRequest) {
+                    const { useAuthStore } = await import('@/stores/auth');
+                    const { useNotificationStore } = await import('@/stores/notification');
+                    const auth = useAuthStore();
+                    if (auth.isAuthenticated) {
+                        const notification = useNotificationStore();
+                        notification.warning(response.data?.detail, 5000);
+                        await auth.logout(true);
+                    }
+                }
+            }
+            if (response.status === 403 && response.data?.detail?.toLowerCase().includes('csrf')) {
+                csrfManager.reset();
+            }
+        }
+        return Promise.reject(error);
+    },
+);
+
+export const resetCSRFToken = () => {
+    csrfManager.reset();
+};
+
+// ==========================================
+// ★auditGet（任意記録用のみ）★
+// ==========================================
+/**
+ * 任意記録用のGETリクエスト
+ * 
+ * 注意: これは一覧・検索などのUI都合での記録にのみ使用してください
+ * 機密データ（ユーザー詳細、給与情報など）はサーバー側で自動記録されます
+ * 
+ * @example
+ * // ❌ 不要: 機密データはサーバー側で自動記録
+ * await auditGet('/api/users/EMP001/')
+ * 
+ * // ✅ OK: 一覧・検索をUI都合で記録したい場合
+ * await auditGet('/api/users/', { params: { search: 'John' } })
+ */
+export const auditGet = (url, config = {}) => {
+    return api.get(url, { ...config, auditLog: true });
+};
+
+export default api;
+
+
+// ==========================================
+// 使用例: Composable
+// ==========================================
+
+// src/composables/useUsers.js
+import api from '@/plugins/axios';
+
+export function useUsers() {
+    /**
+     * ✅ ユーザー一覧取得（監査ログなし）
+     * 理由: 頻繁に実行されるため、ログボリューム増大を防ぐ
+     */
+    async function fetchUsers(params = {}) {
+        const response = await api.get('/api/users/', { params });
+        return response.data;
+    }
+
+    /**
+     * ✅ ユーザー詳細取得（監査ログ自動記録）
+     * 理由: サーバー側で機密URLとして判定され、自動的に記録される
+     * 
+     * フラグ不要！普通にGETするだけでOK
+     */
+    async function fetchUserDetail(employeeId) {
+        // ★フラグなしで普通にGET★
+        // サーバー側で '/api/users/EMP001/' を機密URLと判定し、自動記録
+        const response = await api.get(`/api/users/${employeeId}/`);
+        return response.data;
+    }
+
+    /**
+     * ✅ ユーザー作成（監査ログ自動記録）
+     * 理由: シグナルで自動記録される
+     * 
+     * フラグ不要！普通にPOSTするだけでOK
+     */
+    async function createUser(userData) {
+        // ★フラグなしで普通にPOST★
+        // シグナルで自動記録される
+        const response = await api.post('/api/users/', userData);
+        return response.data;
+    }
+
+    /**
+     * ✅ ユーザー更新（監査ログ自動記録）
+     */
+    async function updateUser(employeeId, userData) {
+        const response = await api.put(`/api/users/${employeeId}/`, userData);
+        return response.data;
+    }
+
+    /**
+     * ✅ ユーザー削除（監査ログ自動記録）
+     */
+    async function deleteUser(employeeId) {
+        await api.delete(`/api/users/${employeeId}/`);
+    }
+
+    /**
+     * △ ユーザー検索（UI都合で記録したい場合のみauditGetを使用）
+     * 
+     * これは任意です。通常のapi.getでも問題ありません。
+     */
+    async function searchUsers(query) {
+        // パターン1: 通常のGET（記録なし）
+        // const response = await api.get('/api/users/', {
+        //     params: { search: query }
+        // });
+
+        // パターン2: UI都合で記録したい場合
+        const response = await auditGet('/api/users/', {
+            params: { search: query }
+        });
+
+        return response.data;
+    }
+
+    return {
+        fetchUsers,
+        fetchUserDetail,
+        createUser,
+        updateUser,
+        deleteUser,
+        searchUsers,
+    };
+}
+
+
+// ==========================================
+// コンポーネントでの使用例
+// ==========================================
+
+/*
+<script setup>
+import { onMounted } from 'vue';
+import { useUsers } from '@/composables/useUsers';
+
+const { fetchUsers, fetchUserDetail, createUser, updateUser, deleteUser } = useUsers();
+
+// ✅ 一覧取得（監査ログなし）
+onMounted(async () => {
+    await fetchUsers();
+});
+
+// ✅ 詳細取得（自動記録）
+async function viewDetail(employeeId) {
+    // ★フラグ不要★ サーバー側で自動記録される
+    const user = await fetchUserDetail(employeeId);
+    
+    // ログ出力例:
+    // {
+    //   "level": "WARNING",
+    //   "user": "EMP999",
+    //   "action": "READ_SENSITIVE",
+    //   "message": "機密情報閲覧: /api/users/EMP001/"
+    // }
+}
+
+// ✅ ユーザー作成（自動記録）
+async function create() {
+    // ★フラグ不要★ シグナルで自動記録される
+    await createUser({ employee_id: 'EMP001', name: 'John' });
+    
+    // ログ出力例:
+    // {
+    //   "user": "EMP999",
+    //   "action": "CREATE",
+    //   "model": "User",
+    //   "changes": "{\"employee_id\": {\"old\": null, \"new\": \"EMP001\"}}"
+    // }
+}
+
+// ✅ ユーザー更新（自動記録）
+async function update(employeeId) {
+    await updateUser(employeeId, { name: 'Jane' });
+}
+
+// ✅ ユーザー削除（自動記録）
+async function remove(employeeId) {
+    await deleteUser(employeeId);
+}
+</script>
+*/
+
+
+// ==========================================
+// ❌ やってはいけないこと
+// ==========================================
+
+// ❌ 間違い1: 機密データでauditGetを使う（不要）
+// await auditGet('/api/users/EMP001/')
+// → サーバー側で自動記録されるのでフラグ不要
+
+// ❌ 間違い2: auditPost を作る（セキュリティ上NG）
+// export const auditPost = (url, data, config = {}) => {
+//     return api.post(url, data, { ...config, auditLog: true });
+// };
+// → 悪意あるユーザーがヘッダーなしでPOSTすると記録されない
+
+
+// ==========================================
+// ✅ 正しい理解
+// ==========================================
+
+/**
+ * 監査ログの記録ルール:
+ * 
+ * 1. POST/PUT/PATCH/DELETE（データ変更）
+ *    → シグナルで自動記録
+ *    → フラグ不要（送っても無視される）
+ * 
+ * 2. GET（機密データ: /api/users/EMP001/）
+ *    → ミドルウェアでURLパターン判定して自動記録
+ *    → フラグ不要（送っても無視される）
+ * 
+ * 3. GET（一覧・検索: /api/users/）
+ *    → auditGet でフラグを送れば記録される（任意）
+ *    → UI都合での記録にのみ使用
+ */
+
+
+===========================================================================================
+********************************************************************************************
+
+最終版：
+# config/settings.py
+
+# === CORS設定 ===
+
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
+
+CORS_EXPOSE_HEADERS = [
+    "Content-Disposition",
+    "X-Request-ID",  # リクエストID（ログ照合用）
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+# ★X-Audit-Log ヘッダーは不要なので削除★
+# CORS_ALLOW_HEADERS はデフォルトのままでOK
+# django-cors-headers のデフォルトで以下が許可されている:
+# - accept, accept-encoding, authorization, content-type
+# - dnt, origin, user-agent, x-csrftoken, x-requested-with
+
+# カスタムヘッダーが必要な場合のみ明示的に追加
+# 例: API Key認証などを使う場合
+# CORS_ALLOW_HEADERS = [
+#     'accept',
+#     'authorization',
+#     'content-type',
+#     'x-api-key',  # カスタムヘッダー
+# ]
+
+
+# 最終推奨実装（超シンプル版）
+
+## 📋 実装するファイル（2つだけ）
+
+### 1️⃣ バックエンド: Middleware
+
+```python
+# common/middleware.py
+
+class SmartAuditMiddleware:
+    """
+    監査ミドルウェア（シンプル版）
+    
+    ルール:
+    - POST/PUT/PATCH/DELETE: シグナルで自動記録（ここでは何もしない）
+    - GET（機密URL + ID指定）: 強制記録
+    """
+    
+    # ★ここに記録したいURLを追加するだけ★
+    SENSITIVE_URLS = [
+        '/api/users/',       # ユーザー詳細
+        '/api/employees/',   # 従業員情報
+        '/api/salaries/',    # 給与情報
+        # 必要に応じて追加...
+    ]
+    
+    EXCLUDE_PATHS = {
+        '/admin/',
+        '/static/',
+        '/media/',
+        '/health/',
+        '/api/auth/csrf/',
+        '/api/auth/me/',
+    }
+    
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        request_id = request.META.get("HTTP_X_REQUEST_ID", str(uuid.uuid4()))
+        request._request_id = request_id
+        set_current_request(request)
+        
+        response = self.get_response(request)
+        response["X-Request-ID"] = request_id
+        
+        self._log_request(request, response)
+        return response
+    
+    def _log_request(self, request, response):
+        # 除外パス
+        if any(request.path.startswith(p) for p in self.EXCLUDE_PATHS):
+            return
+        
+        # ログイン
+        if request.path == "/api/auth/login/":
+            self._log_auth_event(request, response, "LOGIN")
+            return
+        
+        # POST/PUT/PATCH/DELETE はシグナルで記録されるのでスキップ
+        if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
+            return
+        
+        # GET: 機密URL + ID指定のみ記録
+        if request.method == "GET":
+            self._log_get_if_sensitive(request, response)
+    
+    def _log_get_if_sensitive(self, request, response):
+        # 認証済みユーザーのみ
+        if not (hasattr(request, "user") and request.user.is_authenticated):
+            return
+        
+        # 成功レスポンスのみ
+        if response.status_code >= 400:
+            return
+        
+        # 機密URLチェック
+        is_sensitive = any(
+            request.path.startswith(url) for url in self.SENSITIVE_URLS
+        )
+        
+        if not is_sensitive:
+            return
+        
+        # ID指定があるかチェック（詳細画面のみ記録）
+        resource_id = self._extract_resource_id(request.path)
+        if not resource_id:
+            return  # 一覧は記録しない
+        
+        # ★記録★
+        user_info = request.user.employee_id
+        audit_logger.warning(
+            f"機密情報閲覧: {request.path}",
+            extra={
+                "request_id": request._request_id,
+                "user": user_info,
+                "action": "READ_SENSITIVE",
+                "model": "API",
+                "object_id": resource_id,
+                "ip": get_client_ip(request),
+                "changes": json.dumps({
+                    "path": request.path,
+                    "query_params": dict(request.GET),
+                }, ensure_ascii=False),
+            },
+        )
+    
+    def _extract_resource_id(self, path):
+        """URLからリソースIDを抽出"""
+        try:
+            parts = [p for p in path.split("/") if p]
+            if len(parts) >= 2 and parts[-1]:
+                return parts[-1]
+        except (IndexError, AttributeError):
+            pass
+        return None
+    
+    def _log_auth_event(self, request, response, action_type):
+        """認証イベントのログ記録"""
+        # 既存のコードそのまま
+        pass
+```
+
+---
+
+### 2️⃣ バックエンド: Signals（既存のまま）
+
+```python
+# common/signals.py
+
+# ★変更なし！既存のコードそのまま使う★
+
+@receiver(pre_save)
+def audit_pre_save(sender, instance, **kwargs):
+    # 既存のコード
+    pass
+
+@receiver(post_save)
+def audit_post_save(sender, instance, created, **kwargs):
+    # 既存のコード
+    pass
+
+@receiver(post_delete)
+def audit_post_delete(sender, instance, **kwargs):
+    # 既存のコード
+    pass
+```
+
+---
+
+### 3️⃣ フロントエンド: axios.js
+
+```javascript
+// src/plugins/axios.js
+
+// ★auditGet は削除してOK★
+
+import axios from 'axios';
+import { useLocaleStore } from '@/stores/locale';
+
+const api = axios.create({
+    baseURL: import.meta.env.VITE_API_BASE_URL,
+    withCredentials: true,
+    timeout: parseInt(import.meta.env.VITE_API_TIMEOUT, 10) || 10000,
+    xsrfCookieName: 'csrftoken',
+    xsrfHeaderName: 'X-CSRFToken',
+    withXSRFToken: import.meta.env.DEV ? true : undefined,
+});
+
+// CSRF Manager（既存のまま）
+class CSRFManager { /* ... */ }
+const csrfManager = new CSRFManager();
+
+// インターセプター（既存のまま）
+api.interceptors.request.use(async (config) => {
+    const localeStore = useLocaleStore();
+    config.headers['Accept-Language'] = localeStore.locale;
+    
+    // CSRF処理
+    const method = config.method.toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+        await csrfManager.ensureToken();
+    }
+    
+    return config;
+});
+
+api.interceptors.response.use(/* 既存のまま */);
+
+export default api;
+
+// ★auditGet は削除！不要！★
+```
+
+---
+
+### 4️⃣ フロントエンド: Composable
+
+```javascript
+// src/composables/useUsers.js
+
+import api from '@/plugins/axios';
+
+export function useUsers() {
+    // ✅ すべて普通にapi.getやapi.postを使うだけ
+    
+    async function fetchUsers(params = {}) {
+        const response = await api.get('/api/users/', { params });
+        return response.data;
+    }
+    
+    async function fetchUserDetail(employeeId) {
+        // ★普通にGET★ サーバー側で自動記録される
+        const response = await api.get(`/api/users/${employeeId}/`);
+        return response.data;
+    }
+    
+    async function createUser(userData) {
+        // ★普通にPOST★ シグナルで自動記録される
+        const response = await api.post('/api/users/', userData);
+        return response.data;
+    }
+    
+    async function updateUser(employeeId, userData) {
+        const response = await api.put(`/api/users/${employeeId}/`, userData);
+        return response.data;
+    }
+    
+    async function deleteUser(employeeId) {
+        await api.delete(`/api/users/${employeeId}/`);
+    }
+    
+    return {
+        fetchUsers,
+        fetchUserDetail,
+        createUser,
+        updateUser,
+        deleteUser,
+    };
+}
+```
+
+---
+
+## 📊 記録される・されない一覧
+
+| 操作 | URL | 記録 | 理由 |
+|------|-----|------|------|
+| `api.get('/api/users/')` | 一覧 | ❌ | IDなし（一覧） |
+| `api.get('/api/users/EMP001/')` | 詳細 | ✅ | 機密URL + ID指定 |
+| `api.post('/api/users/', data)` | 作成 | ✅ | シグナルで自動 |
+| `api.put('/api/users/EMP001/', data)` | 更新 | ✅ | シグナルで自動 |
+| `api.delete('/api/users/EMP001/')` | 削除 | ✅ | シグナルで自動 |
+| `api.get('/api/news/')` | 公開情報 | ❌ | 機密URLでない |
+| `api.get('/api/news/123/')` | 詳細 | ❌ | 機密URLでない |
+| `api.get('/api/salaries/123/')` | 給与詳細 | ✅ | 機密URL + ID指定 |
+
+---
+
+## 🎯 新しい機密URLを追加する方法
+
+### ステップ1: Middlewareに追加
+
+```python
+# common/middleware.py
+
+SENSITIVE_URLS = [
+    '/api/users/',
+    '/api/employees/',
+    '/api/salaries/',
+    '/api/contracts/',    # ← 追加
+    '/api/medical/',      # ← 追加
+]
+```
+
+### ステップ2: 以上！
+
+フロントエンドは何も変更不要。普通に `api.get()` を使うだけ。
+
+---
+
+## ✅ メリット
+
+1. **シンプル**: フロントエンドは普通にAPIを叩くだけ
+2. **安全**: 悪意あるユーザーがヘッダーを偽装しても記録される
+3. **保守性**: 機密URLはバックエンドで一元管理
+4. **拡張性**: 新しい機密URLを追加するだけでOK
+5. **業界標準**: OWASP、HIPAA、GDPRに準拠
+
+---
+
+## 🚨 注意点
+
+### ❌ やってはいけないこと
+
+```python
+# ❌ 間違い: クライアントからのフラグでPOST/PUTを制御
+if request.headers.get('X-Audit-Log') == 'true':
+    log_audit(...)  # 悪意あるユーザーがヘッダーなしでリクエストすると記録されない
+```
+
+### ✅ 正しいやり方
+
+```python
+# ✅ 正解: サーバー側で判定
+if request.method in ['POST', 'PUT', 'PATCH', 'DELETE']:
+    # シグナルで自動記録されるので何もしない
+    pass
+
+if request.method == 'GET' and self._is_sensitive_url(request.path):
+    # URLパターンで判定して強制記録
+    log_audit(...)
+```
+
+---
+
+## 🎓 最終結論
+
+### 実装すべきもの
+
+1. **Middleware**: 機密URLパターンでGETを記録
+2. **Signals**: POST/PUT/DELETE を記録（既存のまま）
+
+### 実装不要なもの
+
+- `auditGet` ヘルパー関数 → **削除してOK**
+- `X-Audit-Log` ヘッダー → **不要**
+- フロントエンドの特殊処理 → **不要**
+
+### フロントエンドの実装
+
+```javascript
+// ★これだけ！★
+import api from '@/plugins/axios';
+
+// 普通にリクエストするだけでサーバー側で自動記録される
+await api.get(`/api/users/${userId}/`)
+await api.post('/api/users/', userData)
+await api.put(`/api/users/${userId}/`, userData)
+await api.delete(`/api/users/${userId}/`)
+```
+
+**超シンプル！これが業界標準！**(´・ω・｀)b
