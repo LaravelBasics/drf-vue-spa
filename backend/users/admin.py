@@ -27,7 +27,7 @@ class UserCreationForm(forms.ModelForm):
     class Meta:
         model = User
         fields = (
-            "employee_id",
+            "user_id",
             "username",
             "email",
             "is_admin",
@@ -73,7 +73,7 @@ class UserChangeForm(forms.ModelForm):
     class Meta:
         model = User
         fields = (
-            "employee_id",
+            "user_id",
             "username",
             "email",
             "password",
@@ -94,7 +94,7 @@ class CustomUserAdmin(admin.ModelAdmin):
     add_form = UserCreationForm
 
     list_display = [
-        "employee_id",
+        "user_id",
         "username",
         "email",
         "is_admin",
@@ -104,11 +104,11 @@ class CustomUserAdmin(admin.ModelAdmin):
     ]
 
     list_filter = ["is_admin", "is_active", "is_staff", "created_at", "deleted_at"]
-    search_fields = ["employee_id", "username", "email"]
+    search_fields = ["user_id", "username", "email"]
     ordering = ["-created_at"]
 
     fieldsets = (
-        ("認証情報", {"fields": ("employee_id", "password")}),
+        ("認証情報", {"fields": ("user_id", "password")}),
         ("個人情報", {"fields": ("username", "email")}),
         (
             "権限",
@@ -137,7 +137,7 @@ class CustomUserAdmin(admin.ModelAdmin):
             "認証情報",
             {
                 "classes": ("wide",),
-                "fields": ("employee_id", "password1", "password2"),
+                "fields": ("user_id", "password1", "password2"),
             },
         ),
         (

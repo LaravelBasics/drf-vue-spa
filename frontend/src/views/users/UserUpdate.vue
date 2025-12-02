@@ -25,7 +25,7 @@ const showPasswordConfirm = ref(false);
 
 const formData = ref({
     username: '',
-    employee_id: '',
+    user_id: '',
     is_admin: false,
     is_active: true,
     password: '',
@@ -56,7 +56,7 @@ async function fetchUser() {
         const response = await usersAPI.get(userId.value);
         formData.value = {
             username: response.data.username,
-            employee_id: response.data.employee_id,
+            user_id: response.data.user_id,
             is_admin: response.data.is_admin,
             is_active: response.data.is_active,
             password: '',
@@ -81,7 +81,7 @@ async function submitForm() {
     try {
         const updateData = {
             username: formData.value.username,
-            employee_id: formData.value.employee_id,
+            user_id: formData.value.user_id,
             is_admin: formData.value.is_admin,
             is_active: formData.value.is_active,
         };
@@ -150,7 +150,7 @@ onMounted(() => {
 
                                     <v-col cols="12" md="6" class="pb-0">
                                         <v-text-field
-                                            v-model="formData.employee_id"
+                                            v-model="formData.user_id"
                                             :label="
                                                 $t('form.fields.employeeId') +
                                                 ' *'

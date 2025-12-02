@@ -133,7 +133,7 @@ class Command(BaseCommand):
         hashed_password = make_password(password)
 
         # 既存の最大社員番号を取得
-        max_id = User.all_objects.aggregate(max_id=Max("employee_id"))["max_id"]
+        max_id = User.all_objects.aggregate(max_id=Max("user_id"))["max_id"]
         start_id = int(max_id) + 1 if max_id and max_id.isdigit() else 1
 
         # 管理者が存在するか確認
@@ -151,7 +151,7 @@ class Command(BaseCommand):
         batch = []
 
         for i in range(count):
-            employee_id = str(start_id + i)
+            user_id = str(start_id + i)
             full_name = (
                 f"{random.choice(self.LAST_NAMES)}{random.choice(self.FIRST_NAMES)}"
             )
@@ -165,9 +165,9 @@ class Command(BaseCommand):
             is_admin = i == 0 and not has_admin
 
             user = User(
-                employee_id=employee_id,
+                user_id=user_id,
                 username=full_name,
-                email=f"{employee_id}@example.com",
+                email=f"{user_id}@example.com",
                 password=hashed_password,
                 is_admin=is_admin,
                 is_active=True,
@@ -211,15 +211,13 @@ class Command(BaseCommand):
         )
 
         # サンプル表示
-        sample_users = User.objects.filter(employee_id__gte=start_id).order_by(
-            "employee_id"
-        )[:5]
+        sample_users = User.objects.filter(user_id=start_id).order_by("user_id")[:5]
 
         self.stdout.write("\n作成されたユーザー(サンプル):")
         for user in sample_users:
             admin_mark = " [管理者]" if user.is_admin else ""
             self.stdout.write(
-                f"  - 社員番号: {user.employee_id} / 名前: {user.username}{admin_mark}"
+                f"  - 社員番号: {user.user_id} / 名前: {user.username}{admin_mark}"
             )
 
         if total_created > 5:
@@ -234,9 +232,7 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"\n{self.style.WARNING('💡 パフォーマンステストのヒント:')}"
             )
-            self.stdout.write(
-                f"  - インデックス効果: employee_id で検索してみてください"
-            )
+            self.stdout.write(f"  - インデックス効果: user_id で検索してみてください")
             self.stdout.write(
                 f"  - ページネーション: 1000件/ページで試してみてください"
             )

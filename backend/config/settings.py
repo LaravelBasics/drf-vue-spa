@@ -47,7 +47,7 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = "users.User"
 
 AUTHENTICATION_BACKENDS = [
-    "accounts.backends.EmployeeIdBackend",
+    "accounts.backends.GroupUserAuthBackend",  # ← employee_id版から変更
 ]
 
 # === REST Framework ===

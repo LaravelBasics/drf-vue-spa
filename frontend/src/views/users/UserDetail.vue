@@ -110,7 +110,7 @@ onMounted(() => {
                                 <v-col cols="4" class="font-weight-bold">
                                     {{ t('form.fields.employeeId') }}
                                 </v-col>
-                                <v-col cols="8">{{ user.employee_id }}</v-col>
+                                <v-col cols="8">{{ user.user_id }}</v-col>
                             </v-row>
 
                             <v-divider class="my-3" />

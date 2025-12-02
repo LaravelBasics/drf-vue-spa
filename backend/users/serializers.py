@@ -10,7 +10,7 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-EMPLOYEE_ID_UNIQUE_VALIDATOR = UniqueValidator(
+USER_ID_UNIQUE_VALIDATOR = UniqueValidator(
     queryset=User.objects.all(), message=_("社員番号は既に使用されています")
 )
 
@@ -24,7 +24,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id",
-            "employee_id",
+            "user_id",
             "username",
             "email",
             "display_name",
@@ -39,7 +39,7 @@ class UserSerializer(serializers.ModelSerializer):
 class BaseUserSerializer(serializers.ModelSerializer):
     """共通バリデーション用ベースシリアライザー"""
 
-    def validate_employee_id(self, value):
+    def validate_user_id(self, value):
         """社員番号の正規化（空白削除）"""
         return value.strip() if value else value
 
@@ -64,10 +64,10 @@ class UserCreateSerializer(BaseUserSerializer):
         },
     )
 
-    employee_id = serializers.CharField(
+    user_id = serializers.CharField(
         required=True,
         max_length=50,
-        validators=[EMPLOYEE_ID_UNIQUE_VALIDATOR],
+        validators=[USER_ID_UNIQUE_VALIDATOR],
         error_messages={
             "required": _("社員番号は必須です"),
             "blank": _("社員番号は必須です"),
@@ -86,7 +86,7 @@ class UserCreateSerializer(BaseUserSerializer):
     class Meta:
         model = User
         fields = [
-            "employee_id",
+            "user_id",
             "username",
             "email",
             "password",
@@ -110,10 +110,10 @@ class UserUpdateSerializer(BaseUserSerializer):
         },
     )
 
-    employee_id = serializers.CharField(
+    user_id = serializers.CharField(
         required=True,
         max_length=50,
-        validators=[EMPLOYEE_ID_UNIQUE_VALIDATOR],
+        validators=[USER_ID_UNIQUE_VALIDATOR],
         error_messages={
             "required": _("社員番号は必須です"),
             "blank": _("社員番号は必須です"),
@@ -132,7 +132,7 @@ class UserUpdateSerializer(BaseUserSerializer):
     class Meta:
         model = User
         fields = [
-            "employee_id",
+            "user_id",
             "username",
             "email",
             "password",

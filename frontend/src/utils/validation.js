@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n';
 const PATTERNS = {
     EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     ALPHA_NUMERIC: /^[a-zA-Z0-9]+$/,
-    EMPLOYEE_ID: /^\d{1,50}$/,
+    USER_ID: /^\d{1,50}$/,
     PASSWORD_STRENGTH: /(?=.*[a-zA-Z])(?=.*\d)/, // 英字+数字の組み合わせ
 };
 
@@ -79,7 +79,7 @@ export const createValidationRules = () => {
             return (value) => {
                 if (!value) return true;
                 return (
-                    PATTERNS.EMPLOYEE_ID.test(value) ||
+                    PATTERNS.USER_ID.test(value) ||
                     t('form.validation.employeeIdFormat')
                 );
             };

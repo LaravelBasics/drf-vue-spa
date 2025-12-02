@@ -36,7 +36,7 @@ def test_user_list():
         print("\n取得したユーザー（最初の3件）:")
         for user in users[:3]:
             print(
-                f"  - ID: {user['id']}, 社員番号: {user['employee_id']}, 名前: {user['username']}"
+                f"  - ID: {user['id']}, 社員番号: {user['user_id']}, 名前: {user['username']}"
             )
     else:
         print(f"❌ エラー: {response.json()}")
@@ -48,7 +48,7 @@ def test_user_create():
         f"{BASE_URL}/api/users/",
         headers=headers,
         json={
-            "employee_id": "99999",
+            "user_id": "99999",
             "username": "テストユーザー",
             "password": "test1234",
             "email": "test@example.com",

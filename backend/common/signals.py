@@ -83,7 +83,7 @@ def log_audit(action, instance, changes=None):
 
     if request:
         if hasattr(request, "user") and request.user.is_authenticated:
-            user_info = getattr(request.user, "employee_id", request.user.username)
+            user_info = getattr(request.user, "user_id", request.user.username)
         ip = get_client_ip(request)
         request_id = getattr(request, "_request_id", "N/A")
 

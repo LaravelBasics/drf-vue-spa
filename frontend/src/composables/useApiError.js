@@ -12,7 +12,7 @@ export function useApiError() {
      *
      * エラーメッセージの優先順位:
      * 1. detail（Djangoが翻訳済み）
-     * 2. フィールド別エラー（employee_id, usernameなど）
+     * 2. フィールド別エラー（user_id, usernameなど）
      * 3. fallbackMessageKey（指定された場合）
      * 4. 汎用エラーメッセージ
      */
@@ -73,10 +73,10 @@ export function useApiError() {
 
     /**
      * エラーオブジェクトから最初のフィールドエラーを抽出
-     * 優先的に処理するフィールド: employee_id, username, email, password
+     * 優先的に処理するフィールド: user_id, username, email, password
      */
     function extractFirstFieldError(errorData) {
-        const fieldErrors = ['employee_id', 'username', 'email', 'password'];
+        const fieldErrors = ['user_id', 'username', 'email', 'password'];
 
         // 優先フィールドから順に探索
         for (const field of fieldErrors) {

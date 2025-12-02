@@ -20,7 +20,7 @@ const usernameField = ref(null);
 
 const formData = ref({
     username: '',
-    employee_id: '',
+    user_id: '',
     password: '',
     is_admin: false,
 });
@@ -87,7 +87,7 @@ function goBack() {
                             />
 
                             <v-text-field
-                                v-model="formData.employee_id"
+                                v-model="formData.user_id"
                                 :label="$t('form.fields.employeeId') + ' *'"
                                 :rules="employeeIdRules"
                                 variant="outlined"

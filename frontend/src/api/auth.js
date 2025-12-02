@@ -1,20 +1,44 @@
-// src/api/auth.js - 認証関連のAPIエンドポイント
+// src/api/auth.js - グループ認証対応
 
 import api from '@/plugins/axios';
 
 export const authAPI = {
-    // ログイン処理
-    login(employeeId, password) {
-        return api.post('auth/login/', { employee_id: employeeId, password });
+    /**
+     * ログイン（グループ認証版）
+     * @param {string} groupId - グループID
+     * @param {string} userId - ユーザーID
+     * @param {string} password - パスワード
+     */
+    async login(groupId, userId, password) {
+        const response = await api.post('auth/login/', {
+            group_id: groupId,
+            user_id: userId,
+            password,
+        });
+        return response;
     },
 
-    // ログアウト処理
-    logout() {
-        return api.post('auth/logout/');
+    /**
+     * ログアウト
+     */
+    async logout() {
+        const response = await api.post('auth/logout/');
+        return response;
     },
 
-    // 現在のユーザー情報取得
-    me() {
-        return api.get('auth/me/');
+    /**
+     * 現在のユーザー情報取得
+     */
+    async me() {
+        const response = await api.get('auth/me/');
+        return response;
+    },
+
+    /**
+     * グループ一覧取得
+     */
+    async getGroups() {
+        const response = await api.get('auth/groups/');
+        return response;
     },
 };

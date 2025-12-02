@@ -7,6 +7,7 @@ import { useValidation } from '@/composables/useValidation';
 import { useApiError } from '@/composables/useApiError';
 import { ROUTE_NAMES } from '@/constants/routes';
 import { ICONS } from '@/constants/icons';
+import api from '@/plugins/axios';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -15,24 +16,44 @@ const { t } = useI18n();
 const { createRules } = useValidation();
 const { showInfo, handleApiError } = useApiError();
 
-const employeeId = ref('');
+const groupId = ref('');
+const userId = ref('');
 const password = ref('');
 const loading = ref(false);
+const loadingGroups = ref(false);
 const isVisible = ref(false);
 const form = ref(null);
+const groups = ref([]);
 
-const employeeIdRules = createRules.loginEmployeeId();
+const groupIdRules = [(v) => !!v || t('form.validation.required')];
+const userIdRules = createRules.loginEmployeeId(); // 既存のルールを流用可能
 const passwordRules = createRules.loginPassword();
 
 onMounted(async () => {
     await nextTick();
     isVisible.value = true;
 
+    // グループ一覧を取得
+    await fetchGroups();
+
     if (route.query.logout === 'success') {
         showInfo('auth.logoutSuccess', {}, 3000);
         router.replace({ name: ROUTE_NAMES.LOGIN, query: {} });
     }
 });
+
+async function fetchGroups() {
+    loadingGroups.value = true;
+    try {
+        const response = await api.get('auth/groups/');
+        groups.value = response.data;
+    } catch (error) {
+        handleApiError(error);
+        groups.value = [];
+    } finally {
+        loadingGroups.value = false;
+    }
+}
 
 async function onSubmit() {
     if (loading.value) return;
@@ -44,7 +65,7 @@ async function onSubmit() {
     loading.value = true;
 
     try {
-        await auth.loginSession(employeeId.value, password.value);
+        await auth.loginSession(groupId.value, userId.value, password.value);
         showInfo('auth.loginSuccess', {}, 3000);
         isVisible.value = false;
 
@@ -88,18 +109,43 @@ async function onSubmit() {
                                 ref="form"
                                 class="d-flex flex-column ga-4"
                             >
+                                <!-- ✅ グループ選択プルダウン（新規追加） -->
+                                <v-select
+                                    v-model="groupId"
+                                    :items="groups"
+                                    item-title="group_name"
+                                    item-value="group_id"
+                                    :label="t('form.fields.group')"
+                                    :prepend-inner-icon="ICONS.form.group"
+                                    variant="outlined"
+                                    :rules="groupIdRules"
+                                    :loading="loadingGroups"
+                                    :disabled="loading || loadingGroups"
+                                    :hint="
+                                        t('form.hint.selectGroup', {
+                                            default: '所属するグループを選択',
+                                        })
+                                    "
+                                    persistent-hint
+                                />
+
                                 <v-text-field
-                                    v-model="employeeId"
+                                    v-model="userId"
                                     :label="
-                                        t('form.placeholders.employeeId', {
-                                            field: t('form.fields.employeeId'),
+                                        t('form.placeholders.userId', {
+                                            field: t('form.fields.userId'),
+                                            default: 'ユーザーIDを入力',
                                         })
                                     "
                                     :prepend-inner-icon="ICONS.form.user"
                                     variant="outlined"
-                                    inputmode="numeric"
-                                    :rules="employeeIdRules"
-                                    :hint="t('form.hint.testEmployeeId')"
+                                    inputmode="text"
+                                    :rules="userIdRules"
+                                    :hint="
+                                        t('form.hint.testUserId', {
+                                            default: 'テストID: user001',
+                                        })
+                                    "
                                     persistent-hint
                                     :disabled="loading"
                                 />
@@ -141,7 +187,6 @@ async function onSubmit() {
 </template>
 
 <style scoped>
-/* ==================== ログインページ全体のレイアウト ==================== */
 .login-page {
     position: fixed;
     top: 0;
@@ -150,29 +195,21 @@ async function onSubmit() {
     height: 100vh;
 }
 
-/* ==================== ログインカードのスタイル ==================== */
 .login-card {
-    /* 半透明の白背景（背景が透ける演出） */
     background-color: rgba(255, 255, 255, 0.95);
-    /* 中央配置（v-colと組み合わせて使用） */
     margin: 0 auto;
 }
 
-/* ==================== フェードインアニメーション ==================== */
-/* Material Design Easing を使用 */
 .login-fade-enter-active,
 .login-fade-leave-active {
-    /* 0.4秒のスムーズなトランジション（Material Design推奨） */
     transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-/* 登場時: 下から上にフェードイン + 縮小から通常サイズ */
 .login-fade-enter-from {
     opacity: 0;
     transform: translateY(20px) scale(0.9);
 }
 
-/* 退場時: 上に移動しながらフェードアウト + 拡大 */
 .login-fade-leave-to {
     opacity: 0;
     transform: translateY(-20px) scale(1.1);

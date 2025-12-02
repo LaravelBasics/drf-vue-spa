@@ -46,7 +46,7 @@ const headers = computed(() => {
         { title: t('form.fields.username'), key: 'username', sortable: false },
         {
             title: t('form.fields.employeeId'),
-            key: 'employee_id',
+            key: 'user_id',
             sortable: true,
         },
         { title: t('form.fields.isAdmin'), key: 'is_admin', sortable: true },

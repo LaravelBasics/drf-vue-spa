@@ -1,4 +1,4 @@
-// src/stores/auth.js - 認証状態管理
+// src/stores/auth.js - グループ認証対応
 
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
@@ -14,17 +14,19 @@ export const useAuthStore = defineStore(
         const loading = ref(false);
         const error = ref(null);
         const initialized = ref(false);
+        const currentGroupId = ref(null); // ← 現在のグループID
 
         const isAuthenticated = computed(() => !!user.value);
         const isLoading = computed(() => loading.value);
 
-        // ログイン処理（セッションベース）
-        async function loginSession(employeeId, password) {
+        // ログイン処理（グループ認証版）
+        async function loginSession(groupId, userId, password) {
             loading.value = true;
             error.value = null;
 
             try {
-                await authAPI.login(employeeId, password);
+                await authAPI.login(groupId, userId, password);
+                currentGroupId.value = groupId; // グループIDを保存
                 await fetchUser();
             } finally {
                 loading.value = false;
@@ -64,6 +66,7 @@ export const useAuthStore = defineStore(
             } finally {
                 user.value = null;
                 error.value = null;
+                currentGroupId.value = null; // グループIDもクリア
                 loading.value = false;
                 resetCSRFToken();
 
@@ -80,7 +83,7 @@ export const useAuthStore = defineStore(
             error.value = null;
         }
 
-        // 初期化処理（アプリ起動時に実行）
+        // 初期化処理
         async function initialize() {
             if (initialized.value) {
                 return;
@@ -90,14 +93,13 @@ export const useAuthStore = defineStore(
 
             try {
                 if (user.value) {
-                    // 永続化されたユーザー情報がある場合はサーバーと同期
                     try {
                         await fetchUser();
                     } catch (error) {
                         if (error.response?.status === 403) {
-                            // セッション無効の場合はログアウト
                             user.value = null;
                             error.value = null;
+                            currentGroupId.value = null;
                         }
                     }
                 }
@@ -127,6 +129,7 @@ export const useAuthStore = defineStore(
             loading,
             error,
             initialized,
+            currentGroupId, // ← 追加
 
             // Computed
             isAuthenticated,
@@ -143,7 +146,7 @@ export const useAuthStore = defineStore(
     },
     {
         persist: {
-            paths: ['user'],
+            paths: ['user', 'currentGroupId'], // ← currentGroupIdも永続化
         },
     },
 );

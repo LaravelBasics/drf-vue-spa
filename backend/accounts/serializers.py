@@ -12,7 +12,7 @@ User = get_user_model()
 class LoginSerializer(serializers.Serializer):
     """ログイン入力データのバリデーション"""
 
-    employee_id = serializers.CharField(
+    user_id = serializers.CharField(
         max_length=50,
         required=True,
         error_messages={
@@ -33,10 +33,10 @@ class LoginSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         """空白入力の防止"""
-        employee_id = attrs.get("employee_id")
+        user_id = attrs.get("user_id")
         password = attrs.get("password")
 
-        if not employee_id or not password:
+        if not user_id or not password:
             raise serializers.ValidationError(_("社員番号とパスワードは必須です"))
 
         return attrs
@@ -51,7 +51,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id",
-            "employee_id",
+            "user_id",
             "username",
             "email",
             "display_name",

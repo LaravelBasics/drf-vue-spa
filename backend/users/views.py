@@ -55,8 +55,8 @@ class UserViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter,
     ]
     filterset_fields = ["is_admin", "is_active"]
-    search_fields = ["^employee_id", "^username"]
-    ordering_fields = ["id", "employee_id", "created_at", "is_admin"]
+    search_fields = ["^user_id", "^username"]
+    ordering_fields = ["id", "user_id", "created_at", "is_admin"]
     ordering = ["id"]
 
     def get_queryset(self):
@@ -199,8 +199,8 @@ class UserViewSet(viewsets.ModelViewSet):
         ALLOWED_ORDERING = [
             "id",
             "-id",
-            "employee_id",
-            "-employee_id",
+            "user_id",
+            "-user_id",
             "username",
             "-username",
             "email",
@@ -235,7 +235,7 @@ class UserViewSet(viewsets.ModelViewSet):
             writer.writerow(
                 [
                     user.id,
-                    user.employee_id,
+                    user.user_id,
                     user.username or "",
                     "○" if user.is_admin else "",
                     "○" if user.is_active else "",

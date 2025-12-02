@@ -81,7 +81,7 @@ function goToHome() {
                 <v-list-item tabindex="-1">
                     <v-list-item-title class="text-caption">
                         {{ t('form.fields.employeeId') }}:
-                        {{ auth.user?.employee_id }}
+                        {{ auth.user?.user_id }}
                     </v-list-item-title>
                 </v-list-item>
 
