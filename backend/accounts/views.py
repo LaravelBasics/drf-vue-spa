@@ -226,9 +226,11 @@ class LogoutAPIView(APIView):
 
 
 class MeAPIView(APIView):
-    """現在のユーザー情報取得API"""
+    """現在のユーザー情報取得API（グループ情報含む）"""
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        return Response(UserSerializer(request.user).data)
+        # contextにrequestを渡す（これでSerializerがセッション情報にアクセス可能）
+        serializer = UserSerializer(request.user, context={"request": request})
+        return Response(serializer.data)

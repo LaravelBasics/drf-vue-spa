@@ -15,6 +15,7 @@ export const useAuthStore = defineStore(
         const error = ref(null);
         const initialized = ref(false);
         const currentGroupId = ref(null); // ← 現在のグループID
+        const currentGroupName = ref(null); // ← 追加
 
         const isAuthenticated = computed(() => !!user.value);
         const isLoading = computed(() => loading.value);
@@ -27,7 +28,7 @@ export const useAuthStore = defineStore(
             try {
                 await authAPI.login(groupId, userId, password);
                 currentGroupId.value = groupId; // グループIDを保存
-                await fetchUser();
+                await fetchUser(); // ユーザー情報取得（グループ情報も含まれる）
             } finally {
                 loading.value = false;
             }
@@ -41,10 +42,19 @@ export const useAuthStore = defineStore(
             try {
                 const response = await authAPI.me();
                 user.value = response.data;
+
+                // バックエンドから返されたグループ情報を保存
+                if (response.data.current_group) {
+                    currentGroupId.value = response.data.current_group.group_id;
+                    currentGroupName.value =
+                        response.data.current_group.group_name;
+                }
                 error.value = null;
             } catch (err) {
                 if (err.response?.status === 403) {
                     user.value = null;
+                    currentGroupId.value = null;
+                    currentGroupName.value = null;
                 } else {
                     error.value = 'ユーザー情報の取得に失敗しました';
                 }
@@ -67,6 +77,7 @@ export const useAuthStore = defineStore(
                 user.value = null;
                 error.value = null;
                 currentGroupId.value = null; // グループIDもクリア
+                currentGroupName.value = null; // ← 追加
                 loading.value = false;
                 resetCSRFToken();
 
@@ -100,6 +111,7 @@ export const useAuthStore = defineStore(
                             user.value = null;
                             error.value = null;
                             currentGroupId.value = null;
+                            currentGroupName.value = null; // ← 追加
                         }
                     }
                 }
@@ -130,6 +142,7 @@ export const useAuthStore = defineStore(
             error,
             initialized,
             currentGroupId, // ← 追加
+            currentGroupName, // ← 追加
 
             // Computed
             isAuthenticated,
@@ -146,7 +159,7 @@ export const useAuthStore = defineStore(
     },
     {
         persist: {
-            paths: ['user', 'currentGroupId'], // ← currentGroupIdも永続化
+            paths: ['user', 'currentGroupId', , 'currentGroupName'], // ← currentGroupIdも永続化
         },
     },
 );

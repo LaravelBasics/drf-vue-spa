@@ -78,6 +78,14 @@ function goToHome() {
 
             <!-- Vuetify 3.xのバグ対応：tabindex本来は不要、バグ対応で明示的指定が必要 -->
             <v-list density="compact" min-width="200">
+                <!-- グループ名を表示 -->
+                <v-list-item tabindex="-1" v-if="auth.currentGroupName">
+                    <v-list-item-title class="text-caption">
+                        {{ t('form.fields.group') }}:
+                        {{ auth.currentGroupName }}
+                    </v-list-item-title>
+                </v-list-item>
+
                 <v-list-item tabindex="-1">
                     <v-list-item-title class="text-caption">
                         {{ t('form.fields.employeeId') }}:
