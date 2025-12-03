@@ -23,11 +23,7 @@ from .serializers import (
     UserUpdateSerializer,
 )
 from .services.user_service import UserService
-from .exceptions import (
-    UserServiceException,
-    UserNotFoundError,
-    DeletedUserAccessError,
-)
+from .exceptions import UserServiceException, UserNotFoundError
 from .permissions import IsAdminUser
 from common.response_utils import extract_validation_error
 
@@ -56,23 +52,8 @@ class UserViewSet(viewsets.ModelViewSet):
     ]
     filterset_fields = ["is_admin", "is_active"]
     search_fields = ["^user_id", "^username"]
-    ordering_fields = ["id", "user_id", "created_at", "is_admin"]
-    ordering = ["id"]
-
-    def get_queryset(self):
-        """
-        アクションに応じてクエリセットを動的に変更
-        - retrieve: 削除済みも含める（明確なエラーメッセージのため）
-        - その他: 削除済みを除外
-        """
-        queryset = super().get_queryset()
-
-        if self.action == "retrieve":
-            # all_objectsマネージャーを使って削除済みも取得
-            return User.all_objects.all()
-
-        # list などは削除済みを除外
-        return queryset
+    ordering_fields = ["user_id", "created_at", "is_admin"]
+    ordering = ["user_id"]
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -94,36 +75,14 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({"detail": error_msg}, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, *args, **kwargs):
-        """
-        ユーザー詳細取得
-        削除済みユーザーへのアクセスを防止（ブラウザback対策）
-        """
+        """ユーザー詳細取得"""
         instance = self.get_object()
-
-        # 削除済みユーザーのチェック
-        if instance.deleted_at:
-            raise DeletedUserAccessError()
-
         return Response(UserSerializer(instance).data)
 
     def update(self, request, *args, **kwargs):
-        """
-        ユーザー更新
-
-        Note:
-            同時操作対応: all_objectsで取得して削除済みを明示的にチェック
-        """
+        """ユーザー更新"""
         partial = kwargs.pop("partial", False)
-
-        # all_objectsを使って削除済みも含めて取得（同時削除対策）
-        try:
-            instance = User.all_objects.get(pk=self.kwargs["pk"])
-        except User.DoesNotExist:
-            raise UserNotFoundError()
-
-        # 削除済みチェック（別タブで削除された場合）
-        if instance.deleted_at:
-            raise DeletedUserAccessError()
+        instance = self.get_object()
 
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
 
@@ -138,24 +97,11 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({"detail": e.detail}, status=e.status_code)
 
     def destroy(self, request, *args, **kwargs):
-        """
-        ユーザー削除（論理削除）
-
-        Note:
-            同時操作対応: all_objectsで取得して削除済みを明示的にチェック
-        """
-        # all_objectsを使って削除済みも含めて取得（同時削除対策）
-        try:
-            instance = User.all_objects.get(pk=self.kwargs["pk"])
-        except User.DoesNotExist:
-            raise UserNotFoundError()
-
-        # 削除済みチェック（別タブで削除された場合）
-        if instance.deleted_at:
-            raise DeletedUserAccessError()
+        """ユーザー削除（is_active=False）"""
+        instance = self.get_object()
 
         try:
-            UserService.delete_user(instance, request_user_id=request.user.id)
+            UserService.delete_user(instance, request_user_id=request.user.user_id)
             return Response(status=status.HTTP_204_NO_CONTENT)
         except UserServiceException as e:
             return Response({"detail": e.detail}, status=e.status_code)
@@ -197,8 +143,6 @@ class UserViewSet(viewsets.ModelViewSet):
 
         # ソートを適用
         ALLOWED_ORDERING = [
-            "id",
-            "-id",
             "user_id",
             "-user_id",
             "username",
@@ -208,9 +152,9 @@ class UserViewSet(viewsets.ModelViewSet):
             "created_at",
             "-created_at",
         ]
-        ordering = request.query_params.get("ordering", "id")
+        ordering = request.query_params.get("ordering", "user_id")
         if ordering not in ALLOWED_ORDERING:
-            ordering = "id"
+            ordering = "user_id"
 
         queryset = queryset.order_by(ordering)
 
@@ -221,8 +165,7 @@ class UserViewSet(viewsets.ModelViewSet):
         # ヘッダー行
         writer.writerow(
             [
-                "ID",
-                _("社員番号"),
+                _("ユーザーID"),
                 _("ユーザー名"),
                 _("管理者"),
                 _("アクティブ"),
@@ -234,7 +177,6 @@ class UserViewSet(viewsets.ModelViewSet):
         for user in queryset:
             writer.writerow(
                 [
-                    user.id,
                     user.user_id,
                     user.username or "",
                     "○" if user.is_admin else "",

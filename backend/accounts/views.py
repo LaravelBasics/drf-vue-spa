@@ -9,7 +9,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
-from rest_framework import serializers
 from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
@@ -19,34 +18,9 @@ from django.conf import settings
 from common.context import get_client_ip
 from rest_framework.authentication import SessionAuthentication
 
+from .serializers import LoginSerializer, UserSerializer, GroupSerializer
+
 audit_logger = logging.getLogger("audit")
-
-
-# ===== Serializers =====
-
-
-class LoginSerializer(serializers.Serializer):
-    """ログインリクエストのシリアライザ"""
-
-    user_id = serializers.CharField(max_length=50, required=True)
-    password = serializers.CharField(write_only=True, required=True)
-    group_id = serializers.CharField(max_length=50, required=True)  # ← 追加
-
-
-class UserSerializer(serializers.Serializer):
-    """ユーザー情報レスポンスのシリアライザ"""
-
-    user_id = serializers.CharField()
-    username = serializers.CharField()
-    email = serializers.EmailField()
-    is_admin = serializers.BooleanField()
-
-
-class GroupSerializer(serializers.Serializer):
-    """グループ情報シリアライザ"""
-
-    group_id = serializers.CharField()
-    group_name = serializers.CharField()
 
 
 # ===== Authentication =====
@@ -142,7 +116,7 @@ class LoginAPIView(APIView):
 
         user_id = serializer.validated_data["user_id"]
         password = serializer.validated_data["password"]
-        group_id = serializer.validated_data["group_id"]  # ← 追加
+        group_id = serializer.validated_data["group_id"]
 
         # ロックチェック
         if self._is_locked(user_id, group_id):
@@ -162,6 +136,7 @@ class LoginAPIView(APIView):
             )
 
         # 認証（グループIDも渡す）
+        # Note: usernameパラメータ名はDjango規約だが、値はuser_id（プライマリキー）
         user = authenticate(
             request, username=user_id, password=password, group_id=group_id
         )
@@ -237,6 +212,13 @@ class LogoutAPIView(APIView):
                 "object_id": None,
                 "ip": ip,
                 "changes": "{}",
+                "endpoint": request.path,
+                "http_method": request.method,
+                "http_referer": request.META.get(
+                    "HTTP_REFERER", ""
+                ),  # リファラーもここで取得
+                "http_status": 200,  # ログアウト成功は200を想定
+                "view_name": self.__class__.__name__,
             },
         )
 

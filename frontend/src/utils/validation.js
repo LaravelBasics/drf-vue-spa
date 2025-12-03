@@ -27,6 +27,18 @@ export const createValidationRules = () => {
             };
         },
 
+        // 必須選択チェック（セレクトボックス用）
+        requiredSelect(fieldKey) {
+            return (value) => {
+                return (
+                    (value !== null && value !== undefined && value !== '') ||
+                    t('form.validation.required', {
+                        field: t(`form.fields.${fieldKey}`),
+                    })
+                );
+            };
+        },
+
         // 最大文字数チェック
         maxLength(fieldKey, max) {
             return (value) => {

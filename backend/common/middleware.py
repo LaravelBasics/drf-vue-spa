@@ -54,22 +54,18 @@ class AuditMiddleware:
     - 機密情報の閲覧（GET + URLパターン判定）
     - リクエストIDの管理
 
-    Phase 1 追加情報:
+    追加情報:
     - endpoint, http_method, http_status
     - object_repr, view_name
     """
 
+    # 記録したいGET
     SENSITIVE_URL_PATTERNS = [
         "/api/users/",
-        "/api/employees/",
-        "/api/salaries/",
     ]
 
+    # 記録したくないリクエスト
     EXCLUDE_PATHS = {
-        "/admin/",
-        "/static/",
-        "/media/",
-        "/health/",
         "/api/auth/csrf/",
         "/api/auth/me/",
     }
@@ -180,7 +176,6 @@ class AuditMiddleware:
 
         Examples:
             '/api/users/EMP001/' → 'User'
-            '/api/employees/123/' → 'Employee'
         """
         try:
             parts = [p for p in path.split("/") if p]
@@ -210,21 +205,18 @@ class AuditMiddleware:
 
         user_info = request.user.user_id
 
-        # ★Phase 1: 追加情報を収集★
         view_name = self._get_view_name(request)
         object_repr = self._get_object_repr(request, resource_id)
 
         audit_logger.warning(
             f"機密情報閲覧: {request.path} [ID: {resource_id}]",
             extra={
-                # 既存項目
                 "request_id": request._request_id,
                 "user": user_info,
                 "action": "READ_SENSITIVE",
                 "model": self._guess_model_name(request.path),
                 "object_id": resource_id,
                 "ip": get_client_ip(request),
-                # ★Phase 1: 追加項目★
                 "endpoint": request.path,  # どのURL
                 "http_method": request.method,  # どのHTTPメソッド
                 "http_status": response.status_code,  # ステータスコード
@@ -248,7 +240,6 @@ class AuditMiddleware:
             else "anonymous"
         )
 
-        # ★Phase 1: 追加情報★
         view_name = self._get_view_name(request)
 
         base_extra = {
@@ -257,7 +248,6 @@ class AuditMiddleware:
             "model": "Auth",
             "object_id": None,
             "ip": get_client_ip(request),
-            # ★Phase 1: 追加項目★
             "endpoint": request.path,
             "http_method": request.method,
             "http_status": response.status_code,

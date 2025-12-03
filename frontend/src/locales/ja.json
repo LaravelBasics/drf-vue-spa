@@ -21,7 +21,9 @@
             "employeeId": "社員番号",
             "isAdmin": "管理者",
             "isActive": "アカウント有効",
-            "createdAt": "登録日"
+            "createdAt": "登録日",
+            "group": "グループ",
+            "userId": "ユーザーID"
         },
         "labels": {
             "newPassword": "新しいパスワード",
@@ -31,7 +33,8 @@
         "placeholders": {
             "employeeId": "{field}を入力してください",
             "enterUseremployeeId": "{field}を入力してください",
-            "enterPassword": "{field}を入力してください"
+            "enterPassword": "{field}を入力してください",
+            "userId": "{field}を入力してください"
         },
         "hint": {
             "testEmployeeId": "テスト用: 9999 ",
@@ -39,7 +42,9 @@
             "min": "{min}文字以上",
             "employeeIdFormat": "半角数字のみ",
             "passwordStrength": "英数字8文字以上",
-            "newPasswordConfirmation": "確認のため再度入力してください"
+            "newPasswordConfirmation": "確認のため再度入力してください",
+            "selectGroup": "所属するグループを選択してください",
+            "testUserId": "テスト用: user001"
         },
         "validation": {
             "required": "{field}は必須です",

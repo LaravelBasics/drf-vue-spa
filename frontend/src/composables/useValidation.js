@@ -26,6 +26,11 @@ export function useValidation() {
             ];
         },
 
+        // ログイン用グループID
+        loginGroupId() {
+            return [rules.requiredSelect('group')];
+        },
+
         // ユーザー管理用ユーザー名
         username() {
             return [

@@ -21,7 +21,9 @@
             "employeeId": "Employee ID",
             "isAdmin": "Administrator",
             "isActive": "Account Active",
-            "createdAt": "Created Date"
+            "createdAt": "Created Date",
+            "group": "Group",
+            "userId": "User ID"
         },
         "labels": {
             "newPassword": "New Password",
@@ -31,7 +33,8 @@
         "placeholders": {
             "employeeId": "Enter {field}",
             "enterUseremployeeId": "Enter {field}",
-            "enterPassword": "Enter {field}"
+            "enterPassword": "Enter {field}",
+            "userId": "Enter {field}"
         },
         "hint": {
             "testEmployeeId": "Test: 9999",
@@ -39,7 +42,9 @@
             "min": "{min} characters or more",
             "employeeIdFormat": "Numbers only",
             "passwordStrength": "Alphanumeric 8+ characters",
-            "newPasswordConfirmation": "Please enter again for confirmation"
+            "newPasswordConfirmation": "Please enter again for confirmation",
+            "selectGroup": "Please select your group",
+            "testUserId": "Test: user001"
         },
         "validation": {
             "required": "{field} is required",

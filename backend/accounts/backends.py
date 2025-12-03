@@ -22,14 +22,17 @@ class GroupUserAuthBackend(BaseBackend):
 
         Args:
             request: HTTPリクエスト
-            username: ユーザーID（DRF規約でusernameだが実際はuser_id）
+            username: ユーザーID
+                Note: Django規約でパラメータ名は'username'だが、
+                      実際の値はuser_id（プライマリキー）を受け取る
             password: パスワード
-            group_id: グループID（新規追加）
+            group_id: グループID
 
         Returns:
             User: 認証成功時
             None: 認証失敗時
         """
+        # usernameパラメータの値を内部的にuser_idとして扱う
         user_id = username
 
         # 必須パラメータチェック
@@ -37,11 +40,11 @@ class GroupUserAuthBackend(BaseBackend):
             return None
 
         try:
-            # ユーザー存在チェック
+            # ユーザー取得
             user = User.objects.filter(user_id=user_id).first()
 
+            # ユーザー不在時のタイミング攻撃対策
             if user is None:
-                # ユーザー不在時のタイミング攻撃対策
                 User().set_password(password)
                 return None
 
@@ -49,8 +52,7 @@ class GroupUserAuthBackend(BaseBackend):
             if not user.check_password(password):
                 return None
 
-            # ✅ グループ所属チェック（重要！）
-            # このユーザーが指定されたグループに所属しているか確認
+            # グループ所属チェック
             if not user.groups_rel.filter(group_id=group_id, is_active=True).exists():
                 return None
 
@@ -67,7 +69,7 @@ class GroupUserAuthBackend(BaseBackend):
         セッションからユーザー取得
 
         Args:
-            user_id: ユーザーID
+            user_id: ユーザーID（プライマリキー）
 
         Returns:
             User: ユーザー情報

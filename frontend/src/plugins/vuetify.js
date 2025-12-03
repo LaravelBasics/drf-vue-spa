@@ -20,6 +20,7 @@ const materialSymbols = {
         sortAsc: 'arrow_upward',
         sortDesc: 'arrow_downward',
         expand: 'expand_more',
+        dropdown: 'arrow_drop_down',
         unfold: 'arrow_drop_down',
         checkboxOn: 'check_box',
         checkboxOff: 'check_box_outline_blank',

@@ -53,20 +53,20 @@ class AuditJSONFormatter(logging.Formatter):
             # ========== 基本情報 ==========
             "request_id": getattr(record, "request_id", "N/A"),
             "timestamp": self.formatTime(record, datefmt="%Y-%m-%d %H:%M:%S"),
-            "level": record.levelname,
+            # "level": record.levelname,
             # ========== Who（誰が） ==========
             "user": getattr(record, "user", "unknown"),
             # ========== Where（どこで） ==========
             "endpoint": getattr(record, "endpoint", ""),  # ★追加★
-            "http_method": getattr(record, "http_method", ""),  # ★追加★
+            # "http_method": getattr(record, "http_method", ""),  # ★追加★
             "ip": getattr(record, "ip", ""),
             # ========== What（何を） ==========
-            "action": getattr(record, "action", ""),
-            "model": getattr(record, "model", ""),
-            "object_id": getattr(record, "object_id", None),
+            # "action": getattr(record, "action", ""),
+            # "model": getattr(record, "model", ""),
+            # "object_id": getattr(record, "object_id", None),
             "object_repr": getattr(record, "object_repr", ""),  # ★追加★
             # ========== How（どのように） ==========
-            "http_status": getattr(record, "http_status", None),  # ★追加★
+            # "http_status": getattr(record, "http_status", None),  # ★追加★
             "view_name": getattr(record, "view_name", ""),  # ★追加★
             # ========== 変更内容 ==========
             "changes": getattr(record, "changes", "{}"),

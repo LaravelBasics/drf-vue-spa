@@ -66,12 +66,3 @@ class CannotDeleteSelfError(UserServiceException):
 
     def __init__(self):
         super().__init__(detail=str(_("自分自身を削除することはできません。")))
-
-
-class DeletedUserAccessError(UserServiceException):
-    """削除済みユーザーアクセスエラー（同時操作対応）"""
-
-    status_code = 404
-
-    def __init__(self):
-        super().__init__(detail=str(_("このユーザーは削除されています。")))

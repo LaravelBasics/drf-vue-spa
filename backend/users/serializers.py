@@ -11,36 +11,32 @@ User = get_user_model()
 
 
 USER_ID_UNIQUE_VALIDATOR = UniqueValidator(
-    queryset=User.objects.all(), message=_("社員番号は既に使用されています")
+    queryset=User.objects.all(), message=_("ユーザーIDは既に使用されています")
 )
 
 
 class UserSerializer(serializers.ModelSerializer):
     """ユーザー情報取得用"""
 
-    display_name = serializers.CharField(read_only=True)
-
     class Meta:
         model = User
         fields = [
-            "id",
             "user_id",
             "username",
             "email",
-            "display_name",
             "is_admin",
             "is_active",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "created_at", "updated_at"]
+        read_only_fields = ["user_id", "created_at", "updated_at"]
 
 
 class BaseUserSerializer(serializers.ModelSerializer):
     """共通バリデーション用ベースシリアライザー"""
 
     def validate_user_id(self, value):
-        """社員番号の正規化（空白削除）"""
+        """ユーザーIDの正規化（空白削除）"""
         return value.strip() if value else value
 
     def validate_email(self, value):
@@ -69,9 +65,9 @@ class UserCreateSerializer(BaseUserSerializer):
         max_length=50,
         validators=[USER_ID_UNIQUE_VALIDATOR],
         error_messages={
-            "required": _("社員番号は必須です"),
-            "blank": _("社員番号は必須です"),
-            "max_length": _("社員番号は50文字以内で入力してください"),
+            "required": _("ユーザーIDは必須です"),
+            "blank": _("ユーザーIDは必須です"),
+            "max_length": _("ユーザーIDは50文字以内で入力してください"),
         },
     )
 
@@ -111,14 +107,13 @@ class UserUpdateSerializer(BaseUserSerializer):
     )
 
     user_id = serializers.CharField(
-        required=True,
         max_length=50,
-        validators=[USER_ID_UNIQUE_VALIDATOR],
         error_messages={
-            "required": _("社員番号は必須です"),
-            "blank": _("社員番号は必須です"),
-            "max_length": _("社員番号は50文字以内で入力してください"),
+            "required": _("ユーザーIDは必須です"),
+            "blank": _("ユーザーIDは必須です"),
+            "max_length": _("ユーザーIDは50文字以内で入力してください"),
         },
+        read_only=True,  # 更新時はuser_idを変更不可
     )
 
     username = serializers.CharField(

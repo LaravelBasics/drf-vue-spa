@@ -25,8 +25,8 @@ const isVisible = ref(false);
 const form = ref(null);
 const groups = ref([]);
 
-const groupIdRules = [(v) => !!v || t('form.validation.required')];
-const userIdRules = createRules.loginEmployeeId(); // 既存のルールを流用可能
+const groupIdRules = createRules.loginGroupId();
+const userIdRules = createRules.loginEmployeeId();
 const passwordRules = createRules.loginPassword();
 
 onMounted(async () => {
@@ -121,11 +121,7 @@ async function onSubmit() {
                                     :rules="groupIdRules"
                                     :loading="loadingGroups"
                                     :disabled="loading || loadingGroups"
-                                    :hint="
-                                        t('form.hint.selectGroup', {
-                                            default: '所属するグループを選択',
-                                        })
-                                    "
+                                    :hint="t('form.hint.selectGroup')"
                                     persistent-hint
                                 />
 
@@ -134,18 +130,13 @@ async function onSubmit() {
                                     :label="
                                         t('form.placeholders.userId', {
                                             field: t('form.fields.userId'),
-                                            default: 'ユーザーIDを入力',
                                         })
                                     "
                                     :prepend-inner-icon="ICONS.form.user"
                                     variant="outlined"
                                     inputmode="text"
                                     :rules="userIdRules"
-                                    :hint="
-                                        t('form.hint.testUserId', {
-                                            default: 'テストID: user001',
-                                        })
-                                    "
+                                    :hint="t('form.hint.testUserId')"
                                     persistent-hint
                                     :disabled="loading"
                                 />

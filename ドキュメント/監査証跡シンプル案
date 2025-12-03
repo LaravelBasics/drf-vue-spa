@@ -1,0 +1,268 @@
+# ===== 1. context.py に group_id 取得関数を追加 =====
+
+# common/context.py (既存のファイルに追記)
+
+def get_current_group_id(request=None):
+    """
+    現在のグループIDを取得
+    
+    Args:
+        request: Django HTTPRequest オブジェクト (オプション)
+    
+    Returns:
+        str: グループID or None
+    """
+    if request is None:
+        request = get_current_request()
+    
+    if not request:
+        return None
+    
+    # セッションから取得
+    group_id = request.session.get('current_group_id')
+    if group_id:
+        return group_id
+    
+    # ユーザーオブジェクトから取得（もし保存されている場合）
+    if hasattr(request, 'user') and request.user.is_authenticated:
+        if hasattr(request.user, 'group_id'):
+            return request.user.group_id
+    
+    return None
+
+
+# ===== 2. formatters.py にグループ情報を追加 =====
+
+# common/formatters.py (修正版)
+
+class AuditJSONFormatter(logging.Formatter):
+    """
+    監査ログをJSON形式で出力するフォーマッター（グループ対応版）
+
+    出力例:
+    {
+        "request_id": "550e8400-e29b-41d4-a716-446655440000",
+        "timestamp": "2025-12-03 16:32:49",
+        "user": "9999",
+        "group": "A",  // ← 追加
+        "endpoint": "/api/auth/login/",
+        "ip": "127.0.0.1",
+        "object_repr": "",
+        "view_name": "LoginAPIView",
+        "changes": "{}",
+        "message": "ユーザーがログインしました"
+    }
+    """
+
+    def format(self, record):
+        """ログレコードをJSON形式に変換"""
+        log_data = {
+            "request_id": getattr(record, "request_id", "N/A"),
+            "timestamp": self.formatTime(record, datefmt="%Y-%m-%d %H:%M:%S"),
+            "user": getattr(record, "user", "unknown"),
+            "group": getattr(record, "group_id", ""),  # ← グループID追加
+            "endpoint": getattr(record, "endpoint", ""),
+            "ip": getattr(record, "ip", ""),
+            "object_repr": getattr(record, "object_repr", ""),
+            "view_name": getattr(record, "view_name", ""),
+            "changes": getattr(record, "changes", "{}"),
+            "message": record.getMessage(),
+        }
+
+        return json.dumps(log_data, ensure_ascii=False)
+
+
+# ===== 3. middleware.py でグループIDをログに含める =====
+
+# common/middleware.py (修正箇所のみ)
+
+from common.context import get_current_group_id  # ← インポート追加
+
+class AuditMiddleware:
+    # ... 既存コード ...
+    
+    def _log_sensitive_read(self, request, response):
+        """機密情報の閲覧を記録（GET）"""
+        if not (hasattr(request, "user") and request.user.is_authenticated):
+            return
+
+        if response.status_code >= 400:
+            return
+
+        if not self._is_sensitive_url(request.path):
+            return
+
+        resource_id = self._extract_resource_id(request.path)
+        if not resource_id:
+            return
+
+        user_info = request.user.user_id
+        group_id = get_current_group_id(request)  # ← グループID取得
+
+        view_name = self._get_view_name(request)
+        object_repr = self._get_object_repr(request, resource_id)
+
+        audit_logger.warning(
+            f"機密情報閲覧: {request.path} [ID: {resource_id}]",
+            extra={
+                "request_id": request._request_id,
+                "user": user_info,
+                "group_id": group_id,  # ← 追加
+                "action": "READ_SENSITIVE",
+                "model": self._guess_model_name(request.path),
+                "object_id": resource_id,
+                "ip": get_client_ip(request),
+                "endpoint": request.path,
+                "http_method": request.method,
+                "http_status": response.status_code,
+                "object_repr": object_repr,
+                "view_name": view_name,
+                "changes": json.dumps(
+                    {
+                        "path": request.path,
+                        "query_params": dict(request.GET),
+                    },
+                    ensure_ascii=False,
+                ),
+            },
+        )
+
+    def _log_auth_event(self, request, response, action_type):
+        """認証関連イベントのログ記録"""
+        user_info = (
+            request.user.user_id
+            if hasattr(request, "user") and request.user.is_authenticated
+            else "anonymous"
+        )
+        
+        # ログイン時はリクエストボディからグループIDを取得
+        group_id = None
+        if action_type == "LOGIN":
+            try:
+                body = json.loads(request.body) if request.body else {}
+                group_id = body.get('group_id', '')
+            except:
+                pass
+        else:
+            # ログアウト時はセッションから取得
+            group_id = get_current_group_id(request)
+
+        view_name = self._get_view_name(request)
+
+        base_extra = {
+            "request_id": getattr(request, "_request_id", "N/A"),
+            "user": user_info,
+            "group_id": group_id,  # ← 追加
+            "model": "Auth",
+            "object_id": None,
+            "ip": get_client_ip(request),
+            "endpoint": request.path,
+            "http_method": request.method,
+            "http_status": response.status_code,
+            "view_name": view_name,
+            "object_repr": "",
+        }
+
+        if response.status_code == 200:
+            # メッセージもグループ情報を含める
+            message = f"ユーザーが{'ログイン' if action_type == 'LOGIN' else 'ログアウト'}しました"
+            if group_id and action_type == 'LOGIN':
+                message = f"ユーザーがグループ[{group_id}]でログインしました"
+            
+            audit_logger.info(
+                message,
+                extra={**base_extra, "action": action_type, "changes": "{}"},
+            )
+        else:
+            audit_logger.warning(
+                f"ログイン失敗(status: {response.status_code})",
+                extra={
+                    **base_extra,
+                    "action": "LOGIN_FAILED",
+                    "changes": json.dumps({"status_code": response.status_code}),
+                },
+            )
+
+
+# ===== 4. signals.py でグループIDを含める =====
+
+# common/signals.py (修正箇所のみ)
+
+from common.context import get_current_group_id  # ← インポート追加
+
+def log_audit(action, instance, changes=None):
+    """監査ログ出力"""
+    request = get_current_request()
+
+    user_info = "system"
+    group_id = None  # ← 追加
+    ip = "127.0.0.1"
+    request_id = "N/A"
+
+    if request:
+        if hasattr(request, "user") and request.user.is_authenticated:
+            user_info = getattr(request.user, "user_id", request.user.username)
+        group_id = get_current_group_id(request)  # ← グループID取得
+        ip = get_client_ip(request)
+        request_id = getattr(request, "_request_id", "N/A")
+
+    audit_logger.info(
+        f"{instance._meta.model_name} {action}: {instance.pk}",
+        extra={
+            "request_id": request_id,
+            "user": user_info,
+            "group_id": group_id,  # ← 追加
+            "action": action,
+            "model": instance._meta.model_name.capitalize(),
+            "object_id": instance.pk,
+            "ip": ip,
+            "changes": json.dumps(changes or {}, ensure_ascii=False),
+        },
+    )
+
+
+# ===== 出力例 =====
+
+"""
+✅ ログイン成功時:
+{
+    "request_id": "3e840d52-8c3b-4493-9b16-9f9be9ee1d59",
+    "timestamp": "2025-12-03 16:32:49",
+    "user": "9999",
+    "group": "A",
+    "endpoint": "/api/auth/login/",
+    "ip": "127.0.0.1",
+    "object_repr": "",
+    "view_name": "LoginAPIView",
+    "changes": "{}",
+    "message": "ユーザーがグループ[A]でログインしました"
+}
+
+✅ ログイン失敗時:
+{
+    "request_id": "b9f63ca4-4c4c-4b5d-830a-0a633aba8741",
+    "timestamp": "2025-12-03 16:31:16",
+    "user": "anonymous",
+    "group": "A",
+    "endpoint": "/api/auth/login/",
+    "ip": "127.0.0.1",
+    "object_repr": "",
+    "view_name": "LoginAPIView",
+    "changes": "{\"status_code\": 401}",
+    "message": "ログイン失敗(status: 401)"
+}
+
+✅ ユーザー情報閲覧時:
+{
+    "request_id": "6802f480-d843-4dce-92f8-b8453eeb0003",
+    "timestamp": "2025-12-03 16:30:37",
+    "user": "9999",
+    "group": "A",
+    "endpoint": "/api/users/",
+    "ip": "127.0.0.1",
+    "object_repr": "User users",
+    "view_name": "UserViewSet",
+    "changes": "{\"path\": \"/api/users/\", \"query_params\": {\"page\": [\"1\"], \"page_size\": [\"10\"]}}",
+    "message": "機密情報閲覧: /api/users/ [ID: users]"
+}
+"""

@@ -72,7 +72,7 @@ function goToHome() {
                     <v-icon :size="ICON_SIZES.sm" class="me-2">
                         {{ ICONS.nav.profile }}
                     </v-icon>
-                    <span>{{ auth.user?.display_name }}</span>
+                    <span>{{ auth.user?.username }}</span>
                 </v-chip>
             </template>
 

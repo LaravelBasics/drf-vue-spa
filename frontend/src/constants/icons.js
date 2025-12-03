@@ -86,6 +86,7 @@ export const ICONS = Object.freeze({
         time: 'schedule',
         visibility: 'visibility',
         visibilityOff: 'visibility_off',
+        group: 'group',
     },
 
     // ファイル・データ

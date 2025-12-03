@@ -26,7 +26,7 @@ class UserService:
         query = User.objects.filter(is_admin=True, is_active=True)
 
         if exclude_user_id:
-            query = query.exclude(id=exclude_user_id)
+            query = query.exclude(user_id=exclude_user_id)
 
         return query.count()
 
@@ -101,7 +101,7 @@ class UserService:
             new_is_active = validated_data.get("is_active", user_instance.is_active)
 
             UserService._check_last_admin_for_update(
-                user_id=user_instance.id,
+                user_id=user_instance.user_id,
                 new_is_admin=new_is_admin,
                 new_is_active=new_is_active,
             )
@@ -124,18 +124,21 @@ class UserService:
         return user_instance
 
     @staticmethod
+    @transaction.atomic
     def delete_user(user_instance, request_user_id=None):
         """
-        ユーザー削除（論理削除）
+        ユーザー削除（is_active=False）
 
         Args:
             user_instance: 削除対象ユーザー
             request_user_id: 削除実行ユーザーID
         """
-        if request_user_id and user_instance.id == request_user_id:
+        if request_user_id and user_instance.user_id == request_user_id:
             raise CannotDeleteSelfError()
 
         if user_instance.is_admin:
-            UserService._check_last_admin_for_delete(user_id=user_instance.id)
+            UserService._check_last_admin_for_delete(user_id=user_instance.user_id)
 
-        user_instance.soft_delete()
+        # is_activeをFalseに設定（論理削除的な動作）
+        user_instance.is_active = False
+        user_instance.save(update_fields=["is_active", "updated_at"])

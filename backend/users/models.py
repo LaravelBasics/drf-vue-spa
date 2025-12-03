@@ -2,9 +2,9 @@
 グループ認証対応のユーザーモデル
 
 Features:
-- user_id がプライマリキー（employee_idから変更）
+- user_id がプライマリキー（ナチュラルキー）
 - グループとの多対多リレーション
-- 論理削除対応
+- 論理削除なし（is_activeのみで管理）
 """
 
 from django.contrib.auth.models import (
@@ -17,10 +17,7 @@ from django.utils import timezone
 
 
 class CustomUserManager(BaseUserManager):
-    """論理削除対応マネージャー"""
-
-    def get_queryset(self):
-        return super().get_queryset().filter(deleted_at__isnull=True)
+    """カスタムユーザーマネージャー"""
 
     def create_user(self, user_id, password=None, **extra_fields):
         """通常ユーザー作成"""
@@ -36,18 +33,11 @@ class CustomUserManager(BaseUserManager):
         return user
 
 
-class AllObjectsManager(BaseUserManager):
-    """全レコード取得マネージャー"""
-
-    def get_queryset(self):
-        return super().get_queryset()
-
-
 class Group(models.Model):
     """ユーザーグループ"""
 
     group_id = models.CharField("グループID", max_length=50, primary_key=True)
-    group_name = models.CharField("グループ名", max_length=100)
+    group_name = models.CharField("グループ名", max_length=100, db_column="group_name")
     is_active = models.BooleanField("アクティブ", default=True)
     created_at = models.DateTimeField("作成日時", default=timezone.now)
     updated_at = models.DateTimeField("更新日時", auto_now=True)
@@ -70,16 +60,29 @@ class User(AbstractBaseUser, PermissionsMixin):
     - グループID + ユーザーID + パスワード の3点セット
     """
 
-    # 認証フィールド（employee_id → user_id に変更）
+    # 認証フィールド
     user_id = models.CharField(
         "ユーザーID",
         max_length=50,
-        primary_key=True,  # プライマリキー
+        primary_key=True,
+        db_column="user_id",
     )
 
     # 個人情報
-    username = models.CharField("ユーザー名", max_length=50, blank=True, null=True)
-    email = models.EmailField("メールアドレス", max_length=255, blank=True, null=True)
+    username = models.CharField(
+        "ユーザー名",
+        max_length=50,
+        blank=True,
+        null=True,
+        db_column="username",
+    )
+    email = models.EmailField(
+        "メールアドレス",
+        max_length=255,
+        blank=True,
+        null=True,
+        db_column="email",
+    )
 
     # グループリレーション
     groups_rel = models.ManyToManyField(
@@ -90,14 +93,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
 
     # 権限
-    is_admin = models.BooleanField("管理者", default=False)
-    is_staff = models.BooleanField("スタッフ", default=False)
-    is_active = models.BooleanField("アクティブ", default=True)
+    is_admin = models.BooleanField("管理者", default=False, db_column="is_admin")
+    is_active = models.BooleanField("アクティブ", default=True, db_column="is_active")
 
     # タイムスタンプ
     created_at = models.DateTimeField("作成日時", default=timezone.now)
     updated_at = models.DateTimeField("更新日時", auto_now=True)
-    deleted_at = models.DateTimeField("削除日時", blank=True, null=True)
 
     # Django認証設定
     USERNAME_FIELD = "user_id"
@@ -105,7 +106,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     # マネージャー
     objects = CustomUserManager()
-    all_objects = AllObjectsManager()
 
     class Meta:
         db_table = "users"
@@ -113,42 +113,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = "ユーザー"
         ordering = ["-created_at"]
 
-        indexes = [
-            models.Index(fields=["user_id"]),
-            models.Index(fields=["is_active"]),
-            models.Index(fields=["deleted_at"]),
-            models.Index(fields=["is_admin", "is_active"]),
-            models.Index(fields=["-created_at"]),
-        ]
-
     def __str__(self):
-        status = " [削除済み]" if self.deleted_at else ""
-        return f"{self.user_id} ({self.username or '名前未設定'}){status}"
-
-    def soft_delete(self):
-        """論理削除"""
-        self.deleted_at = timezone.now()
-        self.is_active = False
-        self.save(update_fields=["deleted_at", "is_active"])
-
-    def restore(self):
-        """復元"""
-        self.deleted_at = None
-        self.is_active = True
-        self.save(update_fields=["deleted_at", "is_active"])
-
-    @property
-    def display_name(self):
-        """表示名"""
-        return self.username or self.user_id
-
-    def has_perm(self, perm, obj=None):
-        """権限チェック"""
-        return self.is_admin or super().has_perm(perm, obj)
-
-    def has_module_perms(self, app_label):
-        """アプリ権限チェック"""
-        return self.is_admin or super().has_module_perms(app_label)
+        return f"{self.user_id} ({self.username or '名前未設定'})"
 
 
 class UserGroup(models.Model):
@@ -159,10 +125,24 @@ class UserGroup(models.Model):
     """
 
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, verbose_name="ユーザー", db_column="user_id"
+        User,
+        on_delete=models.CASCADE,
+        verbose_name="ユーザー",
+        db_column="user_id",
+        related_name="user_groups",
     )
     group = models.ForeignKey(
-        Group, on_delete=models.CASCADE, verbose_name="グループ", db_column="group_id"
+        Group,
+        on_delete=models.CASCADE,
+        verbose_name="グループ",
+        db_column="group_id",
+        related_name="group_users",
+    )
+    is_active = models.BooleanField(
+        "アクティブ",
+        default=True,
+        db_column="is_active",
+        help_text="グループへの所属が有効かどうか",
     )
     joined_at = models.DateTimeField("参加日時", default=timezone.now)
 
@@ -170,11 +150,7 @@ class UserGroup(models.Model):
         db_table = "user_groups"
         verbose_name = "ユーザーグループ"
         verbose_name_plural = "ユーザーグループ"
-        unique_together = ("user", "group")  # 複合ユニークキー
-        indexes = [
-            models.Index(fields=["user", "group"]),
-            models.Index(fields=["group"]),
-        ]
+        unique_together = ("user", "group")
 
     def __str__(self):
         return f"{self.user.user_id} @ {self.group.group_name}"
