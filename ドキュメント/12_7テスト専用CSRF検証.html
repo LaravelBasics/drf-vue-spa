@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>🔒 CSRF脆弱性テスト（本番運用版）</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                padding: 20px;
+            }
+            .container {
+                background: white;
+                border-radius: 20px;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                max-width: 700px;
+                width: 100%;
+                padding: 40px;
+            }
+            h1 {
+                color: #667eea;
+                margin-bottom: 10px;
+                font-size: 2em;
+                text-align: center;
+            }
+            .subtitle {
+                text-align: center;
+                color: #666;
+                margin-bottom: 30px;
+                font-size: 0.9em;
+            }
+            .config-section {
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 10px;
+                margin-bottom: 20px;
+                border-left: 4px solid #667eea;
+            }
+            .config-section h2 {
+                color: #667eea;
+                font-size: 1.2em;
+                margin-bottom: 15px;
+            }
+            label {
+                display: block;
+                margin: 10px 0 5px 0;
+                font-weight: bold;
+                color: #555;
+            }
+            input[type='text'] {
+                width: 100%;
+                padding: 10px;
+                border: 2px solid #ddd;
+                border-radius: 5px;
+                font-size: 1em;
+                font-family: 'Courier New', monospace;
+            }
+            input[type='text']:focus {
+                outline: none;
+                border-color: #667eea;
+            }
+            .attack-section {
+                margin: 20px 0;
+                padding: 20px;
+                background: #f8f9fa;
+                border-radius: 10px;
+                border-left: 4px solid #dc3545;
+            }
+            .attack-section h2 {
+                color: #dc3545;
+                margin-bottom: 15px;
+                font-size: 1.2em;
+            }
+            button {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                border: none;
+                padding: 15px 30px;
+                font-size: 1em;
+                border-radius: 50px;
+                cursor: pointer;
+                transition: transform 0.2s, box-shadow 0.2s;
+                margin: 5px;
+                width: calc(50% - 10px);
+            }
+            button:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+            }
+            button:active {
+                transform: translateY(0);
+            }
+            .danger-btn {
+                background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            }
+            .clear-btn {
+                background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+                width: 100%;
+            }
+            #result {
+                margin-top: 20px;
+                padding: 15px;
+                border-radius: 10px;
+                display: none;
+                max-height: 400px;
+                overflow-y: auto;
+            }
+            .log-entry {
+                padding: 8px;
+                margin: 5px 0;
+                border-radius: 5px;
+                font-size: 0.9em;
+            }
+            .success {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .error {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            .warning {
+                background: #fff3cd;
+                color: #856404;
+                border: 1px solid #ffeaa7;
+            }
+            .info {
+                background: #d1ecf1;
+                color: #0c5460;
+                border: 1px solid #bee5eb;
+            }
+            .help-box {
+                background: #e7f3ff;
+                padding: 15px;
+                border-radius: 10px;
+                margin: 20px 0;
+                border-left: 4px solid #2196f3;
+            }
+            .help-box h3 {
+                color: #2196f3;
+                margin-bottom: 10px;
+                font-size: 1.1em;
+            }
+            .help-box ul {
+                margin-left: 20px;
+                line-height: 1.8;
+            }
+            .attack-info {
+                background: #fff9e6;
+                padding: 12px;
+                border-radius: 5px;
+                margin: 10px 0;
+                font-size: 0.9em;
+                border-left: 3px solid #ffc107;
+            }
+            code {
+                background: #f4f4f4;
+                padding: 2px 6px;
+                border-radius: 3px;
+                font-family: 'Courier New', monospace;
+                font-size: 0.9em;
+            }
+            .status-indicator {
+                display: inline-block;
+                width: 10px;
+                height: 10px;
+                border-radius: 50%;
+                margin-right: 5px;
+            }
+            .status-safe {
+                background: #28a745;
+            }
+            .status-danger {
+                background: #dc3545;
+            }
+            .current-target {
+                background: #f8f9fa;
+                padding: 12px;
+                border-radius: 5px;
+                font-family: 'Courier New', monospace;
+                color: #333;
+                margin-top: 10px;
+                word-break: break-all;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔒 CSRF脆弱性テスト</h1>
+            <p class="subtitle">
+                Django REST Framework + Vue.js SPA 本番運用版
+            </p>
+
+            <!-- 設定セクション -->
+            <div class="config-section">
+                <h2>⚙️ ターゲット設定</h2>
+
+                <label for="apiBase">
+                    APIベースURL:
+                    <small style="color: #666; font-weight: normal">
+                        (axios.defaults.baseURL と同じ)
+                    </small>
+                </label>
+                <input
+                    type="text"
+                    id="apiBase"
+                    value="http://localhost:8000/api/"
+                    placeholder="http://localhost:8000/api/"
+                />
+                <small style="color: #666; display: block; margin-top: 5px">
+                    例: config/urls.py の <code>path('api/', ...)</code> まで
+                </small>
+
+                <label for="targetEndpoint" style="margin-top: 15px">
+                    攻撃対象エンドポイント:
+                    <small style="color: #666; font-weight: normal">
+                        (backend/api/xxx/urls.py で定義されたパス)
+                    </small>
+                </label>
+                <input
+                    type="text"
+                    id="targetEndpoint"
+                    value="auth/logout/"
+                    placeholder="auth/logout/"
+                />
+                <small style="color: #666; display: block; margin-top: 5px">
+                    例: <code>auth/logout/</code>, <code>users/me/</code>,
+                    <code>posts/123/delete/</code>
+                </small>
+
+                <div class="current-target" id="currentTarget">
+                    読み込み中...
+                </div>
+            </div>
+
+            <!-- 攻撃パターン説明 -->
+            <div class="help-box">
+                <h3>🎯 テストパターン（2種類）</h3>
+                <div class="attack-info">
+                    <strong>Pattern 1: Fetch API</strong><br />
+                    <span class="status-indicator status-safe"></span>
+                    通常のJavaScript攻撃。<code>プリフライト発生</code> →
+                    CORSで防がれるはず。
+                </div>
+                <div class="attack-info">
+                    <strong>Pattern 2: Form送信（本命⚡）</strong><br />
+                    <span class="status-indicator status-danger"></span>
+                    実際の攻撃手法。<code>プリフライトなし</code> → CORSバイパス
+                    → CSRFトークンで防ぐ必要あり。<br />
+                    <small
+                        >※隠しiframe使用でページ遷移なし（実際の攻撃と同じ）</small
+                    >
+                </div>
+            </div>
+
+            <!-- 攻撃テスト -->
+            <div class="attack-section">
+                <h2>⚠️ 攻撃実行</h2>
+                <button onclick="attack1()">Pattern 1: Fetch API</button>
+                <button onclick="attack2()" class="danger-btn">
+                    Pattern 2: Form送信 ⚡
+                </button>
+                <button onclick="clearResults()" class="clear-btn">
+                    🗑️ ログをクリア
+                </button>
+            </div>
+
+            <!-- 結果表示 -->
+            <div id="result"></div>
+
+            <!-- 使い方ガイド -->
+            <div class="help-box">
+                <h3>📖 テスト手順</h3>
+                <ol style="margin-left: 20px; line-height: 1.8">
+                    <li>
+                        対象サイトに<strong>別タブでログイン</strong>しておく
+                    </li>
+                    <li>上の設定でAPIのURLを確認（必要なら変更）</li>
+                    <li>各Patternボタンで攻撃をテスト</li>
+                    <li><code>F12</code>でNetworkタブを開いて結果を確認</li>
+                </ol>
+                <br />
+                <strong>✅ 正常な防御（期待される結果）:</strong>
+                <ul style="margin-left: 20px; margin-top: 5px">
+                    <li>
+                        Pattern 1: <code>CORS error</code> または
+                        <code>403 Forbidden</code>
+                    </li>
+                    <li>
+                        Pattern 2: <code>403 Forbidden</code> (CSRF token
+                        missing)
+                    </li>
+                </ul>
+                <br />
+                <strong>❌ 脆弱性あり（修正必要）:</strong>
+                <ul style="margin-left: 20px; margin-top: 5px">
+                    <li>どちらかで <code>200 OK</code> が返る場合</li>
+                </ul>
+            </div>
+
+            <!-- 重要な警告 -->
+            <div
+                class="help-box"
+                style="background: #ffe6e6; border-left: 4px solid #dc3545"
+            >
+                <h3 style="color: #dc3545">🚨 本番環境での重要な注意</h3>
+                <p style="line-height: 1.8; margin-bottom: 10px">
+                    <strong
+                        >IP制限・HTTPS・ファイアウォールではCSRF攻撃を防げません！</strong
+                    ><br />
+                    理由:
+                    攻撃は<strong>正規ユーザーのブラウザから、正規IPで実行される</strong>ため
+                </p>
+                <p style="font-size: 0.9em; color: #666">
+                    ローカルで200 OKが出る = 本番でも脆弱性あり<br />
+                    ネットワーク制限に関係なく攻撃可能です
+                </p>
+            </div>
+        </div>
+
+        <!-- 隠しIframe（画面遷移を防ぐ） -->
+        <iframe name="csrfFrame" style="display: none"></iframe>
+
+        <!-- 隠しForm -->
+        <form
+            id="csrfForm"
+            method="POST"
+            target="csrfFrame"
+            style="display: none"
+        >
+            <input type="hidden" name="attack_test" value="csrf_simulation" />
+        </form>
+
+        <script>
+            let config = {
+                apiBase: 'http://localhost:8000/api/',
+                endpoint: 'auth/logout/',
+                fullUrl: '',
+            };
+
+            const resultDiv = document.getElementById('result');
+
+            // 初期化
+            window.onload = () => {
+                updateConfig();
+                console.log(
+                    '%c🔒 CSRF脆弱性テスト',
+                    'color: red; font-size: 20px; font-weight: bold;',
+                );
+                console.log('本番運用版 - Django REST Framework + Vue.js SPA');
+                console.log('ターゲット:', config.fullUrl);
+            };
+
+            // 設定更新
+            function updateConfig() {
+                config.apiBase = document
+                    .getElementById('apiBase')
+                    .value.trim();
+                config.endpoint = document
+                    .getElementById('targetEndpoint')
+                    .value.trim();
+
+                if (!config.apiBase.endsWith('/')) {
+                    config.apiBase += '/';
+                }
+
+                config.fullUrl = config.apiBase + config.endpoint;
+
+                document.getElementById('currentTarget').innerHTML = `
+                <strong>テスト対象:</strong> ${config.fullUrl}
+            `;
+
+                document.getElementById('csrfForm').action = config.fullUrl;
+            }
+
+            // URL変更時に自動更新
+            document
+                .getElementById('apiBase')
+                .addEventListener('change', updateConfig);
+            document
+                .getElementById('targetEndpoint')
+                .addEventListener('change', updateConfig);
+
+            // ログ表示
+            function showLog(msg, type = 'info') {
+                const timestamp = new Date().toLocaleTimeString();
+                resultDiv.innerHTML += `
+                <div class="log-entry ${type}">
+                    <strong>[${timestamp}]</strong> ${msg}
+                </div>
+            `;
+                resultDiv.style.display = 'block';
+                resultDiv.scrollTop = resultDiv.scrollHeight;
+            }
+
+            // ログクリア
+            function clearResults() {
+                resultDiv.innerHTML = '';
+                resultDiv.style.display = 'none';
+            }
+
+            // Pattern 1: Fetch API（CORSブロック期待）
+            async function attack1() {
+                showLog(
+                    `🚀 Pattern 1 開始: Fetch API攻撃 → ${config.fullUrl}`,
+                    'warning',
+                );
+                showLog(
+                    'プリフライトリクエスト発生 → CORSで防がれるはず',
+                    'info',
+                );
+
+                try {
+                    const response = await fetch(config.fullUrl, {
+                        method: 'POST',
+                        credentials: 'include', // Cookie送信
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({}),
+                    });
+
+                    if (response.ok) {
+                        showLog(
+                            '❌ 攻撃成功！CSRFトークンなしで実行できました（脆弱性あり）',
+                            'error',
+                        );
+                    } else {
+                        showLog(
+                            `✅ 防御成功！ステータス: ${response.status} - サーバー側で拒否されました`,
+                            'success',
+                        );
+                    }
+                } catch (error) {
+                    showLog(
+                        `✅ 防御成功！CORSによりブロック: ${error.message}`,
+                        'success',
+                    );
+                }
+            }
+
+            // Pattern 2: Form送信（CORSバイパス、実際の攻撃手法）
+            function attack2() {
+                showLog(
+                    `🚀 Pattern 2 開始: Form送信攻撃 → ${config.fullUrl}`,
+                    'warning',
+                );
+                showLog(
+                    '⚡ プリフライトなし → CORSをバイパス → CSRFトークンで防ぐ必要あり',
+                    'info',
+                );
+                showLog(
+                    '💡 隠しiframe使用のためページ遷移なし（実際の攻撃と同じ）',
+                    'info',
+                );
+
+                const form = document.getElementById('csrfForm');
+                form.submit();
+
+                setTimeout(() => {
+                    showLog(
+                        '🔍 F12のNetworkタブで以下を確認してください:',
+                        'info',
+                    );
+                    showLog(
+                        '✅ <strong>403 Forbidden</strong> なら防御成功（CSRFトークンで拒否）',
+                        'success',
+                    );
+                    showLog(
+                        '❌ <strong>200 OK</strong> なら脆弱性あり（即修正が必要）',
+                        'error',
+                    );
+                }, 500);
+            }
+        </script>
+    </body>
+</html>

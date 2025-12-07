@@ -1,0 +1,790 @@
+# Vuetify 3 Grid System - 正しい使い方
+
+## 🎯 公式の基本ルール
+
+### 基本構造
+```vue
+<v-container>
+    <v-row>
+        <v-col>コンテンツ</v-col>
+    </v-row>
+</v-container>
+```
+
+**階層ルール**:
+1. `<v-container>`: 最外部のコンテナ(ページごとに1つが原則)
+2. `<v-row>`: 行を定義(必要に応じて複数可)
+3. `<v-col>`: 列を定義(12カラムシステム)
+
+---
+
+## ✅ v-rowは複数使ってOK!
+
+### パターン1: 複数の`<v-row>`でセクション分け(推奨)
+```vue
+<v-container>
+    <!-- セクション1 -->
+    <v-row>
+        <v-col cols="12" md="6">左コンテンツ</v-col>
+        <v-col cols="12" md="6">右コンテンツ</v-col>
+    </v-row>
+
+    <!-- セクション2 -->
+    <v-row>
+        <v-col cols="12" md="4">カード1</v-col>
+        <v-col cols="12" md="4">カード2</v-col>
+        <v-col cols="12" md="4">カード3</v-col>
+    </v-row>
+
+    <!-- セクション3 -->
+    <v-row>
+        <v-col cols="12">フッター</v-col>
+    </v-row>
+</v-container>
+```
+
+**メリット**:
+- セクションごとに異なるレイアウトを適用できる
+- 各行で`justify`, `align`, `dense`, `no-gutters`を個別設定可能
+- コードが読みやすく、保守しやすい
+
+### パターン2: 1つの`<v-row>`に複数`<v-col>`(シンプルな場合)
+```vue
+<v-container>
+    <v-row>
+        <v-col cols="12" md="6">左</v-col>
+        <v-col cols="12" md="6">右</v-col>
+        <!-- cols="12"なので自動で改行される -->
+        <v-col cols="12">下部コンテンツ</v-col>
+    </v-row>
+</v-container>
+```
+
+**メリット**:
+- シンプルなレイアウトなら1つの`<v-row>`で完結
+- 全列に同じ余白設定を適用したい場合に便利
+
+---
+
+## 🎯 UserUpdate.vueの正しい書き方
+
+### ❌ 君の元のコード(問題点)
+```vue
+<!-- pb-0, pt-0での手動調整が多い -->
+<v-row>
+    <v-col cols="12" md="6" class="pb-0">
+        <v-text-field class="mb-2" />
+    </v-col>
+    <v-col cols="12" md="6" class="pb-0">
+        <v-text-field class="mb-4" />
+    </v-col>
+    <v-col cols="12" md="6" class="pt-0">
+        <v-checkbox class="mb-2" />
+    </v-col>
+</v-row>
+```
+
+**問題点**:
+- `pb-0`, `pt-0`で手動調整
+- `mb-2`, `mb-4`がバラバラ
+- Grid本来の余白管理を無効化している
+
+### ✅ 推奨修正(元のGridを活かす)
+```vue
+<v-container class="pa-4">
+    <v-row justify="center">
+        <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+            <v-card elevation="2">
+                <v-card-text class="pa-6">
+                    <v-form ref="form" @submit.prevent="submitForm">
+                        <!-- ユーザー名と社員ID -->
+                        <v-row>
+                            <v-col cols="12" md="6">
+                                <v-text-field
+                                    v-model="formData.username"
+                                    :label="$t('form.fields.username') + ' *'"
+                                    :rules="usernameRules"
+                                    variant="outlined"
+                                    :hint="t('form.hint.min', { min: 3 })"
+                                    persistent-hint
+                                />
+                            </v-col>
+
+                            <v-col cols="12" md="6">
+                                <v-text-field
+                                    v-model="formData.employee_id"
+                                    :label="$t('form.fields.employeeId') + ' *'"
+                                    :rules="employeeIdRules"
+                                    variant="outlined"
+                                    inputmode="numeric"
+                                    :hint="t('form.hint.employeeIdFormat')"
+                                    persistent-hint
+                                />
+                            </v-col>
+                        </v-row>
+
+                        <!-- パスワード変更セクション -->
+                        <v-row>
+                            <v-col cols="12">
+                                <v-checkbox
+                                    v-model="changePassword"
+                                    :label="t('form.labels.changePassword')"
+                                    hide-details
+                                    class="mb-2"
+                                />
+
+                                <v-expand-transition>
+                                    <div v-if="changePassword" class="d-flex flex-column ga-3">
+                                        <v-text-field
+                                            v-model="formData.password"
+                                            :label="t('form.labels.newPassword')"
+                                            :rules="passwordRules"
+                                            :type="showPassword ? 'text' : 'password'"
+                                            :append-inner-icon="showPassword ? 'visibility' : 'visibility_off'"
+                                            @click:append-inner="showPassword = !showPassword"
+                                            variant="outlined"
+                                            :hint="t('form.hint.passwordStrength')"
+                                            persistent-hint
+                                        />
+
+                                        <v-text-field
+                                            v-model="passwordConfirm"
+                                            :label="t('form.labels.newPasswordConfirmation')"
+                                            :rules="passwordConfirmRules"
+                                            :type="showPasswordConfirm ? 'text' : 'password'"
+                                            :append-inner-icon="showPasswordConfirm ? 'visibility' : 'visibility_off'"
+                                            @click:append-inner="showPasswordConfirm = !showPasswordConfirm"
+                                            variant="outlined"
+                                            :hint="t('form.hint.newPasswordConfirmation')"
+                                            persistent-hint
+                                        />
+                                    </div>
+                                </v-expand-transition>
+                            </v-col>
+                        </v-row>
+
+                        <!-- チェックボックス -->
+                        <v-row>
+                            <v-col cols="12" md="6">
+                                <v-checkbox
+                                    v-model="formData.is_admin"
+                                    :label="t('form.fields.isAdmin')"
+                                    hide-details
+                                />
+                            </v-col>
+
+                            <v-col cols="12" md="6">
+                                <v-checkbox
+                                    v-model="formData.is_active"
+                                    :label="t('form.fields.isActive')"
+                                    hide-details
+                                />
+                            </v-col>
+                        </v-row>
+
+                        <v-divider class="my-4" />
+
+                        <!-- ボタン群 -->
+                        <div class="d-flex ga-2">
+                            <v-btn
+                                type="submit"
+                                color="primary"
+                                size="large"
+                                variant="outlined"
+                                :loading="submitting"
+                                :prepend-icon="ICONS.buttons.save"
+                            >
+                                {{ t('buttons.save') }}
+                            </v-btn>
+
+                            <v-spacer />
+
+                            <v-btn
+                                variant="outlined"
+                                size="large"
+                                :prepend-icon="ICONS.buttons.arrowBack"
+                                @click="router.back()"
+                                type="button"
+                            >
+                                {{ t('buttons.back') }}
+                            </v-btn>
+                        </div>
+                    </v-form>
+                </v-card-text>
+            </v-card>
+        </v-col>
+    </v-row>
+</v-container>
+```
+
+---
+
+## 🎯 UserDetail.vueの正しい書き方
+
+### ❌ 君の元のコード(問題点)
+```vue
+<!-- 全てに個別でclass指定 -->
+<v-row class="mb-3">
+    <v-col cols="4" class="font-weight-bold">ラベル</v-col>
+    <v-col cols="8">値</v-col>
+</v-row>
+<v-divider class="my-3" />
+```
+
+**問題点**:
+- 詳細表示に12カラムGridは過剰
+- 全行に`mb-3`、全dividerに`my-3`が必要
+
+### ✅ 推奨修正(Gridを使わずシンプルに)
+```vue
+<v-card-text class="pa-6">
+    <div class="d-flex flex-column ga-3">
+        <!-- 各項目 -->
+        <div class="d-flex">
+            <div class="font-weight-bold" style="min-width: 120px;">ID</div>
+            <div>{{ user.id }}</div>
+        </div>
+
+        <v-divider />
+
+        <div class="d-flex">
+            <div class="font-weight-bold" style="min-width: 120px;">
+                {{ t('form.fields.username') }}
+            </div>
+            <div>{{ user.username }}</div>
+        </div>
+
+        <v-divider />
+
+        <!-- ... 他の項目 ... -->
+
+        <v-divider />
+
+        <!-- ボタン群 -->
+        <div class="d-flex ga-2">
+            <v-btn color="primary" @click="goToUpdate">
+                {{ t('buttons.users.detail.update') }}
+            </v-btn>
+            <v-spacer />
+            <v-btn color="error" :disabled="isLastAdmin" @click="goToDelete">
+                {{ t('buttons.users.detail.delete') }}
+            </v-btn>
+            <v-spacer />
+            <v-btn @click="goBack">
+                {{ t('buttons.back') }}
+            </v-btn>
+        </div>
+    </div>
+</v-card-text>
+```
+
+**理由**:
+- 詳細表示は左右2列の固定レイアウト
+- Gridの12カラムシステムは不要
+- Flexbox + `ga-3`の方がシンプル
+
+---
+
+## 📊 使い分けまとめ
+
+| 用途 | 推奨手段 | 理由 |
+|------|----------|------|
+| **複雑なレスポンシブレイアウト** | Grid System (`<v-row>`, `<v-col>`) | 12カラムシステム、ブレークポイント対応 |
+| **フォーム(横並び + 縦並び混在)** | Grid System | 画面サイズで並び方を変更 |
+| **詳細表示(固定2列)** | Flexbox (`d-flex`) | シンプル、余白管理が楽 |
+| **ボタン配置(両端など)** | Flexbox + `<v-spacer />` | 柔軟な配置 |
+
+---
+
+## 🎯 結論: UserUpdate.vueはどうすべきか?
+
+### ✅ **推奨**: Gridを活かしつつ、余白管理を改善
+
+```vue
+<!-- 1. 複数の<v-row>でセクション分け -->
+<v-form>
+    <!-- セクション1: ユーザー名と社員ID -->
+    <v-row>
+        <v-col cols="12" md="6">
+            <v-text-field />
+        </v-col>
+        <v-col cols="12" md="6">
+            <v-text-field />
+        </v-col>
+    </v-row>
+
+    <!-- セクション2: パスワード変更 -->
+    <v-row>
+        <v-col cols="12">
+            <v-checkbox />
+            <v-expand-transition>
+                <div v-if="changePassword" class="d-flex flex-column ga-3">
+                    <v-text-field />
+                    <v-text-field />
+                </div>
+            </v-expand-transition>
+        </v-col>
+    </v-row>
+
+    <!-- セクション3: チェックボックス -->
+    <v-row>
+        <v-col cols="12" md="6">
+            <v-checkbox />
+        </v-col>
+        <v-col cols="12" md="6">
+            <v-checkbox />
+        </v-col>
+    </v-row>
+
+    <v-divider class="my-4" />
+
+    <!-- ボタン -->
+    <div class="d-flex ga-2">
+        <v-btn />
+        <v-spacer />
+        <v-btn />
+    </div>
+</v-form>
+```
+
+**メリット**:
+- 元のレスポンシブ動作を維持
+- `pb-0`, `pt-0`, `mb-X`不要
+- Gridの自然な余白を活用
+- 見た目の変化が最小限
+
+---
+
+## 📌 重要ポイント
+
+1. **`<v-row>`は複数使ってOK!** セクションごとに分けるのが一般的
+2. **Grid Systemは複雑なレスポンシブレイアウト用**
+3. **詳細表示など単純な2列はFlexboxがシンプル**
+4. **`pb-0`, `pt-0`での手動調整は避ける** → Gridの自然な余白を使う
+5. **ボタン配置は`d-flex` + `<v-spacer />`**
+
+君の元のコードは**Grid Systemを使ってること自体は正しい**!
+問題は**余白の手動調整**やったから、そこだけ改善すればOKや!(๑•̀ㅂ•́)و✧
+
+
+-------------------------------------------------------------------------------------
+
+<script setup>
+import { ref, computed, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import { useValidation } from '@/composables/useValidation';
+import { useApiError } from '@/composables/useApiError';
+import Header from '@/components/Header.vue';
+import { usersAPI } from '@/api/users';
+import { ROUTE_NAMES } from '@/constants/routes';
+import { ICONS } from '@/constants/icons.js';
+
+const router = useRouter();
+const route = useRoute();
+const { t } = useI18n();
+const { createRules } = useValidation();
+const { showSuccess, handleApiError } = useApiError();
+
+const loading = ref(false);
+const submitting = ref(false);
+const form = ref(null);
+const changePassword = ref(false);
+const showPassword = ref(false);
+const showPasswordConfirm = ref(false);
+
+const formData = ref({
+    username: '',
+    employee_id: '',
+    is_admin: false,
+    is_active: true,
+    password: '',
+});
+
+const passwordConfirm = ref('');
+const usernameRules = createRules.username();
+const employeeIdRules = createRules.employeeId();
+
+const passwordRules = computed(() => {
+    if (!changePassword.value) return [];
+    return createRules.newPassword();
+});
+
+const passwordConfirmRules = computed(() => {
+    if (!changePassword.value) return [];
+    return createRules.passwordConfirm(formData.value.password);
+});
+
+const userId = computed(() => route.params.id);
+
+async function fetchUser() {
+    if (loading.value) return;
+
+    loading.value = true;
+    try {
+        const response = await usersAPI.get(userId.value);
+        formData.value = {
+            username: response.data.username,
+            employee_id: response.data.employee_id,
+            is_admin: response.data.is_admin,
+            is_active: response.data.is_active,
+            password: '',
+        };
+    } catch (error) {
+        handleApiError(error, 'pages.users.detail.error');
+        router.push({ name: ROUTE_NAMES.ADMIN.USERS.LIST });
+    } finally {
+        loading.value = false;
+    }
+}
+
+async function submitForm() {
+    if (submitting.value) return;
+
+    const { valid } = await form.value.validate();
+
+    if (!valid) return;
+
+    submitting.value = true;
+    try {
+        const updateData = {
+            username: formData.value.username,
+            employee_id: formData.value.employee_id,
+            is_admin: formData.value.is_admin,
+            is_active: formData.value.is_active,
+        };
+
+        if (changePassword.value && formData.value.password) {
+            updateData.password = formData.value.password;
+        }
+
+        await usersAPI.update(userId.value, updateData);
+
+        showSuccess('pages.users.update.success', {
+            username: formData.value.username,
+        });
+
+        router.replace({ name: ROUTE_NAMES.ADMIN.USERS.LIST });
+    } catch (error) {
+        handleApiError(error);
+    } finally {
+        submitting.value = false;
+    }
+}
+
+onMounted(() => {
+    fetchUser();
+});
+</script>
+
+<template>
+    <div>
+        <Header :app-title="t('pages.users.update.title')" />
+
+        <v-container class="pa-4">
+            <v-row justify="center">
+                <v-col cols="12" sm="10" md="6" lg="5" xl="4">
+                    <v-card v-if="loading" elevation="2">
+                        <v-card-text class="pa-6 text-center">
+                            <v-progress-circular indeterminate color="primary" />
+                            <p class="mt-4">{{ t('app.loading') }}</p>
+                        </v-card-text>
+                    </v-card>
+
+                    <v-card v-else elevation="2">
+                        <v-card-text class="pa-6">
+                            <v-form ref="form" @submit.prevent="submitForm">
+                                <!-- ✅ セクション1: ユーザー名と社員ID (横並び) -->
+                                <v-row>
+                                    <v-col cols="12" md="6">
+                                        <v-text-field
+                                            v-model="formData.username"
+                                            :label="$t('form.fields.username') + ' *'"
+                                            :rules="usernameRules"
+                                            variant="outlined"
+                                            :hint="t('form.hint.min', { min: 3 })"
+                                            persistent-hint
+                                        />
+                                    </v-col>
+
+                                    <v-col cols="12" md="6">
+                                        <v-text-field
+                                            v-model="formData.employee_id"
+                                            :label="$t('form.fields.employeeId') + ' *'"
+                                            :rules="employeeIdRules"
+                                            variant="outlined"
+                                            inputmode="numeric"
+                                            :hint="t('form.hint.employeeIdFormat')"
+                                            persistent-hint
+                                        />
+                                    </v-col>
+                                </v-row>
+
+                                <!-- ✅ セクション2: パスワード変更 -->
+                                <v-row>
+                                    <v-col cols="12">
+                                        <v-checkbox
+                                            v-model="changePassword"
+                                            :label="t('form.labels.changePassword')"
+                                            hide-details
+                                            class="mb-2"
+                                        />
+
+                                        <v-expand-transition>
+                                            <div v-if="changePassword" class="d-flex flex-column ga-3">
+                                                <v-text-field
+                                                    v-model="formData.password"
+                                                    :label="t('form.labels.newPassword')"
+                                                    :rules="passwordRules"
+                                                    :type="showPassword ? 'text' : 'password'"
+                                                    :append-inner-icon="showPassword ? 'visibility' : 'visibility_off'"
+                                                    @click:append-inner="showPassword = !showPassword"
+                                                    variant="outlined"
+                                                    :hint="t('form.hint.passwordStrength')"
+                                                    persistent-hint
+                                                />
+
+                                                <v-text-field
+                                                    v-model="passwordConfirm"
+                                                    :label="t('form.labels.newPasswordConfirmation')"
+                                                    :rules="passwordConfirmRules"
+                                                    :type="showPasswordConfirm ? 'text' : 'password'"
+                                                    :append-inner-icon="showPasswordConfirm ? 'visibility' : 'visibility_off'"
+                                                    @click:append-inner="showPasswordConfirm = !showPasswordConfirm"
+                                                    variant="outlined"
+                                                    :hint="t('form.hint.newPasswordConfirmation')"
+                                                    persistent-hint
+                                                />
+                                            </div>
+                                        </v-expand-transition>
+                                    </v-col>
+                                </v-row>
+
+                                <!-- ✅ セクション3: チェックボックス (横並び) -->
+                                <v-row>
+                                    <v-col cols="12" md="6">
+                                        <v-checkbox
+                                            v-model="formData.is_admin"
+                                            :label="t('form.fields.isAdmin')"
+                                            hide-details
+                                        />
+                                    </v-col>
+
+                                    <v-col cols="12" md="6">
+                                        <v-checkbox
+                                            v-model="formData.is_active"
+                                            :label="t('form.fields.isActive')"
+                                            hide-details
+                                        />
+                                    </v-col>
+                                </v-row>
+
+                                <v-divider class="my-4" />
+
+                                <!-- ボタン群 -->
+                                <div class="d-flex ga-2">
+                                    <v-btn
+                                        type="submit"
+                                        color="primary"
+                                        size="large"
+                                        variant="outlined"
+                                        :loading="submitting"
+                                        :prepend-icon="ICONS.buttons.save"
+                                    >
+                                        {{ t('buttons.save') }}
+                                    </v-btn>
+
+                                    <v-spacer />
+
+                                    <v-btn
+                                        variant="outlined"
+                                        size="large"
+                                        :prepend-icon="ICONS.buttons.arrowBack"
+                                        @click="router.back()"
+                                        type="button"
+                                    >
+                                        {{ t('buttons.back') }}
+                                    </v-btn>
+                                </div>
+                            </v-form>
+                        </v-card-text>
+                    </v-card>
+                </v-col>
+            </v-row>
+        </v-container>
+    </div>
+</template>
+
+----------------------------------------------------------------------------
+
+<!-- src/components/Header.vue -->
+<script setup>
+import { computed } from 'vue';
+import { useBreadcrumbs } from '@/composables/useBreadcrumbs';
+import { ICONS } from '@/constants/icons';
+import { ICON_SIZES } from '@/constants/theme';
+
+const { breadcrumbs: autoBreadcrumbs } = useBreadcrumbs();
+
+const props = defineProps({
+    appTitle: {
+        type: String,
+        default: 'デフォルトのタイトル名',
+    },
+    headerHeight: {
+        type: [String, Number],
+        default: 64,
+    },
+    headerElevation: {
+        type: [String, Number],
+        default: 2,
+    },
+    pageButtons: {
+        type: Array,
+        default: () => [],
+        validator: (buttons) => {
+            const isValid = buttons.every((btn) => {
+                const hasId = btn.id && typeof btn.id === 'string';
+                const hasValidType =
+                    btn.type &&
+                    [
+                        'primary',
+                        'secondary',
+                        'error',
+                        'warning',
+                        'info',
+                        'success',
+                    ].includes(btn.type);
+
+                if (import.meta.env.DEV) {
+                    if (!hasId) {
+                        console.error(
+                            '[Header] Button missing required "id" field:',
+                            btn,
+                        );
+                    }
+                    if (!hasValidType) {
+                        console.error(
+                            '[Header] Button missing or invalid "type" field:',
+                            btn,
+                        );
+                    }
+                }
+
+                return hasId && hasValidType;
+            });
+
+            return isValid;
+        },
+    },
+    breadcrumbs: {
+        type: Array,
+        default: null,
+    },
+});
+
+const displayBreadcrumbs = computed(() => {
+    if (props.breadcrumbs !== null) {
+        return props.breadcrumbs;
+    }
+    return autoBreadcrumbs.value;
+});
+</script>
+
+<template>
+    <v-toolbar
+        color="surface"
+        :elevation="headerElevation"
+        :height="headerHeight"
+    >
+        <!-- ✅ Grid Systemで明確な構造 -->
+        <v-row no-gutters align="center" class="w-100">
+            <!-- タイトル(xs:全幅、sm以上:3列) -->
+            <v-col cols="12" sm="3">
+                <v-toolbar-title class="text-truncate">
+                    {{ appTitle }}
+                </v-toolbar-title>
+            </v-col>
+
+            <!-- パンくずリスト(xs:全幅、sm以上:6列、中央配置) -->
+            <v-col
+                v-if="displayBreadcrumbs && displayBreadcrumbs.length > 0"
+                cols="12"
+                sm="6"
+                class="d-flex justify-center"
+            >
+                <v-breadcrumbs
+                    :items="displayBreadcrumbs"
+                    class="pa-0"
+                    density="compact"
+                >
+                    <template #divider>
+                        <v-icon
+                            :size="ICON_SIZES.sm"
+                            class="breadcrumb-divider"
+                        >
+                            {{ ICONS.nav.divider }}
+                        </v-icon>
+                    </template>
+
+                    <template #item="{ item }">
+                        <v-breadcrumbs-item
+                            :to="item.to"
+                            :disabled="item.disabled"
+                            class="text-caption"
+                        >
+                            {{ item.title }}
+                        </v-breadcrumbs-item>
+                    </template>
+                </v-breadcrumbs>
+            </v-col>
+
+            <!-- パンくずリストない時の余白 -->
+            <v-col v-else cols="0" sm="6"></v-col>
+
+            <!-- ボタン群(xs:非表示、sm以上:3列、右寄せ) -->
+            <v-col
+                v-if="pageButtons.length > 0"
+                cols="12"
+                sm="3"
+                class="d-none d-sm-flex justify-end"
+            >
+                <v-btn
+                    v-for="button in pageButtons"
+                    :key="button.id"
+                    variant="outlined"
+                    :color="button.type"
+                    :prepend-icon="button.icon"
+                    :loading="button.loading"
+                    :disabled="button.disabled"
+                    class="ml-2"
+                    @click="button.action"
+                >
+                    {{ button.name }}
+                </v-btn>
+            </v-col>
+        </v-row>
+    </v-toolbar>
+</template>
+
+<style scoped>
+/* パンくずリンクのスタイル */
+:deep(.v-breadcrumbs-item--link) {
+    color: rgb(var(--v-theme-primary));
+    transition: opacity 0.2s ease;
+}
+
+:deep(.v-breadcrumbs-item--link:hover) {
+    opacity: 0.7;
+}
+
+:deep(.v-breadcrumbs-item[disabled]) {
+    color: rgba(var(--v-theme-on-surface), 0.6);
+    pointer-events: none;
+}
+
+.breadcrumb-divider {
+    vertical-align: middle;
+    margin-top: -2px;
+}
+</style>
