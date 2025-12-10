@@ -37,7 +37,7 @@ const api = axios.create({
 class CSRFManager {
     constructor() {
         this.tokenFetched = false;
-        this.fetchingPromise = null;
+        this.fetchingPromise = null; // ✅ 重複リクエスト防止
     }
 
     /**
@@ -45,10 +45,10 @@ class CSRFManager {
      * 既に取得済み、または取得中の場合は重複リクエストを防ぐ
      */
     async ensureToken() {
-        if (this.tokenFetched) return;
+        if (this.tokenFetched) return; // ✅ キャッシュ
 
         if (this.fetchingPromise) {
-            return this.fetchingPromise;
+            return this.fetchingPromise; // ✅ 並列リクエスト対策
         }
 
         this.fetchingPromise = this._fetchToken();

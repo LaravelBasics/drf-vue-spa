@@ -710,3 +710,399 @@ APIView (DRFがカスタマイズ)
 
 あなたはpermission_classesに値を入れるだけ
 あとはDRFが勝手にやってくれる
+
+******************************
+
+# ❌ これがあったらCSRF無効
+@csrf_exempt
+
+# ❌ これがあったらCSRF無効
+@method_decorator(csrf_exempt, name='dispatch')
+
+# プロジェクト全体でcsrf_exempt検索
+grep -r "csrf_exempt" .
+
+# 見つかったら → CSRF無効化してる箇所がある（ヤバい）
+# 見つからない → CSRF有効（正しい）
+
+
+
+
+sessionidがCookieにあるなら半分成功してる(´・ω・｀)
+でも確認ポイントあるから見ていこう＼(^o^)／
+確認チェックリスト
+1. CSRFが本当に有効か確認
+python# views.py を確認
+from django.views.decorators.csrf import csrf_exempt
+
+# ❌ これがあったらCSRF無効
+@csrf_exempt
+def my_view(request):
+    pass
+
+# ✅ これならCSRF有効
+def my_view(request):
+    pass
+
+# Class-based viewの場合
+from django.utils.decorators import method_decorator
+
+# ❌ これがあったらCSRF無効
+@method_decorator(csrf_exempt, name='dispatch')
+class MyView(View):
+    pass
+
+# ✅ これならCSRF有効
+class MyView(View):
+    pass
+grep で一括確認
+bash# プロジェクト全体でcsrf_exempt検索
+grep -r "csrf_exempt" .
+
+# 見つかったら → CSRF無効化してる箇所がある（ヤバい）
+# 見つからない → CSRF有効（正しい）
+2. セッション認証が動いてるか確認
+バックエンドで確認
+python# views.py（デバッグ用ビュー追加）
+from django.http import JsonResponse
+from django.views import View
+
+class SessionDebugView(View):
+    """セッション確認用（開発環境のみ）"""
+    
+    def get(self, request):
+        return JsonResponse({
+            # セッション情報
+            'session_key': request.session.session_key,
+            'session_data': dict(request.session),
+            
+            # 認証情報
+            'is_authenticated': request.user.is_authenticated,
+            'user_id': getattr(request.user, 'legacy_user_id', None) if request.user.is_authenticated else None,
+            
+            # Cookie情報
+            'cookies': {
+                'sessionid': request.COOKIES.get('sessionid'),
+                'csrftoken': request.COOKIES.get('csrftoken'),
+            },
+            
+            # セッション設定
+            'settings': {
+                'SESSION_COOKIE_AGE': request.session.get_expiry_age(),
+                'SESSION_COOKIE_HTTPONLY': True,  # settings.pyの値
+            }
+        })
+
+# urls.py
+urlpatterns = [
+    path('api/debug/session/', SessionDebugView.as_view()),
+]
+ブラウザで確認
+javascript// ブラウザのコンソールで実行
+// 1. Cookie確認
+document.cookie
+
+// 出力例（正常）:
+// "sessionid=abc123...; csrftoken=xyz789..."
+
+// 2. API叩いてみる
+fetch('http://localhost:8000/api/debug/session/', {
+  credentials: 'include'  // ← これ重要
+})
+.then(r => r.json())
+.then(console.log)
+
+// 出力例（正常）:
+// {
+//   "session_key": "abc123...",
+//   "is_authenticated": true,
+//   "user_id": "tanaka"
+// }
+```
+
+#### 開発者ツールで確認
+```
+Chrome DevTools:
+1. F12で開発者ツール開く
+2. Network タブ
+3. API リクエスト選択
+4. Headers タブ
+
+【確認ポイント】
+
+■ Request Headers（送信時）
+Cookie: sessionid=abc123...; csrftoken=xyz789...
+X-CSRFToken: xyz789...  ← これあればCSRF有効
+
+■ Response Headers（受信時）
+Set-Cookie: sessionid=abc123...; HttpOnly; Path=/; SameSite=Lax
+Set-Cookie: csrftoken=xyz789...; Path=/; SameSite=Lax
+
+↑これ全部あればOK(´・ω・｀)
+3. フロント側の設定確認
+javascript// src/api/client.js
+
+import axios from 'axios'
+
+const client = axios.create({
+  baseURL: 'http://localhost:8000/api',
+  withCredentials: true,  // ✅ これ必須
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+// CSRFトークン自動付与
+client.interceptors.request.use(config => {
+  // Cookieからcsrftokenを取得
+  const csrftoken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('csrftoken='))
+    ?.split('=')[1]
+  
+  if (csrftoken) {
+    config.headers['X-CSRFToken'] = csrftoken  // ✅ これ必須
+  }
+  
+  return config
+})
+
+export default client
+確認ポイント
+javascript// ❌ これだとダメ
+axios.post('/api/login/', data)  // withCredentials未設定
+
+// ✅ これならOK
+client.post('/login/', data)  // clientインスタンス使う
+4. Django settings.py確認
+python# settings.py
+
+# === セッション設定 ===
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # ✅ DB保存
+SESSION_COOKIE_AGE = 86400  # 1日
+SESSION_COOKIE_HTTPONLY = True  # ✅ JS読み取り不可（セキュア）
+SESSION_COOKIE_SECURE = False  # 開発はFalse、本番はTrue
+SESSION_COOKIE_SAMESITE = 'Lax'  # ✅ CSRF対策
+
+# === CSRF設定 ===
+CSRF_COOKIE_HTTPONLY = False  # ✅ JSから読む必要あり
+CSRF_COOKIE_SECURE = False  # 開発はFalse、本番はTrue
+CSRF_COOKIE_SAMESITE = 'Lax'  # ✅ CSRF対策
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:5173',  # ✅ Vue.jsのポート
+]
+
+# === CORS設定 ===
+CORS_ALLOW_CREDENTIALS = True  # ✅ Cookie送信許可
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5173',  # ✅ Vue.jsのオリジン
+]
+
+# === ミドルウェア ===
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # ✅ 一番上
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',  # ✅ 必須
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',  # ✅ 必須
+    'django.contrib.auth.middleware.AuthenticationMiddleware',  # ✅ 必須
+    # ...
+]
+完全動作確認スクリプト
+python# tests/test_auth.py（手動テスト用）
+
+import requests
+
+BASE_URL = 'http://localhost:8000/api'
+
+# セッション作成（Cookieを保持）
+session = requests.Session()
+
+# 1. CSRFトークン取得
+response = session.get(f'{BASE_URL}/debug/session/')
+print('=== Step 1: Get CSRF Token ===')
+print(f'Status: {response.status_code}')
+print(f'Cookies: {session.cookies.get_dict()}')
+csrf_token = session.cookies.get('csrftoken')
+print(f'CSRF Token: {csrf_token}')
+print()
+
+# 2. ログイン
+print('=== Step 2: Login ===')
+response = session.post(
+    f'{BASE_URL}/login/',
+    json={
+        'user_id': 'test_user',
+        'password': 'test_pass',
+        'group_id': 'test_group'
+    },
+    headers={
+        'X-CSRFToken': csrf_token
+    }
+)
+print(f'Status: {response.status_code}')
+print(f'Response: {response.json()}')
+print(f'Cookies: {session.cookies.get_dict()}')
+print()
+
+# 3. 認証確認
+print('=== Step 3: Check Auth ===')
+response = session.get(f'{BASE_URL}/me/')
+print(f'Status: {response.status_code}')
+print(f'Response: {response.json()}')
+print()
+
+# 4. ログアウト
+print('=== Step 4: Logout ===')
+response = session.post(
+    f'{BASE_URL}/logout/',
+    headers={
+        'X-CSRFToken': csrf_token
+    }
+)
+print(f'Status: {response.status_code}')
+print(f'Response: {response.json()}')
+print(f'Cookies: {session.cookies.get_dict()}')
+実行
+bashpython tests/test_auth.py
+```
+
+**期待される出力**
+```
+=== Step 1: Get CSRF Token ===
+Status: 200
+Cookies: {'csrftoken': 'xyz789...', 'sessionid': 'abc123...'}
+CSRF Token: xyz789...
+
+=== Step 2: Login ===
+Status: 200
+Response: {'status': 'ok', 'user_id': 'test_user', 'group_id': 'test_group'}
+Cookies: {'csrftoken': 'xyz789...', 'sessionid': 'abc123...'}
+
+=== Step 3: Check Auth ===
+Status: 200
+Response: {'authenticated': True, 'user_id': 'test_user', 'group_id': 'test_group'}
+
+=== Step 4: Logout ===
+Status: 200
+Response: {'status': 'ok'}
+Cookies: {'csrftoken': 'xyz789...'}  ← sessionidが消える
+```
+
+## よくある不具合パターン
+
+### パターン1: CSRFエラー
+```
+エラー: 403 Forbidden
+レスポンス: {"detail": "CSRF Failed: CSRF token missing or incorrect."}
+
+原因:
+❌ X-CSRFTokenヘッダーがない
+❌ withCredentials: trueがない
+❌ csrftokenがCookieにない
+
+解決:
+✅ interceptorでX-CSRFToken追加
+✅ withCredentials: true設定
+✅ 初回アクセスでcsrftoken取得
+```
+
+### パターン2: セッションが保存されない
+```
+症状: ログイン成功するけど、次のリクエストで未認証扱い
+
+原因:
+❌ withCredentials: trueがない
+❌ CORS_ALLOW_CREDENTIALS = Falseになってる
+❌ SessionMiddlewareがない
+
+解決:
+✅ withCredentials: true設定
+✅ CORS_ALLOW_CREDENTIALS = True
+✅ ミドルウェア確認
+パターン3: sessionidがあるけど認証されない
+python# デバッグビューで確認
+def debug_view(request):
+    print(f'Session Key: {request.session.session_key}')
+    print(f'Session Data: {dict(request.session)}')
+    print(f'User: {request.user}')
+    print(f'Is Authenticated: {request.user.is_authenticated}')
+    
+    # セッションDBを直接確認
+    from django.contrib.sessions.models import Session
+    try:
+        session = Session.objects.get(session_key=request.session.session_key)
+        print(f'Session Expires: {session.expire_date}')
+        print(f'Session Data (DB): {session.get_decoded()}')
+    except Session.DoesNotExist:
+        print('Session not found in DB!')
+最終確認コマンド
+bash# 1. csrf_exempt探す
+grep -r "csrf_exempt" . --include="*.py"
+
+# 2. セッションDB確認
+python manage.py shell
+>>> from django.contrib.sessions.models import Session
+>>> Session.objects.all()
+>>> Session.objects.all().values()
+
+# 3. ログ確認
+tail -f logs/audit.log
+
+# 4. 設定確認
+python manage.py shell
+>>> from django.conf import settings
+>>> settings.SESSION_COOKIE_HTTPONLY
+>>> settings.CSRF_COOKIE_HTTPONLY
+>>> settings.CORS_ALLOW_CREDENTIALS
+```
+
+## 結論チェックリスト
+```
+□ grep -r "csrf_exempt"で何も見つからない
+□ sessionidがCookieにある
+□ csrftokenがCookieにある
+□ Network タブでX-CSRFTokenヘッダーが送信されてる
+□ Network タブでCookieヘッダーが送信されてる
+□ withCredentials: true設定してる
+□ CORS_ALLOW_CREDENTIALS = True
+□ SessionMiddleware、CsrfViewMiddleware、AuthenticationMiddlewareがある
+□ /api/me/で認証状態が取得できる
+
+↑全部✅ なら完璧(´・ω・｀)
+sessionidがCookieにあるなら、あとはCSRFトークンちゃんと送ってるか確認するだけ＼(^o^)／
+不安なら上記のデバッグビュー追加して確認してみてください(´・ω・｀)
+
+curlで確認
+
+# 1. CSRFトークン取得
+curl -v \
+  -X GET \
+  http://localhost:8000/api/csrf/ \
+  -c cookies.txt
+
+# cookies.txt の中身確認
+cat cookies.txt
+# → csrftoken が保存されてる
+
+# 2. ログインAPI（CSRFトークン付き）
+csrf_token=$(grep csrftoken cookies.txt | awk '{print $7}')
+
+curl -v \
+  -X POST \
+  http://localhost:8000/api/login/ \
+  -b cookies.txt \
+  -H "Content-Type: application/json" \
+  -H "X-CSRFToken: $csrf_token" \
+  -d '{
+    "user_id": "test",
+    "password": "test",
+    "group_id": "test"
+  }'
+
+  Q2: 「CSRFトークンの有効期限は？」
+A: デフォルトで1年(´・ω・｀)
+python# settings.py
+CSRF_COOKIE_AGE = 31449600  # 1年（デフォルト）
+# 変更するなら
+CSRF_COOKIE_AGE = 86400  # 1日
