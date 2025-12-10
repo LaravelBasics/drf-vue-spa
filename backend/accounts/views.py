@@ -141,8 +141,17 @@ class LoginAPIView(APIView):
             request, username=user_id, password=password, group_id=group_id
         )
 
+        # is	    同一である	    user is None
+        # is not	同一ではない	user is not None
+
+        # is_active (ブール値) の否定
+        # if not user.is_active:  # 正しい
+
+        # None (オブジェクト) の否定
+        # if user is not None:    # 正しい
+
         if user:
-            if not user.is_active:
+            if not user.is_active:  # もしユーザーがアクティブでない場合
                 self._increment_attempts(user_id, group_id)
                 return Response(
                     {"detail": str(_("ユーザーIDまたはパスワードが正しくありません"))},
