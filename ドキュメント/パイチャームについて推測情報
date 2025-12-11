@@ -102,3 +102,27 @@ pipenvを使いたい場合：
 bashpip install pipenv
 cd backend
 pipenv install -r requirements.txt
+
+venvは内部で
+C:\元のプロジェクト\backend\venv\Scripts\python.exe
+みたいなパスをハードコーディングしてるので、別の場所に持ってきた瞬間に全部壊れるんですよね...
+サクッと直す手順
+bashcd backend
+
+# 1. 古いvenv消す
+rmdir /s venv
+
+# 2. 新しく作る（5秒で終わる）
+python -m venv venv
+
+# 3. アクティベート
+venv\Scripts\activate
+
+# 4. requirements.txtからインストール
+pip install -r requirements.txt
+
+# 5. 動作確認
+python manage.py runserver
+これでPyCharmのインタープリター設定も直せば完璧です！
+venvは絶対に共有・コピーしちゃダメって覚えておくと今後も安心ですね💡
+gitにも.gitignoreでvenv/を除外するのが鉄則です👍
