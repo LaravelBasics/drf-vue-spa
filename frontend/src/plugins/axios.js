@@ -9,9 +9,7 @@ const API_TIMEOUT = parseInt(import.meta.env.VITE_API_TIMEOUT, 10) || 10000;
 
 // 開発環境でのバリデーション
 if (import.meta.env.DEV && !API_BASE_URL) {
-    console.error(
-        '⚠️ VITE_API_BASE_URL is not defined. Please check your .env file.',
-    );
+    console.error('⚠️ VITE_API_BASE_URL is not defined.');
 }
 
 // Axiosインスタンス作成

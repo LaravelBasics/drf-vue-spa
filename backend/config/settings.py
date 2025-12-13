@@ -38,16 +38,21 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_filters",
     "accounts",
-    "users",
+    # "users",
+    "common",  # モデルアプリ（inspectdb取り込み）
     # "debug_toolbar",  # 開発ツール（最後に追加）
 ]
 
 # === 認証 ===
 
-AUTH_USER_MODEL = "users.User"
+# AUTH_USER_MODEL = "users.User"
+# ========================================
+# カスタムユーザーモデル（★超重要★）
+# ========================================
+AUTH_USER_MODEL = "common.MUser"
 
 AUTHENTICATION_BACKENDS = [
-    "accounts.backends.GroupUserAuthBackend",  # ← employee_id版から変更
+    "accounts.backends.GroupUserAuthBackend",  # カスタムバックエンド
 ]
 
 # === REST Framework ===
@@ -168,6 +173,10 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "your_password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "OPTIONS": {
+            # DjangoがSQLを実行する際に、この検索パスを設定します。
+            "options": "-c search_path=legacy_schema,public",
+        },
     }
 }
 
@@ -184,9 +193,9 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # === パスワードハッシュアルゴリズム ===
 PASSWORD_HASHERS = [
-    "django.contrib.auth.hashers.Argon2PasswordHasher",
-    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
-    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    # "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",  # ★Django標準（追加パッケージ不要）★
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",  # レガシー互換用
     "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
 ]
 
@@ -218,56 +227,56 @@ STATIC_URL = "static/"
 
 # === デフォルト設定 ===
 
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+# DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # === システムチェック ===
 
 # カスタムユーザーモデルで is_superuser フィールドがない警告を抑制
 # (ビジネス要件に従い is_admin を使用しているため)
-SILENCED_SYSTEM_CHECKS = ["auth.W004"]
+# SILENCED_SYSTEM_CHECKS = ["auth.W004"]
 
 # === 監査ログ設定 ===
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,  # 既存のログを無効化しない
-    "formatters": {
-        "verbose": {
-            "format": "{levelname} {asctime} {module} {message}",
-            "style": "{",
-        },
-        "audit_json": {
-            "()": "common.formatters.AuditJSONFormatter",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        },
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "verbose",
-        },
-        "audit_file": {
-            "level": "INFO",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": BASE_DIR / "logs" / "audit.log",
-            "maxBytes": 10 * 1024 * 1024,  # 10MB
-            "backupCount": 30,  # 過去30ファイル保持
-            "formatter": "audit_json",
-            "encoding": "utf-8",
-        },
-    },
-    "loggers": {
-        "django": {
-            "handlers": ["console"],
-            "level": "INFO",
-        },
-        "audit": {
-            "handlers": ["audit_file"],
-            "level": "INFO",
-            "propagate": False,  # 親ロガーに伝播させない
-        },
-    },
-}
+# LOGGING = {
+#     "version": 1,
+#     "disable_existing_loggers": False,  # 既存のログを無効化しない
+#     "formatters": {
+#         "verbose": {
+#             "format": "{levelname} {asctime} {module} {message}",
+#             "style": "{",
+#         },
+#         "audit_json": {
+#             "()": "common.formatters.AuditJSONFormatter",
+#             "datefmt": "%Y-%m-%d %H:%M:%S",
+#         },
+#     },
+#     "handlers": {
+#         "console": {
+#             "class": "logging.StreamHandler",
+#             "formatter": "verbose",
+#         },
+#         "audit_file": {
+#             "level": "INFO",
+#             "class": "logging.handlers.RotatingFileHandler",
+#             "filename": BASE_DIR / "logs" / "audit.log",
+#             "maxBytes": 10 * 1024 * 1024,  # 10MB
+#             "backupCount": 30,  # 過去30ファイル保持
+#             "formatter": "audit_json",
+#             "encoding": "utf-8",
+#         },
+#     },
+#     "loggers": {
+#         "django": {
+#             "handlers": ["console"],
+#             "level": "INFO",
+#         },
+#         "audit": {
+#             "handlers": ["audit_file"],
+#             "level": "INFO",
+#             "propagate": False,  # 親ロガーに伝播させない
+#         },
+#     },
+# }
 
 # Debug Toolbar設定（最後に追加）
 # INTERNAL_IPS = [
@@ -287,3 +296,48 @@ LOGGING = {
 #     "DISPLAY_DUPLICATES": 10,
 #     "RESPONSE_HEADER": "X-DjangoQueryCount-Count",
 # }
+
+
+# ========================================
+# レガシーシステム運用メモ
+# ========================================
+"""
+【inspectdb運用ルール】
+
+1. テーブル管理
+   - PostgreSQL側で管理（ALTER TABLE等）
+   - Djangoマイグレーションは使わない（managed=False）
+
+2. モデル更新手順
+   - PostgreSQLでテーブル変更
+   - python manage.py inspectdb > temp_models.py
+   - 手動でmodels.pyに反映（認証メソッドは維持）
+
+3. 初回セットアップ
+   - PostgreSQLに以下のテーブルを作成:
+     * m_user (user_id PK, password, username, email, is_admin, is_active)
+     * m_group (group_id PK, group_name, is_active)
+     * m_user_group (user_id, group_id, is_active)
+   - Djangoのsessionテーブルは標準マイグレーションで作成:
+     * python manage.py migrate
+
+4. パスワードハッシュ化
+   - 既存ユーザーのパスワードをDjango形式にハッシュ化:
+     ```python
+     from django.contrib.auth.hashers import make_password
+     hashed = make_password('your_password')
+     # PostgreSQLのpasswordカラムに保存
+     ```
+
+5. 管理者権限設定
+   - PostgreSQLで特定ユーザーを管理者に:
+     ```sql
+     UPDATE m_user SET is_admin = TRUE WHERE user_id = 'admin001';
+     ```
+
+6. トラブルシューティング
+   - User.DoesNotExist → user_idの型確認（文字列 vs 整数）
+   - IsAuthenticated動かない → models.pyのメソッド確認
+   - CSRF failed → CSRFEnforcedSessionAuthentication確認
+   - 管理者権限チェック失敗 → is_adminカラム確認
+"""

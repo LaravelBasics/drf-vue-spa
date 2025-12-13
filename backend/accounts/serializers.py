@@ -5,7 +5,7 @@
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
-from users.models import UserGroup
+from common.models import MUserGroup, MGroup  # MGroup もここでインポートが必要！
 
 User = get_user_model()
 
@@ -69,8 +69,8 @@ class UserSerializer(serializers.ModelSerializer):
         fields = [
             "user_id",
             "username",
-            "email",
-            "is_admin",
+            # "email",
+            # "is_admin",
             "is_active",
             "current_group",  # ← 追加
         ]
@@ -96,20 +96,27 @@ class UserSerializer(serializers.ModelSerializer):
             return None
 
         try:
-            # ユーザーが所属しているアクティブなグループか確認
-            user_group = UserGroup.objects.select_related("group").get(
-                user=obj,
+            # ★【修正点 1】グループ所属確認（リレーションを使わず user_id で直接検索）
+            MUserGroup.objects.get(
+                user_id=obj.user_id,  # user=obj の代わりに user_id を使用
                 group_id=group_id,
                 is_active=True,
-                group__is_active=True,
             )
 
+            # ★【修正点 2】MGroup のアクティブ状態を別途検索
+            group_obj = MGroup.objects.get(
+                group_id=group_id,
+                is_active=True,  # group__is_active=True の代わりに個別にチェック
+            )
+
+            # ユーザー所属確認とグループアクティブチェックの両方が通過
             return {
-                "group_id": user_group.group.group_id,
-                "group_name": user_group.group.group_name,
+                "group_id": group_obj.group_id,
+                "group_name": group_obj.group_name,
             }
-        except UserGroup.DoesNotExist:
-            # グループが見つからない場合はNoneを返す
+
+        # MUserGroup.DoesNotExist と MGroup.DoesNotExist の両方をキャッチ
+        except (MUserGroup.DoesNotExist, MGroup.DoesNotExist):
             return None
 
 

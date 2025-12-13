@@ -6,7 +6,7 @@ from django.urls import path, include
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("accounts.urls")),
-    path("api/", include("users.urls")),
+    # path("api/", include("users.urls")),
 ]
 
 # Debug Toolbar用（最後に追加）

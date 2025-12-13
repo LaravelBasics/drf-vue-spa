@@ -1,0 +1,128 @@
+-- PostgreSQL 16 / legacy_system データベース用 テーブル定義
+
+
+-- =========================================
+
+-- 1. ユーザーマスタ: m_userテーブル
+
+-- =========================================
+
+CREATE TABLE m_user (
+
+    user_id VARCHAR(50) PRIMARY KEY, 
+
+    password VARCHAR(128) NOT NULL,
+
+    username VARCHAR(50) NOT NULL,
+
+    last_login TIMESTAMP WITH TIME ZONE,
+
+    is_active BOOLEAN DEFAULT TRUE,
+
+    is_superuser BOOLEAN DEFAULT FALSE,
+
+    is_staff BOOLEAN DEFAULT FALSE, 
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+
+);
+
+
+
+-- =========================================
+
+-- 2. グループマスタ: m_groupテーブル
+
+-- =========================================
+
+CREATE TABLE m_group (
+
+    group_code VARCHAR(50) PRIMARY KEY,
+
+    group_name VARCHAR(100) NOT NULL,
+
+    is_active BOOLEAN DEFAULT TRUE,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+
+);
+
+
+
+-- =========================================
+
+-- 3. ユーザー所属グループマスタ: m_user_groupテーブル
+
+-- =========================================
+
+CREATE TABLE m_user_group (
+
+    user_id VARCHAR(50) NOT NULL,
+
+    group_code VARCHAR(50) NOT NULL,
+
+    is_active BOOLEAN DEFAULT TRUE,
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (user_id, group_code)
+
+);
+
+
+
+-- =========================================
+
+-- 4. グループ権限マスタ: m_group_permissionsテーブル
+
+-- =========================================
+
+CREATE TABLE m_group_permissions (
+
+    group_code VARCHAR(50) NOT NULL,
+
+    permission_code VARCHAR(50) NOT NULL,
+
+    PRIMARY KEY (group_code, permission_code)
+
+);
+
+
+
+
+
+-- =========================================
+
+-- サンプルデータ挿入 (m_group)
+
+-- =========================================
+
+INSERT INTO m_group (group_code, group_name) 
+
+VALUES
+
+
+group_code → group_id へのカラム名変更SQLスクリプト
+
+psql -h localhost -p 5432 -U postgres -d legacy_system
+
+-- 1. m_group テーブル: group_code -> group_id
+ALTER TABLE m_group RENAME COLUMN group_code TO group_id;
+-- 成功すると "ALTER TABLE" と表示されます。
+
+-- 2. m_user_group テーブル: group_code -> group_id
+-- (注: 複合主キーの定義も同時に更新されます)
+ALTER TABLE m_user_group RENAME COLUMN group_code TO group_id;
+-- 成功すると "ALTER TABLE" と表示されます。
+
+-- 3. m_group_permissions テーブル: group_code -> group_id
+-- (注: 複合主キーの定義も同時に更新されます)
+ALTER TABLE m_group_permissions RENAME COLUMN group_code TO group_id;
+-- 成功すると "ALTER TABLE" と表示されます。
+
+----------------------------------------------------------------------
+
