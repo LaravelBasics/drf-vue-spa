@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>is_authenticated の仕組み</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: 'Segoe UI', sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                padding: 20px;
+                min-height: 100vh;
+            }
+
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            h1 {
+                text-align: center;
+                color: white;
+                margin-bottom: 30px;
+                font-size: 2.5em;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            }
+
+            .section {
+                background: white;
+                border-radius: 15px;
+                padding: 30px;
+                margin-bottom: 30px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+
+            .section-title {
+                font-size: 1.8em;
+                color: #667eea;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 3px solid #667eea;
+            }
+
+            .comparison {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin: 20px 0;
+            }
+
+            .comparison-item {
+                padding: 25px;
+                border-radius: 10px;
+                border: 3px solid;
+            }
+
+            .comparison-item.logged-in {
+                background: #e8f5e9;
+                border-color: #4caf50;
+            }
+
+            .comparison-item.not-logged-in {
+                background: #ffebee;
+                border-color: #f44336;
+            }
+
+            .comparison-title {
+                font-weight: bold;
+                margin-bottom: 15px;
+                font-size: 1.3em;
+                text-align: center;
+            }
+
+            .code-block {
+                background: #2d2d2d;
+                color: #f8f8f2;
+                padding: 15px;
+                border-radius: 8px;
+                margin: 10px 0;
+                font-family: 'Courier New', monospace;
+                overflow-x: auto;
+                font-size: 0.9em;
+            }
+
+            .code-title {
+                color: #50fa7b;
+                font-weight: bold;
+                margin-bottom: 5px;
+            }
+
+            .highlight {
+                background: #ffeb3b;
+                padding: 2px 5px;
+                border-radius: 3px;
+                font-weight: bold;
+                color: #000;
+            }
+
+            .highlight-red {
+                background: #ffcdd2;
+                padding: 2px 5px;
+                border-radius: 3px;
+                font-weight: bold;
+                color: #c62828;
+            }
+
+            .highlight-green {
+                background: #c8e6c9;
+                padding: 2px 5px;
+                border-radius: 3px;
+                font-weight: bold;
+                color: #2e7d32;
+            }
+
+            .flow-step {
+                position: relative;
+                padding: 20px;
+                border-radius: 10px;
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                border-left: 5px solid #667eea;
+                margin: 20px 0;
+            }
+
+            .step-number {
+                position: absolute;
+                top: -15px;
+                left: 20px;
+                background: #667eea;
+                color: white;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                font-size: 1.2em;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            }
+
+            .step-title {
+                font-size: 1.3em;
+                color: #333;
+                margin: 10px 0 15px 0;
+                font-weight: bold;
+            }
+
+            .key-point {
+                background: #fff3cd;
+                border-left: 4px solid #ffc107;
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 5px;
+            }
+
+            .key-point-title {
+                font-weight: bold;
+                color: #856404;
+                margin-bottom: 8px;
+                font-size: 1.1em;
+            }
+
+            .danger-box {
+                background: #ffebee;
+                border-left: 4px solid #f44336;
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 5px;
+            }
+
+            .success-box {
+                background: #e8f5e9;
+                border-left: 4px solid #4caf50;
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 5px;
+            }
+
+            .arrow {
+                text-align: center;
+                font-size: 2em;
+                color: #667eea;
+                margin: 10px 0;
+            }
+
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+            }
+
+            th {
+                background: #667eea;
+                color: white;
+                padding: 12px;
+                text-align: left;
+            }
+
+            td {
+                padding: 12px;
+                border-bottom: 1px solid #ddd;
+            }
+
+            tr:hover {
+                background: #f5f5f5;
+            }
+
+            .visual-demo {
+                display: flex;
+                gap: 30px;
+                margin: 30px 0;
+                justify-content: center;
+            }
+
+            .demo-card {
+                flex: 1;
+                padding: 25px;
+                border-radius: 15px;
+                text-align: center;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            }
+
+            .demo-card.success {
+                background: linear-gradient(135deg, #a8e063 0%, #56ab2f 100%);
+                color: white;
+            }
+
+            .demo-card.error {
+                background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+                color: white;
+            }
+
+            .demo-icon {
+                font-size: 4em;
+                margin-bottom: 15px;
+            }
+
+            .demo-title {
+                font-size: 1.5em;
+                font-weight: bold;
+                margin-bottom: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔐 is_authenticated の仕組み完全解説</h1>
+
+            <!-- メインの仕組み -->
+            <div class="section">
+                <h2 class="section-title">核心: request.user の正体</h2>
+
+                <div class="key-point">
+                    <div class="key-point-title">💡 超重要ポイント</div>
+                    <strong>request.user</strong>
+                    には2種類のオブジェクトが入る可能性がある：<br />
+                    1️⃣
+                    <span class="highlight-green">User オブジェクト</span
+                    >（ログイン済み）<br />
+                    2️⃣
+                    <span class="highlight-red">AnonymousUser オブジェクト</span
+                    >（未ログイン）
+                </div>
+
+                <div class="comparison">
+                    <div class="comparison-item logged-in">
+                        <div class="comparison-title">✅ ログイン済み</div>
+                        <div class="code-block">
+                            <div class="code-title"># request.user の中身</div>
+                            &lt;User: user123&gt; #
+                            request.user.is_authenticated を呼ぶと... →
+                            User.is_authenticated が呼ばれる → @property
+                            で定義した return True → ✅ True が返る
+                        </div>
+                    </div>
+
+                    <div class="comparison-item not-logged-in">
+                        <div class="comparison-title">❌ 未ログイン</div>
+                        <div class="code-block">
+                            <div class="code-title"># request.user の中身</div>
+                            &lt;AnonymousUser&gt; #
+                            request.user.is_authenticated を呼ぶと... →
+                            AnonymousUser.is_authenticated が呼ばれる → 常に
+                            False を返す（Django内部実装） → ❌ False が返る
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 詳細フロー -->
+            <div class="section">
+                <h2 class="section-title">AuthenticationMiddleware の動き</h2>
+
+                <div class="flow-step">
+                    <div class="step-number">1</div>
+                    <div class="step-title">セッションチェック</div>
+                    <div class="code-block">
+                        <div class="code-title">
+                            # AuthenticationMiddleware の処理
+                        </div>
+                        # セッションに _auth_user_id があるか？ user_id =
+                        request.session.get('_auth_user_id') if user_id: #
+                        ★ログイン済み → Userを取得★ user =
+                        backend.get_user(user_id) request.user = user # ← User
+                        オブジェクト else: # ★未ログイン →
+                        AnonymousUserをセット★ request.user = AnonymousUser() #
+                        ← AnonymousUser オブジェクト
+                    </div>
+                </div>
+
+                <div class="arrow">↓</div>
+
+                <div class="flow-step">
+                    <div class="step-number">2</div>
+                    <div class="step-title">IsAuthenticated の判定</div>
+                    <div class="code-block">
+                        <div class="code-title">
+                            # IsAuthenticated クラスの内部
+                        </div>
+                        class IsAuthenticated(BasePermission): def
+                        has_permission(self, request, view): # ★ここで
+                        request.user.is_authenticated を呼ぶ★ return
+                        request.user and request.user.is_authenticated
+                    </div>
+
+                    <div class="success-box">
+                        <strong>✅ ログイン済みの場合:</strong><br />
+                        <code>request.user</code> = User オブジェクト<br />
+                        <code>request.user.is_authenticated</code> = True<br />
+                        → <span class="highlight-green">通過</span>
+                    </div>
+
+                    <div class="danger-box">
+                        <strong>❌ 未ログインの場合:</strong><br />
+                        <code>request.user</code> = AnonymousUser
+                        オブジェクト<br />
+                        <code>request.user.is_authenticated</code> = False<br />
+                        → <span class="highlight-red">401 Unauthorized</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AnonymousUser の実装 -->
+            <div class="section">
+                <h2 class="section-title">
+                    AnonymousUser の実装（Django内部）
+                </h2>
+
+                <div class="code-block">
+                    <div class="code-title">
+                        # django/contrib/auth/models.py
+                    </div>
+                    class AnonymousUser: """未ログインユーザーを表すクラス""" id
+                    = None pk = None username = '' is_staff = False is_active =
+                    False is_superuser = False # ★重要: is_authenticated は常に
+                    False★ @property def is_authenticated(self): return False #
+                    ← 常にFalse！ # ★重要: is_anonymous は常に True★ @property
+                    def is_anonymous(self): return True # ← 常にTrue！
+                </div>
+
+                <div class="key-point">
+                    <div class="key-point-title">🔑 ポイント</div>
+                    Djangoは未ログイン時に<strong>None</strong>ではなく<strong>AnonymousUser</strong>をセットする。<br />
+                    これにより<code>request.user.is_authenticated</code>が常に安全に呼べる。
+                </div>
+            </div>
+
+            <!-- 実際の動作比較 -->
+            <div class="section">
+                <h2 class="section-title">実際の動作比較</h2>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>状態</th>
+                            <th>request.user の型</th>
+                            <th>is_authenticated</th>
+                            <th>IsAuthenticated</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>ログイン成功後</strong></td>
+                            <td><code>User</code></td>
+                            <td><span class="highlight-green">True</span></td>
+                            <td>
+                                <span class="highlight-green">✅ 通過</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>ログアウト後</strong></td>
+                            <td><code>AnonymousUser</code></td>
+                            <td><span class="highlight-red">False</span></td>
+                            <td><span class="highlight-red">❌ 401</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>初回アクセス</strong></td>
+                            <td><code>AnonymousUser</code></td>
+                            <td><span class="highlight-red">False</span></td>
+                            <td><span class="highlight-red">❌ 401</span></td>
+                        </tr>
+                        <tr>
+                            <td><strong>セッション期限切れ</strong></td>
+                            <td><code>AnonymousUser</code></td>
+                            <td><span class="highlight-red">False</span></td>
+                            <td><span class="highlight-red">❌ 401</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ビジュアルデモ -->
+            <div class="section">
+                <h2 class="section-title">視覚的に理解</h2>
+
+                <div class="visual-demo">
+                    <div class="demo-card success">
+                        <div class="demo-icon">✅</div>
+                        <div class="demo-title">ログイン済み</div>
+                        <div
+                            class="code-block"
+                            style="text-align: left; margin-top: 15px"
+                        >
+                            request.user → User('user123') → .is_authenticated →
+                            return True → IsAuthenticated: ✅ PASS
+                        </div>
+                    </div>
+
+                    <div class="demo-card error">
+                        <div class="demo-icon">❌</div>
+                        <div class="demo-title">未ログイン</div>
+                        <div
+                            class="code-block"
+                            style="text-align: left; margin-top: 15px"
+                        >
+                            request.user → AnonymousUser() → .is_authenticated →
+                            return False → IsAuthenticated: ❌ 401
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- コード例 -->
+            <div class="section">
+                <h2 class="section-title">実際のコード例</h2>
+
+                <div class="code-block">
+                    <div class="code-title"># views.py</div>
+                    class MeAPIView(APIView): permission_classes =
+                    [IsAuthenticated] def get(self, request): #
+                    ★この時点で既にIsAuthenticatedを通過★ # つまり request.user
+                    は 100% User オブジェクト # AnonymousUser の可能性はゼロ
+                    print(type(request.user)) # ログイン済み: &lt;class
+                    'users.models.User'&gt; #
+                    未ログインはここに来れない（401で弾かれる） return
+                    Response({ 'user_id': request.user.user_id, # ← 安全に使える
+                    'username': request.user.username })
+                </div>
+
+                <div class="code-block">
+                    <div class="code-title"># 未ログイン時のリクエスト</div>
+                    GET /api/me/ → AuthenticationMiddleware → request.session に
+                    _auth_user_id なし → request.user = AnonymousUser() →
+                    IsAuthenticated.has_permission() →
+                    request.user.is_authenticated == False → ❌ return False →
+                    DRF が 401 Unauthorized を返す → views.py の get()
+                    は実行されない
+                </div>
+            </div>
+
+            <!-- まとめ -->
+            <div class="section">
+                <h2 class="section-title">まとめ</h2>
+
+                <div class="key-point">
+                    <div class="key-point-title">🎯 結論</div>
+                    <strong style="font-size: 1.2em">
+                        <code
+                            >@property def is_authenticated(self): return
+                            True</code
+                        >
+                        は<br />
+                        「Userオブジェクトが存在する場合は常にTrue」という意味
+                    </strong>
+                    <br /><br />
+                    <strong>なぜ常にTrueじゃないのか？</strong><br />
+                    → 未ログイン時は<span class="highlight-red"
+                        >AnonymousUser.is_authenticated</span
+                    >が呼ばれるから<br />
+                    → AnonymousUserは常にFalseを返す<br />
+                    → だから<span class="highlight"
+                        >IsAuthenticatedが正しく動作する</span
+                    >
+                </div>
+
+                <div class="success-box" style="margin-top: 20px">
+                    <strong>✅ この設計の利点:</strong><br />
+                    ・<code>request.user</code>が常に存在する（Noneチェック不要）<br />
+                    ・<code>request.user.is_authenticated</code>が安全に呼べる<br />
+                    ・ログイン済み/未ログインをシンプルに判定できる
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

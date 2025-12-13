@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Django Session認証フロー完全図解</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family: 'Segoe UI', sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                padding: 20px;
+                min-height: 100vh;
+            }
+
+            .container {
+                max-width: 1400px;
+                margin: 0 auto;
+            }
+
+            h1 {
+                text-align: center;
+                color: white;
+                margin-bottom: 30px;
+                font-size: 2.5em;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            }
+
+            .flow-section {
+                background: white;
+                border-radius: 15px;
+                padding: 30px;
+                margin-bottom: 30px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+
+            .section-title {
+                font-size: 1.8em;
+                color: #667eea;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 3px solid #667eea;
+            }
+
+            .flow-container {
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+            }
+
+            .flow-step {
+                position: relative;
+                padding: 20px;
+                border-radius: 10px;
+                background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+                border-left: 5px solid #667eea;
+            }
+
+            .step-number {
+                position: absolute;
+                top: -15px;
+                left: 20px;
+                background: #667eea;
+                color: white;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                font-size: 1.2em;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            }
+
+            .step-title {
+                font-size: 1.4em;
+                color: #333;
+                margin: 10px 0 15px 0;
+                font-weight: bold;
+            }
+
+            .step-content {
+                color: #555;
+                line-height: 1.8;
+            }
+
+            .code-block {
+                background: #2d2d2d;
+                color: #f8f8f2;
+                padding: 15px;
+                border-radius: 8px;
+                margin: 10px 0;
+                font-family: 'Courier New', monospace;
+                overflow-x: auto;
+                font-size: 0.9em;
+            }
+
+            .code-title {
+                color: #50fa7b;
+                font-weight: bold;
+                margin-bottom: 5px;
+            }
+
+            .highlight {
+                background: #ffeb3b;
+                padding: 2px 5px;
+                border-radius: 3px;
+                font-weight: bold;
+            }
+
+            .arrow {
+                text-align: center;
+                font-size: 2em;
+                color: #667eea;
+                margin: 10px 0;
+            }
+
+            .key-point {
+                background: #fff3cd;
+                border-left: 4px solid #ffc107;
+                padding: 15px;
+                margin: 15px 0;
+                border-radius: 5px;
+            }
+
+            .key-point-title {
+                font-weight: bold;
+                color: #856404;
+                margin-bottom: 5px;
+            }
+
+            .file-badge {
+                display: inline-block;
+                background: #667eea;
+                color: white;
+                padding: 5px 12px;
+                border-radius: 20px;
+                font-size: 0.9em;
+                margin: 5px 5px 5px 0;
+            }
+
+            .tabs {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #ddd;
+            }
+
+            .tab {
+                padding: 12px 24px;
+                background: #f0f0f0;
+                border: none;
+                cursor: pointer;
+                border-radius: 8px 8px 0 0;
+                font-size: 1.1em;
+                transition: all 0.3s;
+            }
+
+            .tab.active {
+                background: #667eea;
+                color: white;
+            }
+
+            .tab-content {
+                display: none;
+            }
+
+            .tab-content.active {
+                display: block;
+            }
+
+            .comparison {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin: 20px 0;
+            }
+
+            .comparison-item {
+                padding: 20px;
+                border-radius: 10px;
+            }
+
+            .comparison-item.before {
+                background: #ffebee;
+                border: 2px solid #ef5350;
+            }
+
+            .comparison-item.after {
+                background: #e8f5e9;
+                border: 2px solid #66bb6a;
+            }
+
+            .comparison-title {
+                font-weight: bold;
+                margin-bottom: 10px;
+                font-size: 1.2em;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔐 Django Session認証フロー完全図解</h1>
+
+            <!-- タブ -->
+            <div class="flow-section">
+                <div class="tabs">
+                    <button class="tab active" onclick="switchTab('login')">
+                        ① ログイン
+                    </button>
+                    <button class="tab" onclick="switchTab('authenticated')">
+                        ② 認証済みリクエスト
+                    </button>
+                    <button class="tab" onclick="switchTab('config')">
+                        ③ 設定の役割
+                    </button>
+                </div>
+
+                <!-- ログインフロー -->
+                <div id="login" class="tab-content active">
+                    <h2 class="section-title">ログイン処理の流れ</h2>
+
+                    <div class="flow-container">
+                        <!-- Step 1 -->
+                        <div class="flow-step">
+                            <div class="step-number">1</div>
+                            <div class="step-title">
+                                フロントエンドからログインリクエスト
+                            </div>
+                            <div class="step-content">
+                                <div class="code-block">
+                                    <div class="code-title">
+                                        // フロントエンド (Vue.js)
+                                    </div>
+                                    axios.post('/api/login/', { group_id: '1',
+                                    user_id: 'user123', password: 'pass123' })
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-title">
+                                        📍 ポイント
+                                    </div>
+                                    グループID + ユーザーID +
+                                    パスワードの3点セットで送信
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="arrow">↓</div>
+
+                        <!-- Step 2 -->
+                        <div class="flow-step">
+                            <div class="step-number">2</div>
+                            <div class="step-title">
+                                Djangoミドルウェア層を通過
+                            </div>
+                            <div class="step-content">
+                                <div class="file-badge">
+                                    settings.py → MIDDLEWARE
+                                </div>
+                                <div class="code-block">
+                                    <div class="code-title">
+                                        # 通過するミドルウェア（順番重要）
+                                    </div>
+                                    1. CorsMiddleware # CORS設定チェック 2.
+                                    SecurityMiddleware # セキュリティヘッダー 3.
+                                    SessionMiddleware # ★セッション読み込み★ 4.
+                                    CsrfViewMiddleware # ★CSRF検証★ 5.
+                                    AuthenticationMiddleware #
+                                    ★認証処理（後で重要）★ 6. MessageMiddleware
+                                    # Flashメッセージ
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-title">⚠️ 重要</div>
+                                    この時点では<span class="highlight"
+                                        >未認証</span
+                                    >。SessionMiddlewareが既存セッションを読み込むだけ。
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="arrow">↓</div>
+
+                        <!-- Step 3 -->
+                        <div class="flow-step">
+                            <div class="step-number">3</div>
+                            <div class="step-title">
+                                views.py の LoginAPIView に到達
+                            </div>
+                            <div class="step-content">
+                                <div class="file-badge">accounts/views.py</div>
+                                <div class="code-block">
+                                    <div class="code-title"># LoginAPIView</div>
+                                    class LoginAPIView(APIView):
+                                    permission_classes = [AllowAny] # ←
+                                    ログインなので認証不要
+                                    authentication_classes =
+                                    [CSRFEnforcedSessionAuthentication] def
+                                    post(self, request): # バリデーション
+                                    serializer =
+                                    LoginSerializer(data=request.data) #
+                                    ★ここで認証開始★ user = authenticate(
+                                    request=request, username=user_id, # ←
+                                    user_id渡す password=password,
+                                    group_id=group_id )
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-title">
+                                        📍 authenticate()の役割
+                                    </div>
+                                    <span class="highlight"
+                                        >AUTHENTICATION_BACKENDS</span
+                                    >に設定されたバックエンドを呼び出す
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="arrow">↓</div>
+
+                        <!-- Step 4 -->
+                        <div class="flow-step">
+                            <div class="step-number">4</div>
+                            <div class="step-title">
+                                カスタムバックエンドで認証
+                            </div>
+                            <div class="step-content">
+                                <div class="file-badge">
+                                    accounts/backends.py
+                                </div>
+                                <div class="file-badge">
+                                    settings.py → AUTHENTICATION_BACKENDS
+                                </div>
+                                <div class="code-block">
+                                    <div class="code-title"># settings.py</div>
+                                    AUTHENTICATION_BACKENDS = [
+                                    'accounts.backends.GroupUserAuthBackend' # ←
+                                    これが呼ばれる ]
+
+                                    <div class="code-title">
+                                        # accounts/backends.py
+                                    </div>
+                                    class GroupUserAuthBackend(BaseBackend): def
+                                    authenticate(self, request, username=None,
+                                    password=None, group_id=None, **kwargs): #
+                                    ★1. ユーザー取得★ user =
+                                    User.objects.filter(user_id=username).first()
+                                    # ★2. パスワード検証★ if not
+                                    user.check_password(password): return None #
+                                    ★3. グループ所属チェック★ if not
+                                    UserGroup.objects.filter(
+                                    user_id=user.user_id, group_id=group_id
+                                    ).exists(): return None # ★4. 認証成功★
+                                    return user
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-title">
+                                        🔑 ここでmodels.pyの設定が効く
+                                    </div>
+                                    <strong>USERNAME_FIELD = 'user_id'</strong>
+                                    により、Djangoは<span class="highlight"
+                                        >user_idを主キーとして扱う</span
+                                    >
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="arrow">↓</div>
+
+                        <!-- Step 5 -->
+                        <div class="flow-step">
+                            <div class="step-number">5</div>
+                            <div class="step-title">
+                                login()でセッション作成
+                            </div>
+                            <div class="step-content">
+                                <div class="file-badge">
+                                    django.contrib.auth.login()
+                                </div>
+                                <div class="code-block">
+                                    <div class="code-title">
+                                        # views.py に戻る
+                                    </div>
+                                    if user is not None: #
+                                    ★Django標準のlogin()関数★ login(request,
+                                    user) #
+                                    セッションにグループIDも保存（オプション）
+                                    request.session['current_group_id'] =
+                                    group_id return Response({'detail':
+                                    'logged_in'})
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-title">
+                                        📦 login()の内部処理
+                                    </div>
+                                    1.
+                                    <code
+                                        >request.session['_auth_user_id'] =
+                                        user.user_id</code
+                                    >
+                                    をセット<br />
+                                    2.
+                                    <code
+                                        >request.session['_auth_user_backend']</code
+                                    >
+                                    にバックエンド名を保存<br />
+                                    3.
+                                    セッションをDBに保存（django_sessionテーブル）<br />
+                                    4.
+                                    <strong>sessionid Cookie</strong>
+                                    をレスポンスにセット
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="arrow">↓</div>
+
+                        <!-- Step 6 -->
+                        <div class="flow-step">
+                            <div class="step-number">6</div>
+                            <div class="step-title">レスポンス返却</div>
+                            <div class="step-content">
+                                <div class="code-block">
+                                    <div class="code-title">
+                                        // フロントエンドが受け取るレスポンス
+                                    </div>
+                                    { "detail": "logged_in", "user": {
+                                    "user_id": "user123", "username":
+                                    "山田太郎", "is_admin": false,
+                                    "current_group": { "group_id": "1",
+                                    "group_name": "営業部" } } } // ★Cookieに
+                                    sessionid がセットされている★ Set-Cookie:
+                                    sessionid=abc123xyz; HttpOnly; SameSite=Lax
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 認証済みリクエストフロー -->
+                <div id="authenticated" class="tab-content">
+                    <h2 class="section-title">認証済みリクエストの流れ</h2>
+
+                    <div class="flow-container">
+                        <!-- Step 1 -->
+                        <div class="flow-step">
+                            <div class="step-number">1</div>
+                            <div class="step-title">
+                                フロントエンドからAPIリクエスト
+                            </div>
+                            <div class="step-content">
+                                <div class="code-block">
+                                    <div class="code-title">
+                                        // フロントエンド (Vue.js)
+                                    </div>
+                                    // ★sessionid Cookie が自動的に送られる★
+                                    axios.get('/api/me/', { withCredentials:
+                                    true // Cookie送信を有効化 })
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-title">
+                                        🍪 Cookie自動送信
+                                    </div>
+                                    ブラウザが自動的に<span class="highlight"
+                                        >sessionid Cookie</span
+                                    >を送信
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="arrow">↓</div>
+
+                        <!-- Step 2 -->
+                        <div class="flow-step">
+                            <div class="step-number">2</div>
+                            <div class="step-title">
+                                SessionMiddleware がセッション読み込み
+                            </div>
+                            <div class="step-content">
+                                <div class="file-badge">
+                                    django.contrib.sessions.middleware.SessionMiddleware
+                                </div>
+                                <div class="code-block">
+                                    <div class="code-title">
+                                        # SessionMiddleware の処理
+                                    </div>
+                                    1. Cookie から sessionid を取得 2.
+                                    django_session テーブルから session_data
+                                    を取得 3. request.session に復元 →
+                                    request.session['_auth_user_id'] = 'user123'
+                                    → request.session['_auth_user_backend'] =
+                                    '...'
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="arrow">↓</div>
+
+                        <!-- Step 3 -->
+                        <div class="flow-step">
+                            <div class="step-number">3</div>
+                            <div class="step-title">
+                                AuthenticationMiddleware がユーザー復元
+                            </div>
+                            <div class="step-content">
+                                <div class="file-badge">
+                                    django.contrib.auth.middleware.AuthenticationMiddleware
+                                </div>
+                                <div class="code-block">
+                                    <div class="code-title">
+                                        # AuthenticationMiddleware の処理
+                                    </div>
+                                    1. request.session から '_auth_user_id'
+                                    を取得 2. request.session から
+                                    '_auth_user_backend' を取得 3.
+                                    ★バックエンドの get_user() を呼び出す★ #
+                                    accounts/backends.py def get_user(self,
+                                    user_id): # ← ここが呼ばれる！ return
+                                    User.objects.get(pk=user_id) 4. request.user
+                                    にユーザーオブジェクトをセット
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-title">
+                                        🔑 ここでカスタムバックエンドが効く
+                                    </div>
+                                    <span class="highlight">get_user()</span
+                                    >で文字列PKのユーザーを取得
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="arrow">↓</div>
+
+                        <!-- Step 4 -->
+                        <div class="flow-step">
+                            <div class="step-number">4</div>
+                            <div class="step-title">
+                                DRF の認証・権限チェック
+                            </div>
+                            <div class="step-content">
+                                <div class="file-badge">accounts/views.py</div>
+                                <div class="code-block">
+                                    <div class="code-title"># MeAPIView</div>
+                                    class MeAPIView(APIView): permission_classes
+                                    = [IsAuthenticated] # ← ★ここでチェック★
+                                    authentication_classes =
+                                    [CSRFEnforcedSessionAuthentication] def
+                                    get(self, request): # ★この時点で
+                                    request.user は認証済み★ serializer =
+                                    UserSerializer(request.user) return
+                                    Response(serializer.data)
+                                </div>
+                                <div class="key-point">
+                                    <div class="key-point-title">
+                                        ✅ IsAuthenticated の内部処理
+                                    </div>
+                                    1.
+                                    <code>request.user.is_authenticated</code>
+                                    をチェック<br />
+                                    2. models.py で定義した<span
+                                        class="highlight"
+                                        >@property is_authenticated</span
+                                    >が呼ばれる<br />
+                                    3. True なら通過、False なら 401
+                                    Unauthorized
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="arrow">↓</div>
+
+                        <!-- Step 5 -->
+                        <div class="flow-step">
+                            <div class="step-number">5</div>
+                            <div class="step-title">ビュー処理実行</div>
+                            <div class="step-content">
+                                <div class="code-block">
+                                    <div class="code-title">
+                                        # MeAPIView の処理
+                                    </div>
+                                    def get(self, request): # request.user
+                                    は完全に復元されている # - user.user_id # -
+                                    user.username # - user.is_admin # -
+                                    user.is_authenticated (True) serializer =
+                                    UserSerializer( request.user,
+                                    context={'request': request} ) return
+                                    Response(serializer.data)
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="arrow">↓</div>
+
+                        <!-- Step 6 -->
+                        <div class="flow-step">
+                            <div class="step-number">6</div>
+                            <div class="step-title">レスポンス返却</div>
+                            <div class="step-content">
+                                <div class="code-block">
+                                    <div class="code-title">
+                                        // フロントエンドが受け取るレスポンス
+                                    </div>
+                                    { "user_id": "user123", "username":
+                                    "山田太郎", "email": "yamada@example.com",
+                                    "is_admin": false, "is_active": true,
+                                    "current_group": { "group_id": "1",
+                                    "group_name": "営業部" } }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 設定の役割 -->
+                <div id="config" class="tab-content">
+                    <h2 class="section-title">設定の役割とつながり</h2>
+
+                    <div class="comparison">
+                        <div class="comparison-item before">
+                            <div class="comparison-title">
+                                ❌ 標準Django（レガシー不可）
+                            </div>
+                            <div class="code-block">
+                                <div class="code-title"># models.py</div>
+                                from django.contrib.auth.models import User #
+                                標準Userモデル # - username (文字列) # - id
+                                (整数の自動採番)
+                            </div>
+                            <div class="code-block">
+                                <div class="code-title"># settings.py</div>
+                                # デフォルト（明示不要） AUTH_USER_MODEL =
+                                'auth.User' AUTHENTICATION_BACKENDS = [
+                                'django.contrib.auth.backends.ModelBackend' ]
+                            </div>
+                            <strong style="color: #d32f2f">問題点:</strong
+                            ><br />
+                            ・既存テーブルと構造が違う<br />
+                            ・user_id（文字列PK）に対応できない<br />
+                            ・グループ認証ができない
+                        </div>
+
+                        <div class="comparison-item after">
+                            <div class="comparison-title">
+                                ✅ レガシーシステム対応版
+                            </div>
+                            <div class="code-block">
+                                <div class="code-title"># users/models.py</div>
+                                class User(models.Model): user_id =
+                                models.CharField(primary_key=True) #
+                                ★これでDjango認証対応★ USERNAME_FIELD =
+                                'user_id' REQUIRED_FIELDS = [] @property def
+                                is_authenticated(self): return True def
+                                check_password(self, raw_password): return
+                                check_password(raw_password, self.password)
+                            </div>
+                            <div class="code-block">
+                                <div class="code-title"># settings.py</div>
+                                # ★カスタムユーザーモデル指定★ AUTH_USER_MODEL =
+                                'users.User' # ★カスタムバックエンド指定★
+                                AUTHENTICATION_BACKENDS = [
+                                'accounts.backends.GroupUserAuthBackend' ]
+                            </div>
+                            <strong style="color: #388e3c">これで実現:</strong
+                            ><br />
+                            ・文字列PKに対応<br />
+                            ・グループ認証に対応<br />
+                            ・IsAuthenticated使える<br />
+                            ・Django標準機能全部使える
+                        </div>
+                    </div>
+
+                    <div class="flow-step" style="margin-top: 30px">
+                        <div class="step-title">設定が効くタイミングマップ</div>
+                        <div class="step-content">
+                            <div class="code-block">
+                                <div class="code-title">
+                                    # 各設定が使われる場所
+                                </div>
+                                ┌─────────────────────────────────────────────────────┐
+                                │ AUTH_USER_MODEL = 'users.User' │
+                                ├─────────────────────────────────────────────────────┤
+                                │ 使われる場所: │ │ ・get_user_model() → User
+                                モデルを返す │ │ ・login() →
+                                User.objects.get(pk=user_id) 実行 │ │
+                                ・request.user → User インスタンスがセットされる
+                                │
+                                └─────────────────────────────────────────────────────┘
+                                ┌─────────────────────────────────────────────────────┐
+                                │ AUTHENTICATION_BACKENDS │
+                                ├─────────────────────────────────────────────────────┤
+                                │ 使われる場所: │ │ ・authenticate() →
+                                backends.py の authenticate()呼出 │ │
+                                ・AuthenticationMiddleware → get_user()呼出 │
+                                └─────────────────────────────────────────────────────┘
+                                ┌─────────────────────────────────────────────────────┐
+                                │ USERNAME_FIELD = 'user_id' (models.py) │
+                                ├─────────────────────────────────────────────────────┤
+                                │ 使われる場所: │ │ ・authenticate(username=xxx)
+                                → user_id で検索 │ │ ・login() → user_id
+                                をセッションに保存 │
+                                └─────────────────────────────────────────────────────┘
+                                ┌─────────────────────────────────────────────────────┐
+                                │ @property is_authenticated (models.py) │
+                                ├─────────────────────────────────────────────────────┤
+                                │ 使われる場所: │ │ ・IsAuthenticated →
+                                user.is_authenticated チェック │ │
+                                ・テンプレート → {% if user.is_authenticated %}
+                                │
+                                └─────────────────────────────────────────────────────┘
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="key-point" style="margin-top: 30px">
+                        <div class="key-point-title">
+                            💡 まとめ: なぜレガシーシステムでも動くのか？
+                        </div>
+                        <strong>1. AUTH_USER_MODEL</strong>
+                        で「どのモデルをユーザーとして扱うか」指定<br />
+                        <strong>2. USERNAME_FIELD</strong>
+                        で「どのフィールドを主キーとして扱うか」指定<br />
+                        <strong>3. AUTHENTICATION_BACKENDS</strong>
+                        で「どうやって認証するか」指定<br />
+                        <strong>4. models.pyのメソッド</strong>
+                        で「Django標準機能との互換性」確保<br />
+                        <br />
+                        → これで<span class="highlight"
+                            >Django標準のsession認証が完全に動く</span
+                        >！<br />
+                        →
+                        <span class="highlight">IsAuthenticated も使える</span
+                        >！<br />
+                        → <span class="highlight">文字列PKでもOK</span>！
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function switchTab(tabName) {
+                // タブボタンの切り替え
+                document.querySelectorAll('.tab').forEach((tab) => {
+                    tab.classList.remove('active');
+                });
+                event.target.classList.add('active');
+
+                // コンテンツの切り替え
+                document.querySelectorAll('.tab-content').forEach((content) => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(tabName).classList.add('active');
+            }
+        </script>
+    </body>
+</html>
