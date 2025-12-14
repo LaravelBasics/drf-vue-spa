@@ -15,7 +15,7 @@ User = get_user_model()
 def no_control_characters_validator(value):
     """制御文字を禁止"""
     if re.search(r"[\x00-\x1f\x7f-\x9f]", value):
-        raise serializers.ValidationError("ユーザーIDに不正な文字が含まれています")
+        raise serializers.ValidationError(_("ユーザーIDに不正な文字が含まれています"))
 
 
 class LoginSerializer(serializers.Serializer):

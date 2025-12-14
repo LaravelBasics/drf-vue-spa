@@ -89,7 +89,7 @@ class GroupUserAuthBackend(BaseBackend):
 
     def get_user(self, user_id):
         """
-        ★超重要★ セッションからユーザー復元
+        ★重要★ セッションからユーザー復元
 
         Django内部で呼ばれるメソッド。
         user_idを文字列のまま扱う（int変換しない）

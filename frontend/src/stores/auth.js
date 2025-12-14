@@ -164,6 +164,8 @@ export const useAuthStore = defineStore(
     {
         persist: {
             paths: ['user', 'currentGroupId', 'currentGroupName'],
+            // storage: sessionStorage を明示的に指定
+            storage: sessionStorage,
         },
     },
 );

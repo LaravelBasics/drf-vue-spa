@@ -12,8 +12,8 @@ from .views import (
 app_name = "accounts"
 
 urlpatterns = [
-    path("csrf/", CSRFView.as_view(), name="csrf"),
     path("groups/", GroupListAPIView.as_view(), name="groups"),
+    path("csrf/", CSRFView.as_view(), name="csrf"),
     path("login/", LoginAPIView.as_view(), name="login"),
     path("logout/", LogoutAPIView.as_view(), name="logout"),
     path("me/", MeAPIView.as_view(), name="me"),

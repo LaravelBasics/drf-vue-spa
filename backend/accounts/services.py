@@ -178,21 +178,6 @@ class GroupService:
 
         return MGroup.objects.filter(is_active=True).order_by("group_id")
 
-    @staticmethod
-    def group_exists(group_id):
-        """
-        グループが存在するか確認
-
-        Args:
-            group_id: グループID
-
-        Returns:
-            bool: 存在すればTrue
-        """
-        from common.models import MGroup
-
-        return MGroup.objects.filter(group_id=group_id, is_active=True).exists()
-
 
 # ========================================
 # ユーザー所属グループサービス

@@ -176,9 +176,6 @@ class LoginAPIView(APIView):
             # セッションにグループIDを保存
             request.session["current_group_id"] = group_id
 
-            # 監査ログ
-            # self._log_success(request, user_id, group_id)
-
             return Response(
                 {
                     "detail": "logged_in",
@@ -225,19 +222,6 @@ class LoginAPIView(APIView):
     # ========================================
     # 監査ログ用ヘルパーメソッド
     # ========================================
-
-    # def _log_success(self, request, user_id, group_id):
-    #     """ログイン成功ログ"""
-    #     audit_logger.info(
-    #         f"ログイン成功: user_id={user_id}, group_id={group_id}",
-    #         extra={
-    #             "action": "LOGIN_SUCCESS",
-    #             "user": user_id,
-    #             "group_id": group_id,
-    #             "ip": get_client_ip(request),
-    #         },
-    #     )
-
     def _log_lockout(self, request, user_id, group_id):
         """アカウントロックログ"""
         audit_logger.error(
