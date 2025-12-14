@@ -1,6 +1,6 @@
+# common/models.py
 from django.db import models
 from django.contrib.auth.hashers import check_password, make_password
-from django.contrib.auth.models import AbstractBaseUser
 
 
 class MGroup(models.Model):
@@ -30,13 +30,25 @@ class MGroupPermissions(models.Model):
 
 
 class MUser(models.Model):
+    """
+    レガシーシステム対応カスタムユーザーモデル
+
+    PostgreSQLテーブル構造:
+    - is_superuser: 管理者権限フラグ（Boolean）
+    - is_staff: 管理画面アクセス権フラグ（Boolean）
+    - is_admin カラムは存在しない（後方互換性のためプロパティで提供）
+    """
+
     user_id = models.CharField(primary_key=True, max_length=50)
     password = models.CharField(max_length=128)
     username = models.CharField(max_length=50)
     last_login = models.DateTimeField(blank=True, null=True)
     is_active = models.BooleanField(blank=True, null=True)
-    is_superuser = models.BooleanField(blank=True, null=True)
-    is_staff = models.BooleanField(blank=True, null=True)
+
+    # ✅ PostgreSQLに存在するフィールド
+    is_superuser = models.BooleanField(blank=True, null=True)  # 管理者権限
+    is_staff = models.BooleanField(blank=True, null=True)  # 管理画面アクセス権
+
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
 
@@ -66,14 +78,16 @@ class MUser(models.Model):
         return False
 
     @property
-    def is_staff(self):
-        """Django管理画面アクセス権限（is_adminと連動）"""
-        return self.is_admin
+    def is_admin(self):
+        """
+        管理者権限チェック（後方互換性のためのプロパティ）
 
-    @property
-    def is_superuser(self):
-        """スーパーユーザー権限（is_adminと連動）"""
-        return self.is_admin
+        is_superuser=True または is_staff=True なら管理者とみなす
+
+        Returns:
+            bool: 管理者ならTrue
+        """
+        return bool(self.is_superuser or self.is_staff)
 
     # ========================================
     # パスワード管理
@@ -99,20 +113,32 @@ class MUser(models.Model):
         self.password = make_password(raw_password)
 
     # ========================================
-    # 権限管理（is_adminベース）
+    # 権限管理（is_superuser または is_staff ベース）
     # ========================================
 
     def has_perm(self, perm, obj=None):
-        """特定の権限を持っているか"""
-        return self.is_active and self.is_admin
+        """
+        特定の権限を持っているか
+
+        is_superuser=True または is_staff=True なら全ての権限を持つ
+        """
+        return self.is_active and (self.is_superuser or self.is_staff)
 
     def has_perms(self, perm_list, obj=None):
-        """複数の権限を持っているか"""
-        return self.is_active and self.is_admin
+        """
+        複数の権限を持っているか
+
+        is_superuser=True または is_staff=True なら全ての権限を持つ
+        """
+        return self.is_active and (self.is_superuser or self.is_staff)
 
     def has_module_perms(self, app_label):
-        """特定のアプリへのアクセス権限"""
-        return self.is_active and self.is_admin
+        """
+        特定のアプリへのアクセス権限
+
+        is_superuser=True または is_staff=True なら全てのアプリにアクセス可能
+        """
+        return self.is_active and (self.is_superuser or self.is_staff)
 
     # ========================================
     # セッション管理
@@ -149,34 +175,74 @@ class MUserGroup(models.Model):
         db_table = "m_user_group"
         unique_together = (("user_id", "group_id"),)
 
-    # ========================================
-    # リレーション代替（手動JOIN）
-    # ========================================
 
-    # @property
-    # def user(self):
-    #     """遅延評価でUserを取得"""
-    #     try:
-    #         return MUser.objects.get(user_id=self.user_id)
-    #     except MUser.DoesNotExist:
-    #         return None
-
-    # @property
-    # def group(self):
-    #     """遅延評価でGroupを取得"""
-    #     try:
-    #         return MGroup.objects.get(group_id=self.group_id)
-    #     except MGroup.DoesNotExist:
-    #         return None
-
-    # def __str__(self):
-    #     return f"{self.user_id} - {self.group_id}"
-
-
-# QuerySetヘルパー（User.groups_rel）
 # ========================================
+# レガシーシステム運用メモ
+# ========================================
+"""
+【PostgreSQLテーブル構造】
 
-# Userモデルに逆参照用のプロパティを追加
-# MUser.groups_rel = property(
-#     lambda self: MUserGroup.objects.filter(user_id=self.user_id)
-# )
+m_user テーブル:
+- user_id (VARCHAR(50), PRIMARY KEY)
+- password (VARCHAR(128))
+- username (VARCHAR(50))
+- last_login (TIMESTAMP)
+- is_active (BOOLEAN)
+- is_superuser (BOOLEAN) ← 管理者権限
+- is_staff (BOOLEAN)     ← 管理画面アクセス権
+- created_at (TIMESTAMP)
+- updated_at (TIMESTAMP)
+
+【管理者権限の設定】
+
+-- ユーザーを管理者に設定
+UPDATE legacy_schema.m_user 
+SET is_superuser = TRUE, is_staff = TRUE 
+WHERE user_id = 'admin001';
+
+-- スーパーユーザーのみ
+UPDATE legacy_schema.m_user 
+SET is_superuser = TRUE, is_staff = FALSE 
+WHERE user_id = 'user001';
+
+-- 管理画面アクセスのみ
+UPDATE legacy_schema.m_user 
+SET is_superuser = FALSE, is_staff = TRUE 
+WHERE user_id = 'staff001';
+
+【Pythonでの管理者判定】
+
+from common.models import MUser
+
+user = MUser.objects.get(user_id='admin001')
+
+# ✅ is_adminプロパティを使用（推奨）
+if user.is_admin:
+    print('管理者です')
+
+# ✅ 直接フィールドを確認
+if user.is_superuser or user.is_staff:
+    print('管理者です')
+
+【パスワードハッシュ化】
+
+from django.contrib.auth.hashers import make_password
+from common.models import MUser
+
+# 新規ユーザー作成
+hashed = make_password('password123')
+user = MUser(
+    user_id='test001',
+    password=hashed,
+    username='テストユーザー',
+    is_active=True,
+    is_superuser=False,
+    is_staff=False
+)
+user.save()
+
+# 既存ユーザーのパスワード変更
+user = MUser.objects.get(user_id='test001')
+user.set_password('newpassword456')
+user.save()
+"""

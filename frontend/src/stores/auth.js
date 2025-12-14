@@ -1,4 +1,4 @@
-// src/stores/auth.js - グループ認証対応
+// src/stores/auth.js - グループ認証対応（is_admin対応版）
 
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
@@ -14,11 +14,14 @@ export const useAuthStore = defineStore(
         const loading = ref(false);
         const error = ref(null);
         const initialized = ref(false);
-        const currentGroupId = ref(null); // ← 現在のグループID
-        const currentGroupName = ref(null); // ← 追加
+        const currentGroupId = ref(null);
+        const currentGroupName = ref(null);
 
         const isAuthenticated = computed(() => !!user.value);
         const isLoading = computed(() => loading.value);
+
+        // ✅ 管理者権限チェック（バックエンドのis_adminフィールドを参照）
+        const isAdmin = computed(() => user.value?.is_admin ?? false);
 
         // ログイン処理（グループ認証版）
         async function loginSession(groupId, userId, password) {
@@ -27,8 +30,8 @@ export const useAuthStore = defineStore(
 
             try {
                 await authAPI.login(groupId, userId, password);
-                currentGroupId.value = groupId; // グループIDを保存
-                await fetchUser(); // ユーザー情報取得（グループ情報も含まれる）
+                currentGroupId.value = groupId;
+                await fetchUser(); // ユーザー情報取得（is_adminも含まれる）
             } finally {
                 loading.value = false;
             }
@@ -76,8 +79,8 @@ export const useAuthStore = defineStore(
             } finally {
                 user.value = null;
                 error.value = null;
-                currentGroupId.value = null; // グループIDもクリア
-                currentGroupName.value = null; // ← 追加
+                currentGroupId.value = null;
+                currentGroupName.value = null;
                 loading.value = false;
                 resetCSRFToken();
 
@@ -111,7 +114,7 @@ export const useAuthStore = defineStore(
                             user.value = null;
                             error.value = null;
                             currentGroupId.value = null;
-                            currentGroupName.value = null; // ← 追加
+                            currentGroupName.value = null;
                         }
                     }
                 }
@@ -141,12 +144,13 @@ export const useAuthStore = defineStore(
             loading,
             error,
             initialized,
-            currentGroupId, // ← 追加
-            currentGroupName, // ← 追加
+            currentGroupId,
+            currentGroupName,
 
             // Computed
             isAuthenticated,
             isLoading,
+            isAdmin, // ✅ 管理者権限チェック用
 
             // Actions
             loginSession,
@@ -159,7 +163,7 @@ export const useAuthStore = defineStore(
     },
     {
         persist: {
-            paths: ['user', 'currentGroupId', , 'currentGroupName'], // ← currentGroupIdも永続化
+            paths: ['user', 'currentGroupId', 'currentGroupName'],
         },
     },
 );

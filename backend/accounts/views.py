@@ -5,8 +5,9 @@
 特徴:
 - グループID + ユーザーID + パスワード認証
 - ブルートフォース攻撃対策
-- CSRF保護
+- CSRF保護（CSRFEnforcedSessionAuthentication）
 - サービスクラスに処理を分離
+
 """
 
 import logging
@@ -36,12 +37,18 @@ class CSRFEnforcedSessionAuthentication(SessionAuthentication):
     """
     CSRF保護を強制するSessionAuthentication
 
-    レガシーシステムでも標準のSessionAuthenticationを使用可能
+    DRFのSessionAuthenticationの脆弱性対策:
+    - 標準のSessionAuthenticationは未認証ユーザーに対してCSRF検証をスキップする
+    - このクラスは認証状態に関わらず常にCSRF検証を実行する
+
+    用途:
+    - ログインAPI（未認証ユーザーからのPOSTリクエスト）
+    - 認証が必要なAPI全般
     """
 
     def authenticate(self, request):
         """
-        認証処理
+        認証処理（CSRF検証を先に実行）
 
         1. CSRF保護を強制
         2. セッションベース認証を実行
@@ -280,13 +287,10 @@ class LogoutAPIView(APIView):
         """ログアウト処理"""
         user_id = request.user.user_id
 
-        # print(user_id + " is logging out.")
-
         # 監査ログ
         audit_logger.info(
             "ユーザーがログアウトしました",
             extra={
-                # "request_id": request_id,
                 "user_id": user_id,
                 "action": "LOGOUT",
                 "model": "Auth",
@@ -295,10 +299,8 @@ class LogoutAPIView(APIView):
                 "changes": "{}",
                 "endpoint": request.path,
                 "http_method": request.method,
-                "http_referer": request.META.get(
-                    "HTTP_REFERER", ""
-                ),  # リファラーもここで取得
-                "http_status": 200,  # ログアウト成功は200を想定
+                "http_referer": request.META.get("HTTP_REFERER", ""),
+                "http_status": 200,
                 "view_name": self.__class__.__name__,
             },
         )

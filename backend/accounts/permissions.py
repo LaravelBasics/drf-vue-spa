@@ -2,7 +2,9 @@
 """
 カスタムパーミッションクラス
 
-is_adminフラグで管理者権限をチェック
+is_adminプロパティで管理者権限をチェック
+（is_superuser または is_staff の論理和）
+
 レガシーシステムに最適化されたシンプルな権限管理
 """
 
@@ -21,6 +23,7 @@ class IsAdmin(BasePermission):
     ユーザーが以下の条件を満たす場合のみアクセス許可:
     - 認証済み（is_authenticated = True）
     - 管理者フラグ（is_admin = True）
+      ※is_admin は is_superuser または is_staff の論理和
 
     Usage:
         permission_classes = [IsAuthenticated, IsAdmin]
@@ -34,6 +37,10 @@ class IsAdmin(BasePermission):
         グローバルパーミッションチェック
 
         ビュー全体へのアクセス可否を判定
+
+        Note:
+            getattr を使用することで、is_admin プロパティが存在しない場合でも
+            安全にデフォルト値（False）を返す
         """
         return bool(
             request.user
@@ -66,6 +73,7 @@ class IsAdminOrReadOnly(BasePermission):
     権限ルール:
     - GET, HEAD, OPTIONS: 認証済みなら誰でもOK
     - POST, PUT, PATCH, DELETE: 管理者のみOK
+      ※管理者 = is_superuser または is_staff
 
     Usage:
         permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
@@ -114,26 +122,34 @@ class IsAdminOrReadOnly(BasePermission):
 # ========================================
 
 class AdminUserListView(APIView):
-    '''ユーザー一覧（管理者のみ）'''
+    '''
+    ユーザー一覧（管理者のみ）
+    
+    is_superuser=True または is_staff=True のユーザーのみアクセス可能
+    '''
     
     permission_classes = [IsAuthenticated, IsAdmin]
     authentication_classes = [CSRFEnforcedSessionAuthentication]
     
     def get(self, request):
-        from common.models import User
-        users = User.objects.all()
+        from common.models import MUser
+        users = MUser.objects.all()
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
 
 
 class AdminUserDeleteView(APIView):
-    '''ユーザー削除（管理者のみ）'''
+    '''
+    ユーザー削除（管理者のみ）
+    
+    is_superuser=True または is_staff=True のユーザーのみ実行可能
+    '''
     
     permission_classes = [IsAuthenticated, IsAdmin]
     authentication_classes = [CSRFEnforcedSessionAuthentication]
     
     def delete(self, request, user_id):
-        from common.models import User
+        from common.models import MUser
         
         # 自分自身は削除できない
         if request.user.user_id == user_id:
@@ -142,7 +158,7 @@ class AdminUserDeleteView(APIView):
                 status=400
             )
         
-        user = User.objects.get(user_id=user_id)
+        user = MUser.objects.get(user_id=user_id)
         user.delete()
         
         return Response(status=204)
@@ -153,7 +169,12 @@ class AdminUserDeleteView(APIView):
 # ========================================
 
 class ProductManageView(APIView):
-    '''商品管理（管理者: 編集可、一般: 読み取りのみ）'''
+    '''
+    商品管理（管理者: 編集可、一般: 読み取りのみ）
+    
+    GET: 認証済みユーザー全員
+    POST/PUT/DELETE: is_superuser=True または is_staff=True のユーザーのみ
+    '''
     
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     authentication_classes = [CSRFEnforcedSessionAuthentication]
@@ -195,7 +216,7 @@ class ProductManageView(APIView):
 # ========================================
 
 class ShopProductListView(APIView):
-    '''店頭商品一覧（一般ユーザー）'''
+    '''店頭商品一覧（認証済みユーザー全員）'''
     
     permission_classes = [IsAuthenticated]  # 管理者チェックなし
     authentication_classes = [CSRFEnforcedSessionAuthentication]

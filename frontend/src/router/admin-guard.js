@@ -1,4 +1,4 @@
-// src/router/admin-guard.js - 管理者権限チェック
+// src/router/admin-guard.js - 管理者権限チェック（修正版）
 
 import { useAuthStore } from '@/stores/auth';
 import { ROUTE_NAMES } from '@/constants/routes';
@@ -16,8 +16,10 @@ export const adminGuard = async (to, from) => {
         return true;
     }
 
-    // 管理者権限チェック
-    if (!auth.user.is_admin) {
+    // ✅ computed の isAdmin を使用
+    // バックエンドの is_admin フィールドをチェック
+    // （is_superuser=True または is_staff=True なら true）
+    if (!auth.isAdmin) {
         // ホームにリダイレクト + 通知用フラグを設定
         return {
             name: ROUTE_NAMES.HOME,
