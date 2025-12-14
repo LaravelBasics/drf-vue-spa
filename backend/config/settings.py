@@ -28,19 +28,23 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 # === アプリケーション ===
 
 INSTALLED_APPS = [
+    # Django標準
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # サードパーティ
     "rest_framework",
     "corsheaders",
     "django_filters",
+    # 自作アプリ
     "accounts",
     # "users",
-    "common",  # モデルアプリ（inspectdb取り込み）
-    # "debug_toolbar",  # 開発ツール（最後に追加）
+    "common.apps.CommonConfig",
+    # 開発ツール
+    # "debug_toolbar",
 ]
 
 # === 認証 ===
