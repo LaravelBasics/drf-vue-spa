@@ -120,27 +120,27 @@ CORS_ALLOW_CREDENTIALS = True
 
 # === セッション ===
 
-SESSION_COOKIE_AGE = 86400
-# ブラウザを閉じたらセッションを破棄する設定
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_AGE = 86400  # 1日（秒）
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # ブラウザを閉じたらセッションを破棄する設定
 SESSION_SAVE_EVERY_REQUEST = False  # DB負荷考慮
-SESSION_COOKIE_SECURE = False  # 本番ではNG
 
-# 本番設定
-# SESSION_COOKIE_HTTPONLY = True  # ✅ 必須
+# ローカル開発設定
+SESSION_COOKIE_SECURE = False  # 本番ではNG
+CSRF_COOKIE_SECURE = False  # 本番ではNG
+
+# 本番環境設定
 # SESSION_COOKIE_SECURE = True  # ✅ 必須
-# SESSION_COOKIE_SAMESITE = "Lax"  # ✅ 推奨
-# CSRF_COOKIE_HTTPONLY = False  # ✅ 必須（JSから読む）
 # CSRF_COOKIE_SECURE = True  # ✅ 必須
-# CSRF_COOKIE_SAMESITE = "Lax"  # ✅ 推奨
+SESSION_COOKIE_HTTPONLY = True  # ✅ 必須
+SESSION_COOKIE_SAMESITE = "Lax"  # ✅ 推奨
+CSRF_COOKIE_HTTPONLY = False  # ✅ 必須（JSから読む）
+CSRF_COOKIE_SAMESITE = "Lax"  # ✅ 推奨
 
 # === CSRF ===
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
 ]
-CSRF_COOKIE_HTTPONLY = False
-CSRF_COOKIE_SECURE = False  # 本番はTrue
 
 # === URL設定 ===
 
