@@ -1,0 +1,1029 @@
+# 🔐 ログインフロー完全解説（初心者向け）
+
+## 📋 目次
+1. [概要図](#概要図)
+2. [ステップバイステップ解説](#ステップバイステップ解説)
+3. [データの流れ](#データの流れ)
+4. [セキュリティチェックポイント](#セキュリティチェックポイント)
+5. [エラーパターン](#エラーパターン)
+
+---
+
+## 概要図
+
+```
+【フロントエンド】          【バックエンド】
+┌─────────────┐
+│ Login.vue   │
+│ (ユーザー入力)│
+└──────┬──────┘
+       │ ① グループ一覧取得
+       ▼
+┌─────────────┐          ┌─────────────┐
+│ authAPI     │─────────▶│ GET /api/   │
+│ .getGroups()│          │ auth/groups/│
+└─────────────┘          └──────┬──────┘
+       ▲                        │
+       │ ② グループ一覧を返却     │
+       └────────────────────────┘
+       
+       │ ③ ユーザーがフォーム入力
+       │   - グループ選択
+       │   - ユーザーID入力
+       │   - パスワード入力
+       ▼
+┌─────────────┐
+│ onSubmit()  │
+│ (送信ボタン) │
+└──────┬──────┘
+       │ ④ CSRFトークン取得開始
+       ▼
+┌─────────────┐          ┌─────────────┐
+│ CSRFManager │─────────▶│ GET /api/   │
+│.ensureToken()│          │ auth/csrf/  │
+└─────────────┘          └──────┬──────┘
+       ▲                        │
+       │ ⑤ CSRFトークンをCookieに設定
+       │   (csrftoken=xxxxx)    │
+       └────────────────────────┘
+       
+       │ ⑥ ログインリクエスト送信
+       ▼
+┌─────────────┐          ┌─────────────┐
+│ authAPI     │─────────▶│ POST /api/  │
+│ .login()    │          │ auth/login/ │
+│             │          │             │
+│ Headers:    │          │ ⑦ ミドルウェア処理
+│ X-CSRFToken │          │ ├─LanguageMiddleware
+│ Cookie:     │          │ ├─CSRFMiddleware
+│ csrftoken   │          │ └─AuditMiddleware
+└─────────────┘          └──────┬──────┘
+                                │
+                                ▼
+                         ┌─────────────┐
+                         │ LoginAPIView│
+                         │             │
+                         │ ⑧ CSRF検証  │
+                         │ ⑨ バリデーション
+                         │ ⑩ アカウントロック確認
+                         │ ⑪ 認証（GroupUserAuthBackend）
+                         │ ⑫ セッション作成
+                         └──────┬──────┘
+       ┌────────────────────────┘
+       │ ⑬ ログイン成功レスポンス
+       │   - sessionid Cookie設定
+       │   - ユーザー情報返却
+       ▼
+┌─────────────┐
+│ auth.       │
+│ loginSession│
+│ (成功)      │
+└──────┬──────┘
+       │ ⑭ ユーザー情報をStoreに保存
+       │ ⑮ ホーム画面へリダイレクト
+       ▼
+┌─────────────┐
+│ Home.vue    │
+└─────────────┘
+```
+
+---
+
+## ステップバイステップ解説
+
+### **Phase 1: ページ初期化（グループ一覧取得）**
+
+#### **① フロントエンド：Login.vueマウント**
+
+**ファイル**: `src/views/auth/Login.vue`
+
+```javascript
+onMounted(async () => {
+    await nextTick();
+    isVisible.value = true;
+    
+    // グループ一覧を取得
+    await fetchGroups();
+});
+
+async function fetchGroups() {
+    loadingGroups.value = true;
+    try {
+        const response = await api.get('auth/groups/');
+        groups.value = response.data;  // [{ group_id: 'G001', group_name: '営業部' }, ...]
+    } catch (error) {
+        handleApiError(error);
+        groups.value = [];
+    } finally {
+        loadingGroups.value = false;
+    }
+}
+```
+
+**処理内容**:
+- ページ表示後、グループ一覧を取得
+- `api.get('auth/groups/')` → `GET /api/auth/groups/`
+- 取得したグループをプルダウンに表示
+
+---
+
+#### **② バックエンド：グループ一覧取得API**
+
+**ファイル**: `accounts/views.py`
+
+```python
+class GroupListAPIView(APIView):
+    permission_classes = [AllowAny]  # ← 認証不要（ログイン前）
+    authentication_classes = []
+    
+    def get(self, request):
+        groups = GroupService.get_active_groups()
+        serializer = GroupSerializer(groups, many=True)
+        return Response(serializer.data)
+```
+
+**ファイル**: `accounts/services.py`
+
+```python
+class GroupService:
+    @staticmethod
+    def get_active_groups():
+        from common.models import MGroup
+        return MGroup.objects.filter(is_active=True).order_by('group_id')
+```
+
+**処理内容**:
+- `m_group` テーブルから `is_active=True` のレコードを取得
+- `GroupSerializer` でJSON形式に変換
+- レスポンス例:
+  ```json
+  [
+    { "group_id": "G001", "group_name": "営業部" },
+    { "group_id": "G002", "group_name": "開発部" }
+  ]
+  ```
+
+---
+
+### **Phase 2: ログインフォーム送信**
+
+#### **③ フロントエンド：ユーザー入力**
+
+**ファイル**: `src/views/auth/Login.vue`
+
+```vue
+<template>
+  <v-form @submit.prevent="onSubmit" ref="form">
+    <!-- グループ選択 -->
+    <v-select
+      v-model="groupId"
+      :items="groups"
+      item-title="group_name"
+      item-value="group_id"
+    />
+    
+    <!-- ユーザーID -->
+    <v-text-field
+      v-model="userId"
+      :rules="userIdRules"
+    />
+    
+    <!-- パスワード -->
+    <v-text-field
+      v-model="password"
+      type="password"
+      :rules="passwordRules"
+    />
+    
+    <!-- 送信ボタン -->
+    <v-btn type="submit" :loading="loading">
+      ログイン
+    </v-btn>
+  </v-form>
+</template>
+```
+
+**処理内容**:
+- ユーザーがフォームに入力
+  - `groupId`: 'G001'
+  - `userId`: 'test001'
+  - `password`: 'password123'
+- 送信ボタンクリック → `onSubmit()` 実行
+
+---
+
+#### **④ フロントエンド：CSRFトークン取得**
+
+**ファイル**: `src/plugins/axios.js`
+
+```javascript
+// リクエストインターセプター
+api.interceptors.request.use(async (config) => {
+    // CSRFトークンが必要なメソッド（POST/PUT/PATCH/DELETE）
+    const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
+    
+    if (methodsRequiringCsrf.includes(config.method.toLowerCase())) {
+        await csrfManager.ensureToken();  // ← CSRFトークン取得
+    }
+    
+    return config;
+});
+
+class CSRFManager {
+    async ensureToken() {
+        if (this.tokenFetched) return;  // ← キャッシュチェック
+        
+        if (this.fetchingPromise) {
+            return this.fetchingPromise;  // ← 並列リクエスト防止
+        }
+        
+        this.fetchingPromise = this._fetchToken();
+        await this.fetchingPromise;
+        this.fetchingPromise = null;
+    }
+    
+    async _fetchToken() {
+        await api.get('auth/csrf/');  // ← GET /api/auth/csrf/
+        this.tokenFetched = true;
+    }
+}
+```
+
+**処理内容**:
+1. `POST /api/auth/login/` の前に自動実行
+2. `GET /api/auth/csrf/` を呼び出し
+3. サーバーが `csrftoken` Cookieを設定
+4. Axiosが自動的にCookieからトークンを読み取り、`X-CSRFToken` ヘッダーに設定
+
+---
+
+#### **⑤ バックエンド：CSRFトークン設定**
+
+**ファイル**: `accounts/views.py`
+
+```python
+class CSRFView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    
+    @method_decorator(ensure_csrf_cookie)
+    def get(self, request):
+        return Response(status=status.HTTP_204_NO_CONTENT)
+```
+
+**処理内容**:
+- `@ensure_csrf_cookie` デコレーターが自動的にCookieを設定
+- レスポンスヘッダーに `Set-Cookie: csrftoken=xxxxx` が含まれる
+- ブラウザがCookieを保存
+
+---
+
+#### **⑥ フロントエンド：ログインリクエスト送信**
+
+**ファイル**: `src/views/auth/Login.vue`
+
+```javascript
+async function onSubmit() {
+    if (loading.value) return;
+    
+    // バリデーション
+    const { valid } = await form.value.validate();
+    if (!valid) return;
+    
+    loading.value = true;
+    
+    try {
+        // ログインリクエスト
+        await auth.loginSession(groupId.value, userId.value, password.value);
+        
+        showInfo('auth.loginSuccess', {}, 3000);
+        isVisible.value = false;
+        
+        // ホーム画面へリダイレクト
+        setTimeout(async () => {
+            const redirect = route.query.next || ROUTE_NAMES.HOME;
+            await router.push(redirect);
+        }, 150);
+    } catch (error) {
+        handleApiError(error);
+    } finally {
+        loading.value = false;
+    }
+}
+```
+
+**ファイル**: `src/stores/auth.js`
+
+```javascript
+async function loginSession(groupId, userId, password) {
+    loading.value = true;
+    error.value = null;
+    
+    try {
+        await authAPI.login(groupId, userId, password);
+        currentGroupId.value = groupId;
+        await fetchUser();  // ← ユーザー情報取得
+    } finally {
+        loading.value = false;
+    }
+}
+```
+
+**ファイル**: `src/api/auth.js`
+
+```javascript
+async login(groupId, userId, password) {
+    const response = await api.post('auth/login/', {
+        group_id: groupId,
+        user_id: userId,
+        password,
+    });
+    return response;
+}
+```
+
+**処理内容**:
+- `POST /api/auth/login/` にリクエスト送信
+- リクエストヘッダー:
+  ```
+  X-CSRFToken: xxxxx
+  Cookie: csrftoken=xxxxx
+  Content-Type: application/json
+  ```
+- リクエストボディ:
+  ```json
+  {
+    "group_id": "G001",
+    "user_id": "test001",
+    "password": "password123"
+  }
+  ```
+
+---
+
+### **Phase 3: バックエンド認証処理**
+
+#### **⑦ ミドルウェア処理**
+
+**ファイル**: `common/middleware.py`
+
+```python
+class AuditMiddleware:
+    def __call__(self, request):
+        # リクエストIDを生成
+        request_id = request.META.get('HTTP_X_REQUEST_ID', str(uuid.uuid4()))
+        request._request_id = request_id
+        
+        # コンテキストに保存
+        set_current_request(request)
+        
+        # ★View実行前にuser_idを取得（ログインジェクション対策）
+        if request.path == '/api/auth/login/' and request.method == 'POST':
+            self._extract_login_attempt_user_id(request)
+        
+        response = self.get_response(request)  # ← View実行
+        
+        response['X-Request-ID'] = request_id
+        
+        self._log_audit_events(request, response)
+        
+        return response
+```
+
+**処理内容**:
+1. リクエストIDを生成
+2. ログイン試行のuser_idを事前取得（サニタイズ済み）
+3. View実行
+4. 監査ログ記録
+
+---
+
+#### **⑧ CSRF検証**
+
+**ファイル**: `accounts/views.py`
+
+```python
+class CSRFEnforcedSessionAuthentication(SessionAuthentication):
+    def authenticate(self, request):
+        self.enforce_csrf(request)  # ← 常にCSRF検証
+        return super().authenticate(request)
+
+class LoginAPIView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = [CSRFEnforcedSessionAuthentication]
+```
+
+**処理内容**:
+1. `CSRFEnforcedSessionAuthentication.authenticate()` が実行
+2. `self.enforce_csrf(request)` で以下をチェック:
+   - `X-CSRFToken` ヘッダーの存在
+   - `csrftoken` Cookieの存在
+   - トークンの一致
+3. 検証失敗時 → `403 CSRF Failed` エラー
+
+---
+
+#### **⑨ バリデーション**
+
+**ファイル**: `accounts/views.py`
+
+```python
+def post(self, request):
+    # 1. バリデーション
+    serializer = LoginSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    user_id = serializer.validated_data['user_id']
+    password = serializer.validated_data['password']
+    group_id = serializer.validated_data['group_id']
+```
+
+**ファイル**: `accounts/serializers.py`
+
+```python
+def no_control_characters_validator(value):
+    """制御文字を禁止"""
+    if re.search(r'[\x00-\x1f\x7f-\x9f]', value):
+        raise serializers.ValidationError('ユーザーIDに不正な文字が含まれています')
+
+class LoginSerializer(serializers.Serializer):
+    group_id = serializers.CharField(max_length=50, required=True)
+    user_id = serializers.CharField(
+        max_length=50,
+        required=True,
+        validators=[no_control_characters_validator]
+    )
+    password = serializers.CharField(write_only=True, required=True)
+```
+
+**処理内容**:
+1. 必須フィールドチェック
+2. 文字数制限チェック
+3. 制御文字チェック
+4. 検証失敗時 → `400 Bad Request` エラー
+
+---
+
+#### **⑩ アカウントロック確認**
+
+**ファイル**: `accounts/views.py`
+
+```python
+# 2. アカウントロックチェック
+if LoginAttemptService.is_locked(user_id, group_id):
+    return Response(
+        {
+            'detail': str(_(
+                'ログイン試行が%(max_attempts)d回失敗しました。'
+                '%(lockout_duration)d秒後に再度お試しください'
+            ) % {
+                'max_attempts': settings.LOGIN_MAX_ATTEMPTS,
+                'lockout_duration': settings.LOGIN_LOCKOUT_DURATION,
+            })
+        },
+        status=status.HTTP_429_TOO_MANY_REQUESTS
+    )
+```
+
+**ファイル**: `accounts/services.py`
+
+```python
+class LoginAttemptService:
+    @classmethod
+    def is_locked(cls, user_id, group_id):
+        key = cls.get_lockout_key(user_id, group_id)
+        return cache.get(key, False)
+    
+    @classmethod
+    def get_lockout_key(cls, user_id, group_id):
+        return f'{cls.LOCKOUT_KEY_PREFIX}:{group_id}:{user_id}'
+```
+
+**処理内容**:
+1. キャッシュキー: `login_locked:G001:test001`
+2. キャッシュに値があれば → `429 Too Many Requests` エラー
+3. 設定例: `LOGIN_MAX_ATTEMPTS=5`, `LOGIN_LOCKOUT_DURATION=300` (5分)
+
+---
+
+#### **⑪ 認証（GroupUserAuthBackend）**
+
+**ファイル**: `accounts/views.py`
+
+```python
+# 3. 認証（グループ認証バックエンド使用）
+user = authenticate(
+    request=request,
+    username=user_id,  # ← Django規約でusername
+    password=password,
+    group_id=group_id,
+)
+```
+
+**ファイル**: `accounts/backends.py`
+
+```python
+class GroupUserAuthBackend(BaseBackend):
+    def authenticate(self, request, username=None, password=None, group_id=None, **kwargs):
+        user_id = username
+        
+        if not user_id or not password or not group_id:
+            return None
+        
+        try:
+            # 1. ユーザー取得
+            user = User.objects.filter(user_id=user_id).first()
+            
+            # タイミング攻撃対策
+            if user is None:
+                User().set_password(password)
+                return None
+            
+            # 2. パスワード検証
+            if not user.check_password(password):
+                return None
+            
+            # 3. グループ所属チェック
+            group_exists = MUserGroup.objects.filter(
+                user_id=user.user_id,
+                group_id=group_id,
+                is_active=True
+            ).exists()
+            
+            if not group_exists:
+                return None
+            
+            # 4. ユーザーアクティブチェック
+            if not user.is_active:
+                return None
+            
+            return user
+            
+        except Exception:
+            User().set_password(password)
+            return None
+```
+
+**処理内容**:
+1. `m_user` テーブルから `user_id='test001'` を検索
+2. `user.check_password('password123')` でパスワード検証
+   - `pbkdf2_sha256$xxxxx` と比較
+3. `m_user_group` テーブルで `user_id='test001' AND group_id='G001' AND is_active=True` を検索
+4. すべてOKなら `user` オブジェクトを返す
+
+---
+
+#### **⑫ セッション作成**
+
+**ファイル**: `accounts/views.py`
+
+```python
+# 4. 認証結果処理
+if user is not None:
+    # 4-1. アクティブチェック
+    if not user.is_active:
+        LoginAttemptService.increment_attempts(user_id, group_id)
+        return Response(
+            {'detail': str(_('ユーザーIDまたはパスワードが正しくありません'))},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    # 4-2. ログイン成功
+    LoginAttemptService.reset_attempts(user_id, group_id)
+    login(request, user)  # ← セッション作成
+    
+    # セッションにグループIDを保存
+    request.session['current_group_id'] = group_id
+    
+    # 監査ログ
+    self._log_success(request, user_id, group_id)
+    
+    return Response({
+        'detail': 'logged_in',
+        'user': UserSerializer(user, context={'request': request}).data
+    })
+```
+
+**処理内容**:
+1. `login(request, user)` でセッション作成
+   - `django_session` テーブルに新規レコード挿入
+   - セッションデータ:
+     ```python
+     {
+         '_auth_user_id': 'test001',
+         '_auth_user_backend': 'accounts.backends.GroupUserAuthBackend',
+         '_auth_user_hash': 'xxxxx',
+         'current_group_id': 'G001'
+     }
+     ```
+2. レスポンスヘッダーに `Set-Cookie: sessionid=xxxxx` を設定
+3. ブラウザがCookieを保存
+
+---
+
+#### **⑬ ログイン成功レスポンス**
+
+**レスポンス例**:
+
+```json
+{
+  "detail": "logged_in",
+  "user": {
+    "user_id": "test001",
+    "username": "テストユーザー",
+    "is_active": true,
+    "is_superuser": false,
+    "is_staff": false,
+    "is_admin": false,
+    "current_group": {
+      "group_id": "G001",
+      "group_name": "営業部"
+    }
+  }
+}
+```
+
+**Cookieヘッダー**:
+```
+Set-Cookie: sessionid=xxxxx; Path=/; HttpOnly; SameSite=Lax
+```
+
+---
+
+### **Phase 4: フロントエンド完了処理**
+
+#### **⑭ ユーザー情報をStoreに保存**
+
+**ファイル**: `src/stores/auth.js`
+
+```javascript
+async function loginSession(groupId, userId, password) {
+    try {
+        await authAPI.login(groupId, userId, password);
+        currentGroupId.value = groupId;
+        await fetchUser();  // ← ユーザー情報取得
+    } finally {
+        loading.value = false;
+    }
+}
+
+async function fetchUser() {
+    const response = await authAPI.me();
+    user.value = response.data;  // ← Storeに保存
+    
+    if (response.data.current_group) {
+        currentGroupId.value = response.data.current_group.group_id;
+        currentGroupName.value = response.data.current_group.group_name;
+    }
+}
+```
+
+**処理内容**:
+1. Pinia Storeの `user` に保存
+2. `pinia-plugin-persistedstate` により `localStorage` に自動保存
+3. ページリロード時も復元可能
+
+---
+
+#### **⑮ ホーム画面へリダイレクト**
+
+**ファイル**: `src/views/auth/Login.vue`
+
+```javascript
+async function onSubmit() {
+    try {
+        await auth.loginSession(groupId.value, userId.value, password.value);
+        
+        showInfo('auth.loginSuccess', {}, 3000);
+        isVisible.value = false;
+        
+        setTimeout(async () => {
+            const redirect = route.query.next || ROUTE_NAMES.HOME;
+            await router.push(redirect);
+        }, 150);
+    } catch (error) {
+        handleApiError(error);
+    }
+}
+```
+
+**処理内容**:
+1. 成功通知を表示
+2. ログインカードをフェードアウト
+3. 150ms後にホーム画面へリダイレクト
+
+---
+
+## データの流れ
+
+### **1. リクエストデータ**
+
+```
+【フロントエンド → バックエンド】
+
+Headers:
+  Content-Type: application/json
+  X-CSRFToken: xxxxx
+  Cookie: csrftoken=xxxxx
+  Accept-Language: ja
+
+Body:
+  {
+    "group_id": "G001",
+    "user_id": "test001",
+    "password": "password123"
+  }
+```
+
+### **2. 認証処理**
+
+```
+【バックエンド内部】
+
+1. CSRF検証
+   ✅ X-CSRFToken vs csrftoken Cookie
+
+2. バリデーション
+   ✅ 必須フィールド
+   ✅ 文字数制限
+   ✅ 制御文字チェック
+
+3. アカウントロック確認
+   ✅ キャッシュキー: login_locked:G001:test001
+
+4. 認証（3点確認）
+   ✅ ユーザー存在確認（m_user）
+   ✅ パスワード検証（PBKDF2）
+   ✅ グループ所属確認（m_user_group）
+
+5. セッション作成
+   ✅ django_session テーブル挿入
+   ✅ sessionid Cookie設定
+```
+
+### **3. レスポンスデータ**
+
+```
+【バックエンド → フロントエンド】
+
+Status: 200 OK
+
+Headers:
+  Set-Cookie: sessionid=xxxxx; HttpOnly; SameSite=Lax
+  X-Request-ID: 550e8400-e29b-41d4-a716-446655440000
+
+Body:
+  {
+    "detail": "logged_in",
+    "user": {
+      "user_id": "test001",
+      "username": "テストユーザー",
+      "is_active": true,
+      "is_admin": false,
+      "current_group": {
+        "group_id": "G001",
+        "group_name": "営業部"
+      }
+    }
+  }
+```
+
+---
+
+## セキュリティチェックポイント
+
+### **✅ チェックポイント1: CSRF保護**
+
+**場所**: `CSRFEnforcedSessionAuthentication`
+
+- **検証内容**: `X-CSRFToken` ヘッダーと `csrftoken` Cookieの一致
+- **失敗時**: `403 CSRF Failed`
+
+---
+
+### **✅ チェックポイント2: 入力検証**
+
+**場所**: `LoginSerializer`
+
+- **検証内容**:
+  - 必須フィールド（group_id, user_id, password）
+  - 文字数制限（max_length=50）
+  - 制御文字禁止
+- **失敗時**: `400 Bad Request`
+
+---
+
+### **✅ チェックポイント3: ログインジェクション対策**
+
+**場所**: `AuditMiddleware._sanitize_user_id()`
+
+- **検証内容**:
+  - 改行文字除去（`\n`, `\r`）
+  - 制御文字除去（`\x00-\x1f`, `\x7f-\x9f`）
+  - 長さ制限（100文字）
+- **失敗時**: サニタイズされた値をログに記録
+
+---
+
+### **✅ チェックポイント4: ブルートフォース対策**
+
+**場所**: `LoginAttemptService`
+
+- **検証内容**:
+  - 失敗回数チェック（キャッシュ: `login_attempts:G001:test001`）
+  - アカウントロック状態（キャッシュ: `login_locked:G001:test001`）
+- **失敗時**: `429 Too Many Requests`
+
+---
+
+### **✅ チェックポイント5: タイミング攻撃対策**
+
+**場所**: `GroupUserAuthBackend.authenticate()`
+
+- **検証内容**:
+  - ユーザー存在しない場合も `User().set_password(password)` を実行
+  - 処理時間を均一化
+- **失敗時**: `None` を返す（認証失敗）
+
+---
+
+### **✅ チェックポイント6: グループ所属確認**
+
+**場所**: `GroupUserAuthBackend.authenticate()`
+
+- **検証内容**:
+  - `m_user_group` テーブルで `user_id` と `group_id` の組み合わせ確認
+  - `is_active=True` チェック
+- **失敗時**: `None` を返す（認証失敗）
+
+---
+
+## エラーパターン
+
+### **❌ パターン1: CSRF検証失敗**
+
+**原因**:
+- CSRFトークンが取得されていない
+- トークンが期限切れ
+- トークンが改ざんされている
+
+**エラーレスポンス**:
+```json
+{
+  "detail": "CSRF Failed: CSRF cookie not set."
+}
+```
+
+**HTTPステータス**: `403 Forbidden`
+
+**対応**:
+1. `GET /api/auth/csrf/` でトークンを再取得
+2. リクエスト再送信
+
+---
+
+### **❌ パターン2: バリデーションエラー**
+
+**原因**:
+- 必須フィールドが空
+- 文字数制限オーバー
+- 制御文字が含まれる
+
+**エラーレスポンス**:
+```json
+{
+  "user_id": ["ユーザーIDは必須です"],
+  "password": ["パスワードは必須です"]
+}
+```
+
+**HTTPステータス**: `400 Bad Request`
+
+**対応**:
+1. エラーメッセージをフォームに表示
+2. ユーザーに修正を促す
+
+---
+
+### **❌ パターン3: アカウントロック**
+
+**原因**:
+- ログイン失敗が5回以上
+- ロック期間中（5分）
+
+**エラーレスポンス**:
+```json
+{
+  "detail": "ログイン試行が5回失敗しました。300秒後に再度お試しください"
+}
+```
+
+**HTTPステータス**: `429 Too Many Requests`
+
+**対応**:
+1. 5分間待機
+2. または管理者に連絡してロック解除
+
+---
+
+### **❌ パターン4: 認証失敗**
+
+**原因**:
+- ユーザーIDが存在しない
+- パスワードが間違っている
+- グループに所属していない
+- アカウントが無効（is_active=False）
+
+**エラーレスポンス**:
+```json
+{
+  "detail": "ユーザーIDまたはパスワードが正しくありません"
+}
+```
+
+**HTTPステータス**: `401 Unauthorized`
+
+**対応**:
+1. 入力内容を確認
+2. 失敗回数が増加（5回でロック）
+
+---
+
+### **❌ パターン5: サーバーエラー**
+
+**原因**:
+- データベース接続エラー
+- サーバー内部エラー
+
+**エラーレスポンス**:
+```json
+{
+  "detail": "サーバーエラーが発生しました"
+}
+```
+
+**HTTPステータス**: `500 Internal Server Error`
+
+**対応**:
+1. サーバーログを確認
+2. データベース接続を確認
+
+---
+
+## まとめ
+
+### **ログインフローの全体像**
+
+1. **グループ一覧取得** → ログイン画面表示
+2. **ユーザー入力** → フォーム送信
+3. **CSRFトークン取得** → セキュリティ準備
+4. **ログインリクエスト** → 認証開始
+5. **CSRF検証** → トークン確認
+6. **バリデーション** → 入力チェック
+7. **アカウントロック確認** → ブルートフォース対策
+8. **認証処理** → グループ・ユーザー・パスワード確認
+9. **セッション作成** → ログイン成功
+10. **ユーザー情報保存** → Store更新
+11. **リダイレクト** → ホーム画面へ
+
+### **セキュリティの多層防御**
+
+| 層 | チェック内容 | 効果 |
+|----|------------|------|
+| **第1層** | CSRF検証 | クロスサイトリクエスト偽造を防止 |
+| **第2層** | 入力検証 | 不正なデータを早期に拒否 |
+| **第3層** | ログインジェクション対策 | ログ改ざんを防止 |
+| **第4層** | ブルートフォース対策 | 総当たり攻撃を防止 |
+| **第5層** | タイミング攻撃対策 | 処理時間による情報漏洩を防止 |
+| **第6層** | グループ所属確認 | 不正アクセスを防止 |
+
+---
+
+## 初心者向けチェックリスト
+
+### **動作確認時のチェックポイント**
+
+- [ ] グループ一覧が正しく取得できているか
+- [ ] フォームバリデーションが動作しているか
+- [ ] CSRFトークンが自動取得されているか
+- [ ] ログイン成功後にセッションが作成されているか
+- [ ] ログイン失敗時に適切なエラーメッセージが表示されるか
+- [ ] 5回失敗するとアカウントがロックされるか
+- [ ] 監査ログに記録されているか
+
+### **デバッグ時の確認ポイント**
+
+1. **ブラウザ開発者ツール**:
+   - Network タブでリクエスト/レスポンスを確認
+   - Application タブで Cookie を確認
+   - Console タブでエラーメッセージを確認
+
+2. **サーバーログ**:
+   - `logs/audit.log` で監査ログを確認
+   - Django開発サーバーのコンソール出力を確認
+
+3. **データベース**:
+   - `django_session` テーブルを確認
+   - `m_user` テーブルを確認
+   - `m_user_group` テーブルを確認

@@ -7,8 +7,15 @@ from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 from common.models import MUserGroup, MGroup
+import re
 
 User = get_user_model()
+
+
+def no_control_characters_validator(value):
+    """制御文字を禁止"""
+    if re.search(r"[\x00-\x1f\x7f-\x9f]", value):
+        raise serializers.ValidationError("ユーザーIDに不正な文字が含まれています")
 
 
 class LoginSerializer(serializers.Serializer):
@@ -26,6 +33,7 @@ class LoginSerializer(serializers.Serializer):
     user_id = serializers.CharField(
         max_length=50,
         required=True,
+        validators=[no_control_characters_validator],
         error_messages={
             "required": _("ユーザーIDは必須です"),
             "blank": _("ユーザーIDは必須です"),
@@ -60,7 +68,7 @@ class UserSerializer(serializers.ModelSerializer):
     """
     ユーザー情報シリアライザー（ログイン・認証用）
 
-    is_admin: is_superuser または is_staff の論理和（プロパティから取得）
+    is_admin: is_superuser または is_staff （プロパティから取得）
     current_group: セッションから現在のグループ情報を取得
     """
 

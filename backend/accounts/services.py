@@ -120,7 +120,7 @@ class LoginAttemptService:
             group_id: グループID
         """
         key = cls.get_lockout_key(user_id, group_id)
-        lockout_duration = getattr(settings, "LOGIN_LOCKOUT_DURATION", 300)
+        lockout_duration = getattr(settings, "LOGIN_LOCKOUT_DURATION")
         cache.set(key, True, lockout_duration)
 
     @classmethod
@@ -148,7 +148,7 @@ class LoginAttemptService:
             bool: ロックすべきならTrue
         """
         attempts = cls.get_attempts(user_id, group_id)
-        max_attempts = getattr(settings, "LOGIN_MAX_ATTEMPTS", 5)
+        max_attempts = getattr(settings, "LOGIN_MAX_ATTEMPTS")
         return attempts >= max_attempts
 
 
@@ -205,7 +205,7 @@ class UserGroupService:
 
     機能:
     - ユーザーのグループ所属確認
-    - グループ情報取得（手動JOIN）
+    - グループ情報取得
     """
 
     @staticmethod
@@ -223,7 +223,6 @@ class UserGroupService:
         from common.models import MUserGroup, MGroup
 
         try:
-            # 手動JOIN: MUserGroup → MGroup
             user_group = MUserGroup.objects.filter(
                 user_id=user_id, group_id=group_id, is_active=True
             ).first()
@@ -231,7 +230,6 @@ class UserGroupService:
             if not user_group:
                 return None
 
-            # Groupテーブルから情報取得
             group = MGroup.objects.filter(
                 group_id=user_group.group_id, is_active=True
             ).first()

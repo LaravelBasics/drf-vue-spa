@@ -6,14 +6,14 @@ from .views import (
     LogoutAPIView,
     MeAPIView,
     CSRFView,
-    GroupListAPIView,  # ← 追加
+    GroupListAPIView,
 )
 
 app_name = "accounts"
 
 urlpatterns = [
     path("csrf/", CSRFView.as_view(), name="csrf"),
-    path("groups/", GroupListAPIView.as_view(), name="groups"),  # ← 追加
+    path("groups/", GroupListAPIView.as_view(), name="groups"),
     path("login/", LoginAPIView.as_view(), name="login"),
     path("logout/", LogoutAPIView.as_view(), name="logout"),
     path("me/", MeAPIView.as_view(), name="me"),

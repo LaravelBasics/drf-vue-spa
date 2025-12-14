@@ -1,0 +1,979 @@
+# 👤 ユーザー情報取得フロー完全解説（初心者向け）
+
+## 📋 目次
+1. [概要図](#概要図)
+2. [ステップバイステップ解説](#ステップバイステップ解説)
+3. [データの流れ](#データの流れ)
+4. [セキュリティチェックポイント](#セキュリティチェックポイント)
+5. [エラーパターン](#エラーパターン)
+
+---
+
+## 概要図
+
+```
+【フロントエンド】          【バックエンド】
+
+┌─────────────┐
+│ アプリ起動  │
+│ (main.js)   │
+└──────┬──────┘
+       │ ① Pinia Store初期化
+       ▼
+┌─────────────┐
+│ auth.store  │
+│ .initialize()│
+└──────┬──────┘
+       │ ② localStorage確認
+       │   user: { user_id: 'test001', ... }
+       │   currentGroupId: 'G001'
+       ▼
+┌─────────────┐
+│ セッション  │
+│ 有効性確認  │
+└──────┬──────┘
+       │ ③ ユーザー情報取得リクエスト
+       ▼
+┌─────────────┐          ┌─────────────┐
+│ authAPI     │─────────▶│ GET /api/   │
+│ .me()       │          │ auth/me/    │
+│             │          │             │
+│ Headers:    │          │ ④ ミドルウェア処理
+│ Cookie:     │          │ ├─LanguageMiddleware
+│ sessionid   │          │ ├─CommonMiddleware
+└─────────────┘          │ └─AuthenticationMiddleware
+                         └──────┬──────┘
+                                │
+                                ▼
+                         ┌─────────────┐
+                         │ MeAPIView   │
+                         │             │
+                         │ ⑤ セッション認証
+                         │ ⑥ ユーザー情報取得
+                         │ ⑦ グループ情報取得
+                         └──────┬──────┘
+       ┌────────────────────────┘
+       │ ⑧ ユーザー情報レスポンス
+       ▼
+┌─────────────┐
+│ auth.store  │
+│ .fetchUser()│
+│             │
+│ ⑨ Storeに保存
+│ ⑩ localStorage更新
+└──────┬──────┘
+       │ ⑪ UI更新（ユーザー名表示等）
+       ▼
+┌─────────────┐
+│ アプリ準備  │
+│ 完了        │
+└─────────────┘
+
+【特殊ケース：セッション期限切れ】
+
+┌─────────────┐          ┌─────────────┐
+│ authAPI.me()│─────────▶│ GET /api/   │
+│             │          │ auth/me/    │
+└─────────────┘          └──────┬──────┘
+       ▲                        │
+       │ ⑫ 403 Forbidden        │
+       │   (セッション無効)      │
+       └────────────────────────┘
+       │
+       ▼
+┌─────────────┐
+│ axios       │
+│ interceptor │
+│             │
+│ ⑬ 自動ログアウト
+│ ⑭ ログイン画面へリダイレクト
+└─────────────┘
+```
+
+---
+
+## ステップバイステップ解説
+
+### **Phase 1: アプリ起動とStore初期化**
+
+#### **① アプリ起動時の処理**
+
+**ファイル**: `src/main.js`
+
+```javascript
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
+import App from './App.vue';
+import router from './router';
+
+const app = createApp(App);
+
+// Pinia Store初期化
+const pinia = createPinia();
+pinia.use(piniaPluginPersistedstate);  // ← localStorage連携
+app.use(pinia);
+
+app.use(router);
+app.mount('#app');
+```
+
+**処理内容**:
+1. Piniaストアを初期化
+2. `pinia-plugin-persistedstate` により `localStorage` から自動復元
+3. 復元されるデータ:
+   ```javascript
+   {
+     user: { user_id: 'test001', username: 'テストユーザー', ... },
+     currentGroupId: 'G001',
+     currentGroupName: '営業部'
+   }
+   ```
+
+---
+
+#### **② Store初期化処理**
+
+**ファイル**: `src/stores/auth.js`
+
+```javascript
+export const useAuthStore = defineStore(
+    'auth',
+    () => {
+        const user = ref(null);
+        const currentGroupId = ref(null);
+        const currentGroupName = ref(null);
+        const initialized = ref(false);
+        
+        // 初期化処理
+        async function initialize() {
+            if (initialized.value) {
+                return;  // ← 2回目以降はスキップ
+            }
+            
+            loading.value = true;
+            
+            try {
+                // localStorageにユーザー情報があれば検証
+                if (user.value) {
+                    try {
+                        await fetchUser();  // ← セッション有効性確認
+                    } catch (error) {
+                        if (error.response?.status === 403) {
+                            // セッション無効
+                            user.value = null;
+                            currentGroupId.value = null;
+                            currentGroupName.value = null;
+                        }
+                    }
+                }
+            } finally {
+                initialized.value = true;
+                loading.value = false;
+            }
+        }
+        
+        return {
+            user,
+            currentGroupId,
+            currentGroupName,
+            initialize,
+            // ...
+        };
+    },
+    {
+        persist: {
+            paths: ['user', 'currentGroupId', 'currentGroupName'],
+        },
+    },
+);
+```
+
+**処理内容**:
+1. `localStorage` からユーザー情報を復元
+2. ユーザー情報があれば `fetchUser()` でセッション有効性を確認
+3. セッション無効なら情報をクリア
+
+---
+
+### **Phase 2: ルーターガードでの初期化**
+
+**ファイル**: `src/router/index.js`
+
+```javascript
+router.beforeEach(async (to, from, next) => {
+    const auth = useAuthStore();
+    
+    // ★初回のみ実行
+    await auth.initialize();
+    
+    // 認証が必要なページ
+    if (to.meta.requiresAuth) {
+        if (!auth.isAuthenticated) {
+            next({ name: ROUTE_NAMES.LOGIN, query: { next: to.fullPath } });
+            return;
+        }
+    }
+    
+    next();
+});
+```
+
+**処理内容**:
+1. 各ページ遷移前に `auth.initialize()` を実行
+2. `initialized.value` フラグにより2回目以降はスキップ
+3. 認証が必要なページで未認証なら → ログイン画面へリダイレクト
+
+---
+
+### **Phase 3: ユーザー情報取得リクエスト**
+
+#### **③ フロントエンド：リクエスト送信**
+
+**ファイル**: `src/stores/auth.js`
+
+```javascript
+async function fetchUser() {
+    if (loading.value) return;  // ← 並列リクエスト防止
+    
+    loading.value = true;
+    
+    try {
+        const response = await authAPI.me();
+        user.value = response.data;
+        
+        // バックエンドから返されたグループ情報を保存
+        if (response.data.current_group) {
+            currentGroupId.value = response.data.current_group.group_id;
+            currentGroupName.value = response.data.current_group.group_name;
+        }
+        
+        error.value = null;
+    } catch (err) {
+        if (err.response?.status === 403) {
+            // セッション無効
+            user.value = null;
+            currentGroupId.value = null;
+            currentGroupName.value = null;
+        } else {
+            error.value = 'ユーザー情報の取得に失敗しました';
+        }
+    } finally {
+        loading.value = false;
+    }
+}
+```
+
+**ファイル**: `src/api/auth.js`
+
+```javascript
+export const authAPI = {
+    async me() {
+        const response = await api.get('auth/me/');
+        return response;
+    },
+};
+```
+
+**処理内容**:
+- `GET /api/auth/me/` にリクエスト送信
+- リクエストヘッダー:
+  ```
+  Cookie: sessionid=xxxxx
+  Accept-Language: ja
+  ```
+
+---
+
+### **Phase 4: バックエンド認証処理**
+
+#### **④ ミドルウェア処理**
+
+**ファイル**: `config/settings.py`
+
+```python
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'common.middleware.LanguageMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',  # ← セッション認証
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'common.middleware.AuditMiddleware',
+]
+```
+
+**処理順序**:
+1. **SessionMiddleware**: `sessionid` Cookieからセッションデータを取得
+2. **AuthenticationMiddleware**: セッションデータから `request.user` を設定
+3. **AuditMiddleware**: 監査ログ記録（この場合は `/api/auth/me/` は除外対象）
+
+---
+
+#### **⑤ セッション認証**
+
+**ファイル**: `accounts/views.py`
+
+```python
+class MeAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CSRFEnforcedSessionAuthentication]
+    
+    def get(self, request):
+        serializer = UserSerializer(request.user, context={'request': request})
+        return Response(serializer.data)
+```
+
+**認証フロー**:
+
+```python
+# 1. SessionMiddleware
+session_key = request.COOKIES.get('sessionid')  # → 'xxxxx'
+session_data = Session.objects.get(session_key=session_key).get_decoded()
+# session_data = {
+#     '_auth_user_id': 'test001',
+#     '_auth_user_backend': 'accounts.backends.GroupUserAuthBackend',
+#     'current_group_id': 'G001'
+# }
+
+# 2. AuthenticationMiddleware
+user_id = session_data['_auth_user_id']  # → 'test001'
+backend = session_data['_auth_user_backend']
+user = backend.get_user(user_id)  # → MUser.objects.get(user_id='test001')
+request.user = user
+
+# 3. CSRFEnforcedSessionAuthentication
+# GETリクエストなのでCSRF検証はスキップ
+
+# 4. IsAuthenticated Permission
+if not request.user.is_authenticated:
+    raise PermissionDenied  # → 403 Forbidden
+```
+
+**処理内容**:
+1. `sessionid` Cookieからセッションデータを取得
+2. セッションデータから `user_id` を抽出
+3. `GroupUserAuthBackend.get_user()` でユーザーオブジェクトを取得
+4. `request.user` にユーザーオブジェクトを設定
+5. `IsAuthenticated` パーミッションで認証状態を確認
+
+---
+
+#### **⑥ ユーザー情報取得**
+
+**ファイル**: `accounts/serializers.py`
+
+```python
+class UserSerializer(serializers.ModelSerializer):
+    current_group = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = [
+            'user_id',
+            'username',
+            'is_active',
+            'is_superuser',
+            'is_staff',
+            'is_admin',
+            'current_group',
+        ]
+        read_only_fields = fields
+    
+    def get_is_admin(self, obj):
+        """管理者権限チェック"""
+        return bool(obj.is_superuser or obj.is_staff)
+    
+    def get_current_group(self, obj):
+        """セッションから現在のグループ情報を取得"""
+        request = self.context.get('request')
+        
+        if not request or not hasattr(request, 'session'):
+            return None
+        
+        group_id = request.session.get('current_group_id')
+        if not group_id:
+            return None
+        
+        try:
+            # ユーザー所属確認
+            MUserGroup.objects.get(
+                user_id=obj.user_id,
+                group_id=group_id,
+                is_active=True,
+            )
+            
+            # グループ情報取得
+            group_obj = MGroup.objects.get(
+                group_id=group_id,
+                is_active=True,
+            )
+            
+            return {
+                'group_id': group_obj.group_id,
+                'group_name': group_obj.group_name,
+            }
+        
+        except (MUserGroup.DoesNotExist, MGroup.DoesNotExist):
+            return None
+```
+
+**処理内容**:
+1. `request.user` から基本情報を取得
+2. `is_admin` プロパティを計算（`is_superuser OR is_staff`）
+3. `request.session['current_group_id']` からグループIDを取得
+4. `m_user_group` テーブルで所属確認
+5. `m_group` テーブルからグループ情報を取得
+
+---
+
+#### **⑦ グループ情報取得の詳細**
+
+**データベースクエリ**:
+
+```sql
+-- 1. ユーザー所属確認
+SELECT * FROM legacy_schema.m_user_group
+WHERE user_id = 'test001'
+  AND group_id = 'G001'
+  AND is_active = TRUE;
+
+-- 2. グループ情報取得
+SELECT * FROM legacy_schema.m_group
+WHERE group_id = 'G001'
+  AND is_active = TRUE;
+```
+
+**取得結果例**:
+
+```python
+# m_user_group
+{
+    'user_id': 'test001',
+    'group_id': 'G001',
+    'is_active': True,
+    'created_at': datetime(2025, 1, 1)
+}
+
+# m_group
+{
+    'group_id': 'G001',
+    'group_name': '営業部',
+    'is_active': True,
+    'created_at': datetime(2025, 1, 1)
+}
+```
+
+---
+
+### **Phase 5: レスポンス処理**
+
+#### **⑧ バックエンド：レスポンス送信**
+
+**レスポンス例**:
+
+```json
+{
+  "user_id": "test001",
+  "username": "テストユーザー",
+  "is_active": true,
+  "is_superuser": false,
+  "is_staff": false,
+  "is_admin": false,
+  "current_group": {
+    "group_id": "G001",
+    "group_name": "営業部"
+  }
+}
+```
+
+**HTTPステータス**: `200 OK`
+
+---
+
+#### **⑨ フロントエンド：Storeに保存**
+
+**ファイル**: `src/stores/auth.js`
+
+```javascript
+async function fetchUser() {
+    const response = await authAPI.me();
+    user.value = response.data;  // ← Pinia Storeに保存
+    
+    if (response.data.current_group) {
+        currentGroupId.value = response.data.current_group.group_id;
+        currentGroupName.value = response.data.current_group.group_name;
+    }
+}
+```
+
+**保存内容**:
+```javascript
+// Pinia Store
+{
+  user: {
+    user_id: 'test001',
+    username: 'テストユーザー',
+    is_active: true,
+    is_admin: false,
+    current_group: {
+      group_id: 'G001',
+      group_name: '営業部'
+    }
+  },
+  currentGroupId: 'G001',
+  currentGroupName: '営業部'
+}
+```
+
+---
+
+#### **⑩ localStorage更新**
+
+**ファイル**: `pinia-plugin-persistedstate`（自動）
+
+```javascript
+// localStorage に自動保存
+localStorage.setItem('auth', JSON.stringify({
+  user: { ... },
+  currentGroupId: 'G001',
+  currentGroupName: '営業部'
+}));
+```
+
+**確認方法**:
+1. ブラウザ開発者ツールを開く
+2. Application タブ → Local Storage
+3. `auth` キーを確認
+
+---
+
+#### **⑪ UI更新**
+
+**ファイル**: `src/components/AppBar.vue`（例）
+
+```vue
+<template>
+  <v-app-bar>
+    <v-toolbar-title>
+      {{ auth.user?.username }} さん（{{ auth.currentGroupName }}）
+    </v-toolbar-title>
+    
+    <v-chip v-if="auth.isAdmin" color="error">
+      管理者
+    </v-chip>
+  </v-app-bar>
+</template>
+
+<script setup>
+import { useAuthStore } from '@/stores/auth';
+const auth = useAuthStore();
+</script>
+```
+
+**表示例**:
+```
+テストユーザー さん（営業部）  [管理者]
+```
+
+---
+
+## データの流れ
+
+### **1. リクエストデータ**
+
+```
+【フロントエンド → バックエンド】
+
+GET /api/auth/me/ HTTP/1.1
+Host: localhost:8000
+
+Headers:
+  Cookie: sessionid=xxxxx
+  Accept-Language: ja
+  Accept: application/json
+
+Body: (なし)
+```
+
+### **2. セッション認証**
+
+```
+【バックエンド内部】
+
+1. SessionMiddleware
+   ✅ sessionid Cookie → セッションデータ取得
+   
+   django_session テーブル:
+   session_key: xxxxx
+   session_data: {
+     '_auth_user_id': 'test001',
+     '_auth_user_backend': 'accounts.backends.GroupUserAuthBackend',
+     'current_group_id': 'G001'
+   }
+
+2. AuthenticationMiddleware
+   ✅ セッションデータから user_id 取得
+   ✅ GroupUserAuthBackend.get_user('test001')
+   ✅ request.user = MUser(user_id='test001', ...)
+
+3. IsAuthenticated Permission
+   ✅ request.user.is_authenticated → True
+```
+
+### **3. ユーザー情報取得**
+
+```
+【バックエンド内部】
+
+1. 基本情報
+   m_user テーブル:
+   - user_id: 'test001'
+   - username: 'テストユーザー'
+   - is_active: True
+   - is_superuser: False
+   - is_staff: False
+
+2. 管理者権限計算
+   is_admin = is_superuser OR is_staff
+            = False OR False
+            = False
+
+3. グループ情報取得
+   request.session['current_group_id'] → 'G001'
+   
+   m_user_group テーブル:
+   - user_id: 'test001'
+   - group_id: 'G001'
+   - is_active: True
+   
+   m_group テーブル:
+   - group_id: 'G001'
+   - group_name: '営業部'
+```
+
+### **4. レスポンスデータ**
+
+```
+【バックエンド → フロントエンド】
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+Body:
+{
+  "user_id": "test001",
+  "username": "テストユーザー",
+  "is_active": true,
+  "is_superuser": false,
+  "is_staff": false,
+  "is_admin": false,
+  "current_group": {
+    "group_id": "G001",
+    "group_name": "営業部"
+  }
+}
+```
+
+---
+
+## セキュリティチェックポイント
+
+### **✅ チェックポイント1: セッション認証**
+
+**場所**: `SessionMiddleware` + `AuthenticationMiddleware`
+
+- **検証内容**:
+  - `sessionid` Cookieの存在確認
+  - セッションデータの有効性確認
+  - ユーザーの存在確認
+- **失敗時**: `request.user = AnonymousUser`
+
+---
+
+### **✅ チェックポイント2: 認証状態確認**
+
+**場所**: `IsAuthenticated` Permission
+
+- **検証内容**:
+  - `request.user.is_authenticated` チェック
+- **失敗時**: `403 Forbidden`
+
+---
+
+### **✅ チェックポイント3: グループ所属確認**
+
+**場所**: `UserSerializer.get_current_group()`
+
+- **検証内容**:
+  - `m_user_group` テーブルで所属確認
+  - `is_active=True` チェック
+- **失敗時**: `current_group: null`
+
+---
+
+### **✅ チェックポイント4: HTTPOnly Cookie**
+
+**場所**: セッションCookie設定
+
+- **保護内容**:
+  - JavaScriptから `sessionid` Cookieにアクセス不可
+  - XSS攻撃によるセッションハイジャックを防止
+- **設定**: `SESSION_COOKIE_HTTPONLY = True`
+
+---
+
+## エラーパターン
+
+### **❌ パターン1: セッション期限切れ**
+
+**原因**:
+- セッションタイムアウト（24時間）
+- ブラウザを閉じた（`SESSION_EXPIRE_AT_BROWSER_CLOSE = True`）
+- サーバー側でセッション削除
+
+**エラーレスポンス**:
+```json
+{
+  "detail": "Authentication credentials were not provided."
+}
+```
+
+**HTTPステータス**: `403 Forbidden`
+
+**自動処理**:
+```javascript
+// axios interceptor
+if (response.status === 403) {
+    const auth = useAuthStore();
+    if (auth.isAuthenticated) {
+        await auth.logout(true);  // ← 自動ログアウト
+        router.push({ name: 'Login' });
+    }
+}
+```
+
+---
+
+### **❌ パターン2: セッションが存在しない**
+
+**原因**:
+- ログインしていない
+- Cookieが削除された
+- 別のブラウザでアクセス
+
+**エラーレスポンス**:
+```json
+{
+  "detail": "Authentication credentials were not provided."
+}
+```
+
+**HTTPステータス**: `403 Forbidden`
+
+**対応**:
+1. ログイン画面へリダイレクト
+2. ユーザーに再ログインを促す
+
+---
+
+### **❌ パターン3: ユーザーが無効化されている**
+
+**原因**:
+- `m_user` テーブルの `is_active=False`
+- 管理者によるアカウント無効化
+
+**エラーレスポンス**:
+```json
+{
+  "detail": "User account is disabled."
+}
+```
+
+**HTTPステータス**: `403 Forbidden`
+
+**対応**:
+1. 管理者に連絡
+2. アカウント有効化を依頼
+
+---
+
+### **❌ パターン4: グループ所属が削除されている**
+
+**原因**:
+- `m_user_group` テーブルのレコードが削除
+- `m_user_group.is_active=False`
+
+**エラーレスポンス**:
+```json
+{
+  "user_id": "test001",
+  "username": "テストユーザー",
+  "current_group": null  ← グループ情報なし
+}
+```
+
+**HTTPステータス**: `200 OK`（エラーではない）
+
+**対応**:
+1. `current_group` が `null` の場合は警告表示
+2. ユーザーに管理者へ連絡を促す
+
+---
+
+### **❌ パターン5: ネットワークエラー**
+
+**原因**:
+- サーバーダウン
+- ネットワーク切断
+
+**エラーレスポンス**: なし
+
+**対応**:
+```javascript
+try {
+    await authAPI.me();
+} catch (error) {
+    if (!error.response) {
+        // ネットワークエラー
+        notification.error('サーバーに接続できません');
+    }
+}
+```
+
+---
+
+## 使用ケース
+
+### **ケース1: アプリ起動時**
+
+```javascript
+// main.js
+const app = createApp(App);
+app.use(pinia);  // ← localStorage自動復元
+
+// router/index.js
+router.beforeEach(async (to, from, next) => {
+    const auth = useAuthStore();
+    await auth.initialize();  // ← セッション有効性確認
+    next();
+});
+```
+
+---
+
+### **ケース2: ページリロード時**
+
+```javascript
+// 1. localStorage からユーザー情報復元
+const user = localStorage.getItem('auth');
+// { user: { user_id: 'test001', ... }, currentGroupId: 'G001' }
+
+// 2. セッション有効性確認
+await authAPI.me();
+// → 200 OK: セッション有効
+// → 403 Forbidden: セッション無効 → 自動ログアウト
+```
+
+---
+
+### **ケース3: 定期的なセッション確認**
+
+```javascript
+// App.vue
+onMounted(() => {
+    // 5分ごとにセッション有効性確認
+    setInterval(async () => {
+        const auth = useAuthStore();
+        const isValid = await auth.validateSession();
+        
+        if (!isValid) {
+            notification.warning('セッションが期限切れです');
+            await auth.logout(true);
+        }
+    }, 5 * 60 * 1000);
+});
+```
+
+---
+
+### **ケース4: ユーザー情報の手動更新**
+
+```javascript
+// プロフィール編集後など
+async function updateProfile() {
+    await api.put('/api/users/me/', { username: '新しい名前' });
+    
+    // ユーザー情報を再取得
+    const auth = useAuthStore();
+    await auth.fetchUser();
+}
+```
+
+---
+
+## まとめ
+
+### **ユーザー情報取得フローの全体像**
+
+1. **アプリ起動** → Pinia Store初期化
+2. **localStorage復元** → 前回のユーザー情報を読み込み
+3. **セッション確認** → `/api/auth/me/` リクエスト
+4. **セッション認証** → `sessionid` Cookieから認証
+5. **ユーザー情報取得** → `m_user` テーブルから取得
+6. **グループ情報取得** → `m_user_group` + `m_group` テーブルから取得
+7. **Storeに保存** → Pinia Store更新
+8. **localStorage更新** → 自動永続化
+9. **UI更新** → ユーザー名表示等
+
+### **セキュリティの仕組み**
+
+| 層 | チェック内容 | 効果 |
+|----|------------|------|
+| **第1層** | HTTPOnly Cookie | JavaScriptからCookie読み取り不可 |
+| **第2層** | セッション認証 | 正しいセッションIDのみアクセス可能 |
+| **第3層** | 認証状態確認 | 未認証ユーザーを拒否 |
+| **第4層** | グループ所属確認 | 不正なグループアクセスを防止 |
+
+---
+
+## 初心者向けチェックリスト
+
+### **動作確認時のチェックポイント**
+
+- [ ] ページリロード後もログイン状態が維持されているか
+- [ ] ユーザー名が正しく表示されているか
+- [ ] グループ名が正しく表示されているか
+- [ ] 管理者フラグ（is_admin）が正しく計算されているか
+- [ ] セッション期限切れ時に自動ログアウトされるか
+
+### **デバッグ時の確認ポイント**
+
+1. **ブラウザ開発者ツール**:
+   - Application タブ → Local Storage → `auth` キー確認
+   - Application タブ → Cookies → `sessionid` 確認
+   - Network タブ → `/api/auth/me/` のリクエスト/レスポンス確認
+
+2. **データベース**:
+   ```sql
+   -- セッション確認
+   SELECT * FROM django_session
+   WHERE session_key = 'xxxxx';
+   
+   -- ユーザー情報確認
+   SELECT * FROM legacy_schema.m_user
+   WHERE user_id = 'test001';
+   
+   -- グループ所属確認
+   SELECT * FROM legacy_schema.m_user_group
+   WHERE user_id = 'test001' AND group_id = 'G001';
+   ```
+
+3. **Pinia Devtools**:
+   - Vue Devtools拡張機能をインストール
+   - Pinia タブで Store の状態をリアルタイム確認

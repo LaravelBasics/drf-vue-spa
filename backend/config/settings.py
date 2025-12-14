@@ -202,8 +202,8 @@ PASSWORD_HASHERS = [
 
 # === ログイン設定 ===
 
-LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "10"))
-LOGIN_LOCKOUT_DURATION = int(os.getenv("LOGIN_LOCKOUT_DURATION", "60"))
+LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS"))
+LOGIN_LOCKOUT_DURATION = int(os.getenv("LOGIN_LOCKOUT_DURATION"))
 
 # === 国際化 ===
 
@@ -238,46 +238,46 @@ STATIC_URL = "static/"
 
 # === 監査ログ設定 ===
 
-# LOGGING = {
-#     "version": 1,
-#     "disable_existing_loggers": False,  # 既存のログを無効化しない
-#     "formatters": {
-#         "verbose": {
-#             "format": "{levelname} {asctime} {module} {message}",
-#             "style": "{",
-#         },
-#         "audit_json": {
-#             "()": "common.formatters.AuditJSONFormatter",
-#             "datefmt": "%Y-%m-%d %H:%M:%S",
-#         },
-#     },
-#     "handlers": {
-#         "console": {
-#             "class": "logging.StreamHandler",
-#             "formatter": "verbose",
-#         },
-#         "audit_file": {
-#             "level": "INFO",
-#             "class": "logging.handlers.RotatingFileHandler",
-#             "filename": BASE_DIR / "logs" / "audit.log",
-#             "maxBytes": 10 * 1024 * 1024,  # 10MB
-#             "backupCount": 30,  # 過去30ファイル保持
-#             "formatter": "audit_json",
-#             "encoding": "utf-8",
-#         },
-#     },
-#     "loggers": {
-#         "django": {
-#             "handlers": ["console"],
-#             "level": "INFO",
-#         },
-#         "audit": {
-#             "handlers": ["audit_file"],
-#             "level": "INFO",
-#             "propagate": False,  # 親ロガーに伝播させない
-#         },
-#     },
-# }
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,  # 既存のログを無効化しない
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
+        },
+        "audit_json": {
+            "()": "common.formatters.AuditJSONFormatter",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "audit_file": {
+            "level": "INFO",
+            "class": "logging.handlers.RotatingFileHandler",
+            "filename": BASE_DIR / "logs" / "audit.log",
+            "maxBytes": 10 * 1024 * 1024,  # 10MB
+            "backupCount": 30,  # 過去30ファイル保持
+            "formatter": "audit_json",
+            "encoding": "utf-8",
+        },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+        "audit": {
+            "handlers": ["audit_file"],
+            "level": "INFO",
+            "propagate": False,  # 親ロガーに伝播させない
+        },
+    },
+}
 
 # Debug Toolbar設定（最後に追加）
 # INTERNAL_IPS = [

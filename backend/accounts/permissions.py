@@ -216,7 +216,7 @@ class ProductManageView(APIView):
 # ========================================
 
 class ShopProductListView(APIView):
-    '''店頭商品一覧（認証済みユーザー全員）'''
+    '''商品一覧（認証済みユーザー全員）'''
     
     permission_classes = [IsAuthenticated]  # 管理者チェックなし
     authentication_classes = [CSRFEnforcedSessionAuthentication]

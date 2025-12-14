@@ -66,7 +66,7 @@ class GroupUserAuthBackend(BaseBackend):
             if not user.check_password(password):
                 return None
 
-            # ★3. グループ所属チェック（手動JOIN）★
+            # ★3. グループ所属チェック★
             # ForeignKey使えないので、文字列フィールドで直接検索
             group_exists = MUserGroup.objects.filter(
                 user_id=user.user_id, group_id=group_id, is_active=True

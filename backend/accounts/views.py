@@ -19,6 +19,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
+from common.context import get_client_ip
 from django.conf import settings
 from rest_framework.authentication import SessionAuthentication
 
@@ -188,9 +189,11 @@ class LoginAPIView(APIView):
         # ========================================
         # 5. 認証失敗処理
         # ========================================
+
+        # ★5-1. 失敗回数をインクリメント★
         attempts = LoginAttemptService.increment_attempts(user_id, group_id)
 
-        # ロック判定
+        # ★5-2. ロック判定★
         if LoginAttemptService.should_lock(user_id, group_id):
             LoginAttemptService.lock_user(user_id, group_id)
 
@@ -213,9 +216,7 @@ class LoginAPIView(APIView):
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-        # 監査ログ
-        self._log_failure(request, user_id, group_id, attempts)
-
+        # ★5-3. 通常の認証失敗レスポンス★
         return Response(
             {"detail": str(_("ユーザーIDまたはパスワードが正しくありません"))},
             status=status.HTTP_401_UNAUTHORIZED,
@@ -231,22 +232,9 @@ class LoginAPIView(APIView):
             f"ログイン成功: user_id={user_id}, group_id={group_id}",
             extra={
                 "action": "LOGIN_SUCCESS",
-                "user_id": user_id,
+                "user": user_id,
                 "group_id": group_id,
-                "ip": self._get_client_ip(request),
-            },
-        )
-
-    def _log_failure(self, request, user_id, group_id, attempts):
-        """ログイン失敗ログ"""
-        audit_logger.warning(
-            f"ログイン失敗: user_id={user_id}, group_id={group_id}, attempts={attempts}",
-            extra={
-                "action": "LOGIN_FAILURE",
-                "user_id": user_id,
-                "group_id": group_id,
-                "attempts": attempts,
-                "ip": self._get_client_ip(request),
+                "ip": get_client_ip(request),
             },
         )
 
@@ -256,19 +244,11 @@ class LoginAPIView(APIView):
             f"アカウントロック: user_id={user_id}, group_id={group_id}",
             extra={
                 "action": "ACCOUNT_LOCKED",
-                "user_id": user_id,
+                "user": user_id,
                 "group_id": group_id,
-                "ip": self._get_client_ip(request),
+                "ip": get_client_ip(request),
             },
         )
-
-    @staticmethod
-    def _get_client_ip(request):
-        """クライアントIPアドレス取得"""
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            return x_forwarded_for.split(",")[0]
-        return request.META.get("REMOTE_ADDR")
 
 
 class LogoutAPIView(APIView):
@@ -285,17 +265,24 @@ class LogoutAPIView(APIView):
 
     def post(self, request):
         """ログアウト処理"""
-        user_id = request.user.user_id
+
+        user_info = request.user.user_id
+        request_id = getattr(request, "_request_id", "N/A")
+        ip = get_client_ip(request)
+
+        # セッション破棄
+        logout(request)
 
         # 監査ログ
         audit_logger.info(
             "ユーザーがログアウトしました",
             extra={
-                "user_id": user_id,
+                "request_id": request_id,
+                "user": user_info,
                 "action": "LOGOUT",
                 "model": "Auth",
                 "object_id": None,
-                "ip": self._get_client_ip(request),
+                "ip": ip,
                 "changes": "{}",
                 "endpoint": request.path,
                 "http_method": request.method,
@@ -305,18 +292,7 @@ class LogoutAPIView(APIView):
             },
         )
 
-        # セッション破棄
-        logout(request)
-
         return Response({"detail": "logged_out"})
-
-    @staticmethod
-    def _get_client_ip(request):
-        """クライアントIPアドレス取得"""
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            return x_forwarded_for.split(",")[0]
-        return request.META.get("REMOTE_ADDR")
 
 
 class MeAPIView(APIView):

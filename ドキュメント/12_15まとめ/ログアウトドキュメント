@@ -1,0 +1,1152 @@
+# 🚪 ログアウトフロー完全解説（初心者向け）
+
+## 📋 目次
+1. [概要図](#概要図)
+2. [ステップバイステップ解説](#ステップバイステップ解説)
+3. [データの流れ](#データの流れ)
+4. [セキュリティチェックポイント](#セキュリティチェックポイント)
+5. [エラーパターン](#エラーパターン)
+
+---
+
+## 概要図
+
+```
+【正常ケース：ログアウト成功】
+
+【フロントエンド】          【バックエンド】
+
+┌─────────────┐
+│ ユーザー操作│
+│ (ログアウト │
+│  ボタン)    │
+└──────┬──────┘
+       │ ① ログアウトリクエスト
+       ▼
+┌─────────────┐          ┌─────────────┐
+│ auth.logout()│─────────▶│ POST /api/  │
+│             │          │ auth/logout/│
+│ Headers:    │          │             │
+│ X-CSRFToken │          │ ② ミドルウェア処理
+│ Cookie:     │          │ ├─CSRFMiddleware
+│ sessionid   │          │ ├─AuthenticationMiddleware
+│ csrftoken   │          │ └─AuditMiddleware
+└─────────────┘          └──────┬──────┘
+                                │
+                                ▼
+                         ┌─────────────┐
+                         │LogoutAPIView│
+                         │             │
+                         │ ③ CSRF検証  │
+                         │ ④ セッション認証
+                         │ ⑤ 監査ログ記録
+                         │ ⑥ セッション破棄
+                         └──────┬──────┘
+       ┌────────────────────────┘
+       │ ⑦ ログアウト成功レスポンス
+       │   - sessionid Cookie削除
+       ▼
+┌─────────────┐
+│ auth.logout()│
+│ (フロント)  │
+│             │
+│ ⑧ Storeクリア
+│ ⑨ localStorage削除
+│ ⑩ CSRFトークンリセット
+└──────┬──────┘
+       │ ⑪ ログイン画面へリダイレクト
+       ▼
+┌─────────────┐
+│ Login.vue   │
+│ (ログアウト │
+│  成功通知)  │
+└─────────────┘
+
+【エラーケース：ログアウト失敗】
+
+┌─────────────┐          ┌─────────────┐
+│ auth.logout()│─────────▶│ POST /api/  │
+│             │          │ auth/logout/│
+└─────────────┘          └──────┬──────┘
+       ▲                        │
+       │ ⑫ エラーレスポンス      │
+       │   - 403 CSRF Failed    │
+       │   - 401 Unauthorized   │
+       │   - 500 Server Error   │
+       └────────────────────────┘
+       │
+       ▼
+┌─────────────┐
+│ auth.logout()│
+│ (finally)   │
+│             │
+│ ⑬ エラーでもクリア
+│   - Storeクリア
+│   - localStorage削除
+│   - CSRFトークンリセット
+└──────┬──────┘
+       │ ⑭ ログイン画面へリダイレクト
+       ▼
+┌─────────────┐
+│ Login.vue   │
+└─────────────┘
+
+【特殊ケース：セッション期限切れ】
+
+┌─────────────┐          ┌─────────────┐
+│ 任意のAPI   │─────────▶│ GET/POST    │
+│ リクエスト  │          │ /api/xxx/   │
+└─────────────┘          └──────┬──────┘
+       ▲                        │
+       │ ⑮ 403 Forbidden        │
+       │   (セッション無効)      │
+       └────────────────────────┘
+       │
+       ▼
+┌─────────────┐
+│ axios       │
+│ interceptor │
+│             │
+│ ⑯ 自動ログアウト
+│   (redirect=true)
+└──────┬──────┘
+       │ ⑰ ログイン画面へリダイレクト
+       ▼
+┌─────────────┐
+│ Login.vue   │
+│ (警告通知)  │
+└─────────────┘
+```
+
+---
+
+## ステップバイステップ解説
+
+### **Phase 1: ユーザー操作**
+
+#### **① ログアウトボタンクリック**
+
+**ファイル**: `src/components/AppBar.vue`（例）
+
+```vue
+<template>
+  <v-app-bar>
+    <v-menu>
+      <template v-slot:activator="{ props }">
+        <v-btn icon v-bind="props">
+          <v-icon>{{ ICONS.user.profile }}</v-icon>
+        </v-btn>
+      </template>
+      
+      <v-list>
+        <v-list-item>
+          <v-list-item-title>
+            {{ auth.user?.username }}
+          </v-list-item-title>
+        </v-list-item>
+        
+        <v-divider />
+        
+        <v-list-item @click="handleLogout">
+          <template v-slot:prepend>
+            <v-icon>{{ ICONS.auth.logout }}</v-icon>
+          </template>
+          <v-list-item-title>
+            {{ t('auth.logout') }}
+          </v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-menu>
+  </v-app-bar>
+</template>
+
+<script setup>
+import { useAuthStore } from '@/stores/auth';
+import { useRouter } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import { ROUTE_NAMES } from '@/constants/routes';
+import { ICONS } from '@/constants/icons';
+
+const auth = useAuthStore();
+const router = useRouter();
+const { t } = useI18n();
+
+async function handleLogout() {
+    try {
+        await auth.logout(true);  // ← redirect=true
+        router.push({
+            name: ROUTE_NAMES.LOGIN,
+            query: { logout: 'success' }
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+}
+</script>
+```
+
+**処理内容**:
+- ユーザーがログアウトボタンをクリック
+- `auth.logout(true)` を実行
+- 引数 `redirect=true` でログイン画面へリダイレクト
+
+---
+
+### **Phase 2: CSRFトークン取得（自動）**
+
+#### **② Axiosインターセプター**
+
+**ファイル**: `src/plugins/axios.js`
+
+```javascript
+api.interceptors.request.use(async (config) => {
+    // CSRFトークンが必要なメソッド
+    const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
+    
+    if (methodsRequiringCsrf.includes(config.method.toLowerCase())) {
+        await csrfManager.ensureToken();  // ← 自動取得
+    }
+    
+    return config;
+});
+```
+
+**処理内容**:
+- `POST /api/auth/logout/` の前に自動実行
+- CSRFトークンがまだ取得されていなければ取得
+- 既に取得済みならキャッシュを使用
+
+---
+
+### **Phase 3: ログアウトリクエスト送信**
+
+#### **③ フロントエンド：リクエスト送信**
+
+**ファイル**: `src/stores/auth.js`
+
+```javascript
+async function logout(redirect = true) {
+    loading.value = true;
+    
+    try {
+        if (user.value) {
+            await authAPI.logout();  // ← API呼び出し
+        }
+    } catch (e) {
+        // ログアウトAPIが失敗してもクライアント側の状態はクリア
+        console.error('Logout API failed:', e);
+    } finally {
+        // ⑧ Storeクリア
+        user.value = null;
+        error.value = null;
+        currentGroupId.value = null;
+        currentGroupName.value = null;
+        loading.value = false;
+        
+        // ⑨ CSRFトークンリセット
+        resetCSRFToken();
+        
+        // ⑩ ログイン画面へリダイレクト
+        if (redirect && router.currentRoute.value.name !== ROUTE_NAMES.LOGIN) {
+            router.push({ name: ROUTE_NAMES.LOGIN }).catch(() => {});
+        }
+    }
+}
+```
+
+**ファイル**: `src/api/auth.js`
+
+```javascript
+export const authAPI = {
+    async logout() {
+        const response = await api.post('auth/logout/');
+        return response;
+    },
+};
+```
+
+**処理内容**:
+- `POST /api/auth/logout/` にリクエスト送信
+- リクエストヘッダー:
+  ```
+  X-CSRFToken: xxxxx
+  Cookie: sessionid=xxxxx; csrftoken=xxxxx
+  Content-Type: application/json
+  ```
+- リクエストボディ: `{}`（空）
+
+---
+
+### **Phase 4: バックエンド認証処理**
+
+#### **④ ミドルウェア処理**
+
+**ファイル**: `common/middleware.py`
+
+```python
+class AuditMiddleware:
+    def __call__(self, request):
+        request_id = request.META.get('HTTP_X_REQUEST_ID', str(uuid.uuid4()))
+        request._request_id = request_id
+        
+        set_current_request(request)
+        
+        response = self.get_response(request)  # ← View実行
+        
+        response['X-Request-ID'] = request_id
+        
+        # ログアウトは監査ログ除外
+        if request.path != '/api/auth/logout/':
+            self._log_audit_events(request, response)
+        
+        return response
+```
+
+**処理内容**:
+1. リクエストIDを生成
+2. コンテキストに保存
+3. View実行（`LogoutAPIView`）
+4. ログアウトは監査ログ記録対象外（Viewで記録）
+
+---
+
+#### **⑤ CSRF検証**
+
+**ファイル**: `accounts/views.py`
+
+```python
+class LogoutAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    authentication_classes = [CSRFEnforcedSessionAuthentication]
+```
+
+**処理内容**:
+1. `CSRFEnforcedSessionAuthentication.authenticate()` が実行
+2. `self.enforce_csrf(request)` で以下をチェック:
+   - `X-CSRFToken` ヘッダーの存在
+   - `csrftoken` Cookieの存在
+   - トークンの一致
+3. 検証失敗時 → `403 CSRF Failed` エラー
+
+---
+
+#### **⑥ セッション認証**
+
+**ファイル**: `accounts/views.py`
+
+```python
+class LogoutAPIView(APIView):
+    permission_classes = [IsAuthenticated]  # ← 認証必須
+```
+
+**処理内容**:
+1. `SessionMiddleware` が `sessionid` Cookieからセッションデータを取得
+2. `AuthenticationMiddleware` がセッションデータから `request.user` を設定
+3. `IsAuthenticated` パーミッションで認証状態を確認
+4. 未認証の場合 → `403 Forbidden` エラー
+
+---
+
+#### **⑦ 監査ログ記録**
+
+**ファイル**: `accounts/views.py`
+
+```python
+class LogoutAPIView(APIView):
+    def post(self, request):
+        user_info = request.user.user_id
+        request_id = getattr(request, '_request_id', 'N/A')
+        ip = get_client_ip(request)
+        
+        # セッション破棄
+        logout(request)
+        
+        # 監査ログ
+        audit_logger.info(
+            'ユーザーがログアウトしました',
+            extra={
+                'request_id': request_id,
+                'user': user_info,
+                'action': 'LOGOUT',
+                'model': 'Auth',
+                'object_id': None,
+                'ip': ip,
+                'changes': '{}',
+                'endpoint': request.path,
+                'http_method': request.method,
+                'http_referer': request.META.get('HTTP_REFERER', ''),
+                'http_status': 200,
+                'view_name': self.__class__.__name__,
+            },
+        )
+        
+        return Response({'detail': 'logged_out'})
+```
+
+**監査ログ出力例**:
+
+```json
+{
+  "request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "timestamp": "2025-12-14 18:30:45",
+  "user_id": "test001",
+  "endpoint": "/api/auth/logout/",
+  "ip": "192.168.1.100",
+  "object_repr": "",
+  "view_name": "LogoutAPIView",
+  "changes": "{}",
+  "message": "ユーザーがログアウトしました"
+}
+```
+
+---
+
+#### **⑧ セッション破棄**
+
+**ファイル**: `accounts/views.py`
+
+```python
+from django.contrib.auth import logout
+
+class LogoutAPIView(APIView):
+    def post(self, request):
+        # ...監査ログ記録...
+        
+        logout(request)  # ← セッション破棄
+        
+        return Response({'detail': 'logged_out'})
+```
+
+**Django内部処理**:
+
+```python
+def logout(request):
+    # 1. セッションデータから認証情報を削除
+    request.session.flush()
+    
+    # 2. django_session テーブルからレコード削除
+    # DELETE FROM django_session WHERE session_key = 'xxxxx';
+    
+    # 3. 新しいセッションを作成（空）
+    request.session.create()
+    
+    # 4. request.user を AnonymousUser に変更
+    request.user = AnonymousUser()
+```
+
+**処理内容**:
+1. セッションデータをクリア
+2. データベースからセッションレコードを削除
+3. 新しい空のセッションを作成
+4. ユーザーを匿名ユーザーに変更
+
+---
+
+#### **⑨ ログアウト成功レスポンス**
+
+**レスポンス例**:
+
+```json
+{
+  "detail": "logged_out"
+}
+```
+
+**HTTPステータス**: `200 OK`
+
+**レスポンスヘッダー**:
+```
+Set-Cookie: sessionid=""; expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/
+```
+
+**処理内容**:
+- `sessionid` Cookieを空文字に設定
+- 有効期限を過去の日時に設定（即座に削除）
+
+---
+
+### **Phase 5: フロントエンド完了処理**
+
+#### **⑩ Storeクリア**
+
+**ファイル**: `src/stores/auth.js`
+
+```javascript
+async function logout(redirect = true) {
+    try {
+        if (user.value) {
+            await authAPI.logout();
+        }
+    } catch (e) {
+        // エラーでも状態はクリア
+    } finally {
+        // Storeクリア
+        user.value = null;
+        error.value = null;
+        currentGroupId.value = null;
+        currentGroupName.value = null;
+        loading.value = false;
+        
+        // CSRFトークンリセット
+        resetCSRFToken();
+        
+        // リダイレクト
+        if (redirect && router.currentRoute.value.name !== ROUTE_NAMES.LOGIN) {
+            router.push({ name: ROUTE_NAMES.LOGIN }).catch(() => {});
+        }
+    }
+}
+```
+
+**処理内容**:
+1. すべてのユーザー情報を `null` に設定
+2. エラー情報をクリア
+3. グループ情報をクリア
+
+---
+
+#### **⑪ localStorage削除**
+
+**ファイル**: `pinia-plugin-persistedstate`（自動）
+
+```javascript
+// Storeの変更を検知して自動削除
+watch(
+    () => user.value,
+    (newValue) => {
+        if (newValue === null) {
+            localStorage.removeItem('auth');
+        }
+    }
+);
+```
+
+**確認方法**:
+1. ブラウザ開発者ツールを開く
+2. Application タブ → Local Storage
+3. `auth` キーが削除されていることを確認
+
+---
+
+#### **⑫ CSRFトークンリセット**
+
+**ファイル**: `src/plugins/axios.js`
+
+```javascript
+export const resetCSRFToken = () => {
+    csrfManager.reset();
+};
+
+class CSRFManager {
+    reset() {
+        this.tokenFetched = false;
+        this.fetchingPromise = null;
+    }
+}
+```
+
+**処理内容**:
+1. `tokenFetched` フラグを `false` に設定
+2. `fetchingPromise` をクリア
+3. 次回のPOSTリクエスト時に再取得
+
+---
+
+#### **⑬ ログイン画面へリダイレクト**
+
+**ファイル**: `src/stores/auth.js`
+
+```javascript
+async function logout(redirect = true) {
+    // ...状態クリア...
+    
+    if (redirect && router.currentRoute.value.name !== ROUTE_NAMES.LOGIN) {
+        router.push({ name: ROUTE_NAMES.LOGIN }).catch(() => {});
+    }
+}
+```
+
+**処理内容**:
+- `redirect=true` の場合のみリダイレクト
+- 既にログイン画面にいる場合はスキップ
+- ルート: `/login`
+
+---
+
+#### **⑭ ログアウト成功通知**
+
+**ファイル**: `src/views/auth/Login.vue`
+
+```javascript
+onMounted(async () => {
+    if (route.query.logout === 'success') {
+        showInfo('auth.logoutSuccess', {}, 3000);
+        router.replace({ name: ROUTE_NAMES.LOGIN, query: {} });
+    }
+});
+```
+
+**処理内容**:
+1. URLクエリパラメータ `?logout=success` を確認
+2. 成功通知を3秒間表示
+3. クエリパラメータを削除（URLをクリーンに）
+
+---
+
+## データの流れ
+
+### **1. リクエストデータ**
+
+```
+【フロントエンド → バックエンド】
+
+POST /api/auth/logout/ HTTP/1.1
+Host: localhost:8000
+
+Headers:
+  Content-Type: application/json
+  X-CSRFToken: xxxxx
+  Cookie: sessionid=xxxxx; csrftoken=xxxxx
+
+Body:
+  {}
+```
+
+### **2. 認証処理**
+
+```
+【バックエンド内部】
+
+1. CSRF検証
+   ✅ X-CSRFToken vs csrftoken Cookie
+
+2. セッション認証
+   ✅ sessionid Cookie → セッションデータ取得
+   ✅ セッションデータ → request.user 設定
+
+3. 認証状態確認
+   ✅ request.user.is_authenticated → True
+
+4. 監査ログ記録
+   ✅ user_id, ip, timestamp, action=LOGOUT
+
+5. セッション破棄
+   ✅ request.session.flush()
+   ✅ DELETE FROM django_session WHERE session_key = 'xxxxx'
+   ✅ 新しい空セッション作成
+```
+
+### **3. レスポンスデータ**
+
+```
+【バックエンド → フロントエンド】
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+Headers:
+  Set-Cookie: sessionid=""; expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/
+  X-Request-ID: 550e8400-e29b-41d4-a716-446655440000
+
+Body:
+  {
+    "detail": "logged_out"
+  }
+```
+
+### **4. クライアント側クリーンアップ**
+
+```
+【フロントエンド内部】
+
+1. Pinia Storeクリア
+   user = null
+   currentGroupId = null
+   currentGroupName = null
+
+2. localStorage削除
+   localStorage.removeItem('auth')
+
+3. CSRFトークンリセット
+   csrfManager.tokenFetched = false
+
+4. ログイン画面へリダイレクト
+   router.push('/login?logout=success')
+
+5. 成功通知表示
+   notification.info('ログアウトしました')
+```
+
+---
+
+## セキュリティチェックポイント
+
+### **✅ チェックポイント1: CSRF保護**
+
+**場所**: `CSRFEnforcedSessionAuthentication`
+
+- **検証内容**: `X-CSRFToken` ヘッダーと `csrftoken` Cookieの一致
+- **失敗時**: `403 CSRF Failed`
+- **目的**: クロスサイトリクエスト偽造を防止
+
+---
+
+### **✅ チェックポイント2: セッション認証**
+
+**場所**: `IsAuthenticated` Permission
+
+- **検証内容**: `request.user.is_authenticated` チェック
+- **失敗時**: `403 Forbidden`
+- **目的**: ログイン済みユーザーのみログアウト可能
+
+---
+
+### **✅ チェックポイント3: 監査ログ記録**
+
+**場所**: `LogoutAPIView.post()`
+
+- **記録内容**:
+  - ユーザーID
+  - IPアドレス
+  - タイムスタンプ
+  - リクエストID
+- **目的**: セキュリティインシデント調査
+
+---
+
+### **✅ チェックポイント4: セッション完全削除**
+
+**場所**: Django `logout()` 関数
+
+- **処理内容**:
+  - セッションデータクリア
+  - データベースレコード削除
+  - Cookie削除
+- **目的**: セッションハイジャック防止
+
+---
+
+### **✅ チェックポイント5: クライアント側クリーンアップ**
+
+**場所**: `auth.logout()`
+
+- **処理内容**:
+  - Storeクリア
+  - localStorage削除
+  - CSRFトークンリセット
+- **目的**: 機密情報の残留防止
+
+---
+
+## エラーパターン
+
+### **❌ パターン1: CSRF検証失敗**
+
+**原因**:
+- CSRFトークンが取得されていない
+- トークンが期限切れ
+- トークンが改ざんされている
+
+**エラーレスポンス**:
+```json
+{
+  "detail": "CSRF Failed: CSRF cookie not set."
+}
+```
+
+**HTTPステータス**: `403 Forbidden`
+
+**フロントエンド処理**:
+```javascript
+async function logout(redirect = true) {
+    try {
+        if (user.value) {
+            await authAPI.logout();
+        }
+    } catch (e) {
+        // ★エラーでもクライアント側の状態はクリア
+        console.error('Logout API failed:', e);
+    } finally {
+        // 必ず実行：状態クリア + リダイレクト
+        user.value = null;
+        resetCSRFToken();
+        if (redirect) {
+            router.push({ name: ROUTE_NAMES.LOGIN });
+        }
+    }
+}
+```
+
+**対応**:
+1. クライアント側の状態はクリアされる
+2. ログイン画面へリダイレクト
+3. 次回ログイン時に新しいCSRFトークンを取得
+
+---
+
+### **❌ パターン2: セッション期限切れ**
+
+**原因**:
+- セッションタイムアウト（24時間）
+- ブラウザを閉じた
+- サーバー側でセッション削除
+
+**エラーレスポンス**:
+```json
+{
+  "detail": "Authentication credentials were not provided."
+}
+```
+
+**HTTPステータス**: `403 Forbidden`
+
+**フロントエンド処理**:
+```javascript
+// axios interceptor
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        if (error.response?.status === 403) {
+            const isLogoutRequest = error.config.url?.endsWith('auth/logout/');
+            
+            if (!isLogoutRequest) {
+                // ログアウトリクエスト以外のエラー
+                const auth = useAuthStore();
+                if (auth.isAuthenticated) {
+                    notification.warning('セッションが期限切れです');
+                    await auth.logout(true);  // ← 自動ログアウト
+                }
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+```
+
+**対応**:
+1. 既にセッションが無効なので問題なし
+2. クライアント側の状態をクリア
+3. ログイン画面へリダイレクト
+
+---
+
+### **❌ パターン3: サーバーエラー**
+
+**原因**:
+- データベース接続エラー
+- サーバー内部エラー
+
+**エラーレスポンス**:
+```json
+{
+  "detail": "サーバーエラーが発生しました"
+}
+```
+
+**HTTPステータス**: `500 Internal Server Error`
+
+**フロントエンド処理**:
+```javascript
+async function logout(redirect = true) {
+    try {
+        if (user.value) {
+            await authAPI.logout();
+        }
+    } catch (e) {
+        // ★サーバーエラーでもクライアント側の状態はクリア
+        console.error('Logout API failed:', e);
+        notification.error('ログアウトに失敗しましたが、ローカルの情報はクリアしました');
+    } finally {
+        // 必ず実行：状態クリア + リダイレクト
+        user.value = null;
+        resetCSRFToken();
+        if (redirect) {
+            router.push({ name: ROUTE_NAMES.LOGIN });
+        }
+    }
+}
+```
+
+**対応**:
+1. クライアント側の状態はクリアされる
+2. サーバーエラーを通知
+3. ログイン画面へリダイレクト
+4. サーバーログを確認して原因調査
+
+---
+
+### **❌ パターン4: ネットワークエラー**
+
+**原因**:
+- サーバーダウン
+- ネットワーク切断
+
+**エラーレスポンス**: なし
+
+**フロントエンド処理**:
+```javascript
+async function logout(redirect = true) {
+    try {
+        if (user.value) {
+            await authAPI.logout();
+        }
+    } catch (e) {
+        // ★ネットワークエラーでもクライアント側の状態はクリア
+        if (!e.response) {
+            console.error('Network error:', e);
+            notification.error('サーバーに接続できません');
+        }
+    } finally {
+        // 必ず実行：状態クリア + リダイレクト
+        user.value = null;
+        resetCSRFToken();
+        if (redirect) {
+            router.push({ name: ROUTE_NAMES.LOGIN });
+        }
+    }
+}
+```
+
+**対応**:
+1. クライアント側の状態はクリアされる
+2. ネットワークエラーを通知
+3. ログイン画面へリダイレクト
+
+---
+
+## 特殊ケース
+
+### **ケース1: 自動ログアウト（セッション期限切れ）**
+
+**トリガー**: 任意のAPIリクエストで `403 Forbidden`
+
+```javascript
+// axios interceptor
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const { response, config } = error;
+        
+        if (response?.status === 403) {
+            const isLogoutRequest = config.url?.endsWith('auth/logout/');
+            
+            if (!isLogoutRequest) {
+                const { useAuthStore } = await import('@/stores/auth');
+                const { useNotificationStore } = await import('@/stores/notification');
+                const auth = useAuthStore();
+                
+                if (auth.isAuthenticated) {
+                    const notification = useNotificationStore();
+                    notification.warning(response.data?.detail, 5000);
+                    await auth.logout(true);  // ← 自動ログアウト
+                }
+            }
+        }
+        
+        return Promise.reject(error);
+    }
+);
+```
+
+**処理フロー**:
+1. 任意のAPIリクエストが `403 Forbidden` を返す
+2. Axiosインターセプターが自動的にキャッチ
+3. ログアウトリクエスト自体のエラーは無視
+4. それ以外のエラーは自動ログアウト実行
+5. 警告通知を表示
+6. ログイン画面へリダイレクト
+
+---
+
+### **ケース2: 手動ログアウト（正常）**
+
+**トリガー**: ユーザーがログアウトボタンをクリック
+
+```javascript
+async function handleLogout() {
+    try {
+        await auth.logout(true);  // ← redirect=true
+        router.push({
+            name: ROUTE_NAMES.LOGIN,
+            query: { logout: 'success' }
+        });
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+}
+```
+
+**処理フロー**:
+1. ユーザーがログアウトボタンをクリック
+2. `auth.logout(true)` を実行
+3. サーバー側でセッション破棄
+4. クライアント側で状態クリア
+5. ログイン画面へリダイレクト（`?logout=success`）
+6. 成功通知を表示
+
+---
+
+### **ケース3: プログラム的ログアウト（リダイレクトなし）**
+
+**トリガー**: アプリ内部処理
+
+```javascript
+// 例：アカウント削除後のログアウト
+async function deleteAccount() {
+    try {
+        await api.delete('/api/users/me/');
+        
+        // リダイレクトせずにログアウト
+        await auth.logout(false);  // ← redirect=false
+        
+        // カスタムページへ遷移
+        router.push({ name: 'AccountDeleted' });
+    } catch (error) {
+        handleApiError(error);
+    }
+}
+```
+
+**処理フロー**:
+1. アカウント削除API呼び出し
+2. `auth.logout(false)` でリダイレクトなし
+3. カスタムページへ遷移
+
+---
+
+## まとめ
+
+### **ログアウトフローの全体像**
+
+1. **ユーザー操作** → ログアウトボタンクリック
+2. **CSRFトークン取得** → 自動的に取得（必要な場合）
+3. **ログアウトリクエスト** → `POST /api/auth/logout/`
+4. **CSRF検証** → トークン確認
+5. **セッション認証** → ログイン済み確認
+6. **監査ログ記録** → ログアウト履歴保存
+7. **セッション破棄** → データベースから削除
+8. **Storeクリア** → Pinia Store初期化
+9. **localStorage削除** → 永続化データ削除
+10. **CSRFトークンリセット** → 次回ログイン用
+11. **リダイレクト** → ログイン画面へ
+
+### **セキュリティの仕組み**
+
+| 層 | チェック内容 | 効果 |
+|----|------------|------|
+| **第1層** | CSRF保護 | クロスサイトリクエスト偽造を防止 |
+| **第2層** | セッション認証 | ログイン済みユーザーのみログアウト可能 |
+| **第3層** | 監査ログ記録 | セキュリティインシデント調査に利用 |
+| **第4層** | セッション完全削除 | セッションハイジャック防止 |
+| **第5層** | クライアント側クリーンアップ | 機密情報の残留防止 |
+
+### **エラー処理の設計思想**
+
+```
+【重要原則】
+ログアウトAPIが失敗しても、
+クライアント側の状態は必ずクリアする
+
+理由：
+1. ユーザーの意図を尊重（ログアウトしたい）
+2. セキュリティ優先（ログイン状態を残さない）
+3. ユーザビリティ向上（エラーでも前に進める）
+```
+
+---
+
+## 初心者向けチェックリスト
+
+### **動作確認時のチェックポイント**
+
+- [ ] ログアウトボタンが正しく動作するか
+- [ ] ログアウト後にログイン画面へリダイレクトされるか
+- [ ] ログアウト成功通知が表示されるか
+- [ ] localStorageからユーザー情報が削除されるか
+- [ ] sessionid Cookieが削除されるか
+- [ ] 監査ログに記録されるか
+- [ ] エラー時でもクライアント側の状態がクリアされるか
+
+### **デバッグ時の確認ポイント**
+
+1. **ブラウザ開発者ツール**:
+   - Network タブ → `/api/auth/logout/` のリクエスト/レスポンス確認
+   - Application タブ → Local Storage → `auth` キーが削除されていることを確認
+   - Application タブ → Cookies → `sessionid` が削除されていることを確認
+   - Console タブ → エラーメッセージを確認
+
+2. **サーバーログ**:
+   ```bash
+   # 監査ログ確認
+   tail -f logs/audit.log | grep "LOGOUT"
+   ```
+
+3. **データベース**:
+   ```sql
+   -- セッション削除確認
+   SELECT * FROM django_session
+   WHERE session_key = 'xxxxx';
+   -- → レコードが存在しない（削除済み）
+   ```
+
+### **トラブルシューティング**
+
+#### **問題1: ログアウト後もログイン状態が残る**
+
+**原因**:
+- `auth.logout()` が正しく呼ばれていない
+- Pinia Storeの状態が更新されていない
+
+**確認**:
+```javascript
+// Vue Devtoolsで確認
+console.log(auth.user);  // → null であるべき
+console.log(localStorage.getItem('auth'));  // → null であるべき
+```
+
+---
+
+#### **問題2: CSRFエラーが発生する**
+
+**原因**:
+- CSRFトークンが取得されていない
+- トークンが期限切れ
+
+**確認**:
+```javascript
+// ブラウザ開発者ツール → Application → Cookies
+document.cookie;  // → csrftoken が含まれているか確認
+```
+
+**対応**:
+```javascript
+// CSRFトークンを再取得
+await csrfManager.ensureToken();
+```
+
+---
+
+#### **問題3: 監査ログに記録されない**
+
+**原因**:
+- ログ設定が正しくない
+- ログファイルの権限エラー
+
+**確認**:
+```python
+# settings.py
+LOGGING = {
+    'handlers': {
+        'audit_file': {
+            'filename': BASE_DIR / 'logs' / 'audit.log',
+        },
+    },
+}
+```
+
+**対応**:
+```bash
+# ログディレクトリを作成
+mkdir -p logs
+chmod 755 logs
+```

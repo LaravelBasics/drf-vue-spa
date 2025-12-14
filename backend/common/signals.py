@@ -1,11 +1,9 @@
 """
 監査ログ用シグナル(全モデル自動監視)
-
-Django公式推奨の@receiverデコレーターパターンに準拠
-Over-Engineeringを排除し、シンプルで保守性の高い実装
 """
 
 import logging
+import re
 import json
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
@@ -66,6 +64,24 @@ def get_field_changes(old_instance, new_instance):
     return changes
 
 
+def _sanitize_log_value(value, max_length=100):
+    """ログ値のサニタイズ"""
+    if not value:
+        return "unknown"
+
+    value = str(value)
+
+    # 長さ制限
+    if len(value) > max_length:
+        value = value[:max_length] + "...[truncated]"
+
+    # 改行・制御文字除去
+    value = value.replace("\n", "").replace("\r", "")
+    value = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", value)
+
+    return value.strip() or "unknown"
+
+
 def log_audit(action, instance, changes=None):
     """
     監査ログ出力
@@ -83,7 +99,8 @@ def log_audit(action, instance, changes=None):
 
     if request:
         if hasattr(request, "user") and request.user.is_authenticated:
-            user_info = getattr(request.user, "user_id", request.user.username)
+            raw_user = getattr(request.user, "user_id", request.user.username)
+            user_info = _sanitize_log_value(raw_user)  # ← サニタイズ追加
         ip = get_client_ip(request)
         request_id = getattr(request, "_request_id", "N/A")
 
