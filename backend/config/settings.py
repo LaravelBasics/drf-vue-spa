@@ -178,9 +178,10 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", "your_password"),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
+        "CONN_MAX_AGE": 600,  # ← 10分間接続を維持
         "OPTIONS": {
-            # DjangoがSQLを実行する際に、この検索パスを設定します。
-            "options": "-c search_path=legacy_schema,public",
+            "connect_timeout": 5,
+            "options": "-c search_path=legacy_schema,public",  # DjangoがSQLを実行する際に、この検索パスを設定します。
         },
     }
 }

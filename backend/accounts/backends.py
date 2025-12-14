@@ -11,6 +11,7 @@
 
 from django.contrib.auth.backends import BaseBackend
 from django.contrib.auth import get_user_model
+from django.db.models import Exists, OuterRef
 from common.models import MUserGroup
 
 User = get_user_model()
@@ -53,8 +54,18 @@ class GroupUserAuthBackend(BaseBackend):
             return None
 
         try:
-            # ★1. ユーザー取得（文字列PKで検索）★
-            user = User.objects.filter(user_id=user_id).first()
+            # ★1クエリでユーザー取得 + グループチェック★
+            # ForeignKeyなしでも動く！文字列フィールド同士で結合
+            # ★改善版: EXISTSを1回だけ★
+            # filter()だけで完結させる
+            user = User.objects.filter(
+                user_id=user_id,
+                is_active=True,
+                # グループ所属チェックをfilter内で完結
+                pk__in=MUserGroup.objects.filter(
+                    group_id=group_id, is_active=True
+                ).values_list("user_id", flat=True),
+            ).first()
 
             # ★タイミング攻撃対策★
             # ユーザー不在でも同じ処理時間を確保
@@ -66,16 +77,7 @@ class GroupUserAuthBackend(BaseBackend):
             if not user.check_password(password):
                 return None
 
-            # ★3. グループ所属チェック★
-            # ForeignKey使えないので、文字列フィールドで直接検索
-            group_exists = MUserGroup.objects.filter(
-                user_id=user.user_id, group_id=group_id, is_active=True
-            ).exists()
-
-            if not group_exists:
-                return None
-
-            # ★4. ユーザーアクティブチェック★
+            # ★3. アクティブチェック★
             if not user.is_active:
                 return None
 
