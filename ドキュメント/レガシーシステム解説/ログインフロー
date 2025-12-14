@@ -1,0 +1,1038 @@
+# 1️⃣ ログインフロー詳細解説
+
+## 📋 目次
+1. [フロー全体図](#フロー全体図)
+2. [フロントエンド処理](#フロントエンド処理)
+3. [Axios CSRF自動取得](#axios-csrf自動取得)
+4. [Django Middleware処理](#django-middleware処理)
+5. [LoginAPIView処理](#loginapiview処理)
+6. [認証バックエンド処理](#認証バックエンド処理)
+7. [セッション作成](#セッション作成)
+8. [レスポンス処理](#レスポンス処理)
+
+---
+
+## 🎯 フロー全体図
+
+```
+👤 ユーザー
+  ↓ ログインボタンクリック
+  
+🎨 Login.vue
+  ↓ onSubmit()
+  ↓ form.validate()
+  
+💾 authStore
+  ↓ loginSession(groupId, userId, password)
+  
+📡 Axios
+  ↓ リクエストインターセプター起動
+  ↓ CSRF自動取得（GET /api/auth/csrf/）
+  ↓ POST /api/auth/login/
+  
+⚙️ Django
+  ↓ Middleware処理（SessionMiddleware, AuthenticationMiddleware, etc.）
+  ↓ URLルーティング（config/urls.py → accounts/urls.py）
+  
+📍 LoginAPIView
+  ↓ CSRFEnforcedSessionAuthentication（CSRF検証）
+  ↓ LoginSerializer（バリデーション）
+  ↓ LoginAttemptService（ブルートフォース対策）
+  ↓ authenticate()
+  
+🎯 GroupUserAuthBackend
+  ↓ authenticate()
+  ├─ 1. ユーザー取得（User.objects.filter(user_id=...).first()）
+  ├─ 2. パスワード検証（user.check_password(password)）
+  ├─ 3. グループ所属チェック（MUserGroup.objects.filter(...).exists()）
+  ├─ 4. アクティブチェック（user.is_active）
+  └─ return user
+  
+🔑 セッション作成
+  ↓ login(request, user)
+  ↓ django_session テーブルに保存
+  ↓ Set-Cookie: sessionid=abc123xyz...
+  
+📝 UserSerializer
+  ↓ ユーザー情報をJSON化
+  ↓ current_group取得
+  
+📡 Axios
+  ↓ レスポンス受信
+  
+💾 authStore
+  ↓ user.value = response.data.user
+  ↓ localStorage保存（pinia-plugin-persistedstate）
+  ↓ router.push("/")
+  
+🎨 Vue.js
+  ↓ ホーム画面表示
+  
+🎉 ログイン完了！
+```
+
+---
+
+## 🎨 フロントエンド処理
+
+### ステップ1: ユーザー入力
+
+**ファイル**: `frontend/src/views/Login.vue`
+
+```vue
+<template>
+  <v-form @submit.prevent="onSubmit" ref="form">
+    <!-- グループ選択 -->
+    <v-select
+      v-model="groupId"
+      :items="groups"
+      item-title="group_name"
+      item-value="group_id"
+    />
+    
+    <!-- ユーザーID入力 -->
+    <v-text-field
+      v-model="userId"
+      :label="t('form.fields.userId')"
+    />
+    
+    <!-- パスワード入力 -->
+    <v-text-field
+      v-model="password"
+      type="password"
+      :label="t('form.fields.password')"
+    />
+    
+    <!-- ログインボタン -->
+    <v-btn type="submit" :loading="loading">
+      {{ t('auth.login') }}
+    </v-btn>
+  </v-form>
+</template>
+```
+
+**ユーザー入力例**:
+```
+groupId: "group001"
+userId: "user001"
+password: "password123"
+```
+
+---
+
+### ステップ2: onSubmit() 実行
+
+**ファイル**: `frontend/src/views/Login.vue`
+
+```javascript
+async function onSubmit() {
+    if (loading.value) return;  // 二重送信防止
+    
+    // 1. フロント側バリデーション
+    const { valid } = await form.value.validate();
+    if (!valid) return;
+    
+    loading.value = true;
+    
+    try {
+        // 2. authStore.loginSession() 実行
+        await auth.loginSession(groupId.value, userId.value, password.value);
+        
+        // 3. ログイン成功
+        showInfo('auth.loginSuccess', {}, 3000);
+        isVisible.value = false;
+        
+        // 4. ホーム画面へ遷移
+        setTimeout(async () => {
+            const redirect = route.query.next || ROUTE_NAMES.HOME;
+            await router.push(redirect);
+        }, 150);
+        
+    } catch (error) {
+        // 5. エラーハンドリング
+        handleApiError(error);
+    } finally {
+        loading.value = false;
+    }
+}
+```
+
+---
+
+### ステップ3: authStore.loginSession()
+
+**ファイル**: `frontend/src/stores/auth.js`
+
+```javascript
+async function loginSession(groupId, userId, password) {
+    loading.value = true;
+    error.value = null;
+
+    try {
+        // 1. authAPI.login() 実行
+        await authAPI.login(groupId, userId, password);
+        
+        // 2. ログイン後のグループID保存
+        currentGroupId.value = groupId;
+        
+        // 3. ユーザー情報取得（is_adminも含まれる）
+        await fetchUser();
+        
+    } finally {
+        loading.value = false;
+    }
+}
+```
+
+---
+
+### ステップ4: authAPI.login()
+
+**ファイル**: `frontend/src/api/auth.js`
+
+```javascript
+export const authAPI = {
+    async login(groupId, userId, password) {
+        const response = await api.post('auth/login/', {
+            group_id: groupId,
+            user_id: userId,
+            password,
+        });
+        return response;
+    },
+};
+```
+
+**送信データ**:
+```json
+{
+  "group_id": "group001",
+  "user_id": "user001",
+  "password": "password123"
+}
+```
+
+---
+
+## 📡 Axios CSRF自動取得
+
+### ステップ5: リクエストインターセプター起動
+
+**ファイル**: `frontend/src/plugins/axios.js`
+
+```javascript
+// Axiosインスタンス設定
+const api = axios.create({
+    baseURL: 'http://localhost:8000/api/',
+    withCredentials: true,           // ★Cookie送受信を有効化★
+    xsrfCookieName: 'csrftoken',     // ★Django標準のCSRF Cookie名★
+    xsrfHeaderName: 'X-CSRFToken',   // ★DjangoのCSRFヘッダー名★
+    withXSRFToken: import.meta.env.DEV ? true : undefined,  // ★開発環境のみ★
+});
+
+// リクエストインターセプター
+api.interceptors.request.use(async (config) => {
+    // 1. Accept-Languageヘッダーの設定
+    const localeStore = useLocaleStore();
+    config.headers['Accept-Language'] = localeStore.locale;
+
+    // 2. CSRFトークンが必要なメソッドの場合、事前取得
+    const method = config.method.toLowerCase();
+    const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
+
+    if (methodsRequiringCsrf.includes(method)) {
+        try {
+            await csrfManager.ensureToken();  // ★CSRF自動取得★
+        } catch (error) {
+            console.warn('Failed to fetch CSRF token:', error);
+        }
+    }
+
+    return config;
+});
+```
+
+---
+
+### ステップ6: csrfManager.ensureToken()
+
+**ファイル**: `frontend/src/plugins/axios.js`
+
+```javascript
+class CSRFManager {
+    constructor() {
+        this.tokenFetched = false;
+        this.fetchingPromise = null;  // ★重複リクエスト防止★
+    }
+
+    async ensureToken() {
+        // 1. 既に取得済みならスキップ
+        if (this.tokenFetched) return;
+
+        // 2. 取得中ならその処理を待つ（重複防止）
+        if (this.fetchingPromise) {
+            return this.fetchingPromise;
+        }
+
+        // 3. CSRF取得処理
+        this.fetchingPromise = this._fetchToken();
+        await this.fetchingPromise;
+        this.fetchingPromise = null;
+    }
+
+    async _fetchToken() {
+        // GET /api/auth/csrf/ を実行
+        await api.get('auth/csrf/');
+        this.tokenFetched = true;
+    }
+
+    reset() {
+        this.tokenFetched = false;
+        this.fetchingPromise = null;
+    }
+}
+```
+
+**処理内容**:
+```
+1. GET /api/auth/csrf/ を送信
+   ↓
+2. Django側でCSRFトークン生成
+   ↓
+3. Set-Cookie: csrftoken=xxx をレスポンス
+   ↓
+4. ブラウザがCookieに保存
+   ↓
+5. Axiosが次のリクエストで自動的にヘッダーにセット
+```
+
+---
+
+### ステップ7: ログインリクエスト送信
+
+```http
+POST /api/auth/login/ HTTP/1.1
+Host: localhost:8000
+Cookie: csrftoken=abc123xyz...
+X-CSRFToken: abc123xyz...
+Content-Type: application/json
+Accept-Language: ja
+
+{
+  "group_id": "group001",
+  "user_id": "user001",
+  "password": "password123"
+}
+```
+
+**重要ポイント**:
+- `Cookie: csrftoken`: CookieにCSRFトークン
+- `X-CSRFToken`: ヘッダーにCSRFトークン
+- **両方が同じ値**でなければCSRF検証失敗
+
+---
+
+## ⚙️ Django Middleware処理
+
+### ステップ8: Middleware実行順序
+
+**ファイル**: `backend/config/settings.py`
+
+```python
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",            # 1
+    "django.contrib.sessions.middleware.SessionMiddleware",     # 2 ★重要★
+    "corsheaders.middleware.CorsMiddleware",                    # 3
+    "common.middleware.LanguageMiddleware",                     # 4
+    "django.middleware.locale.LocaleMiddleware",                # 5
+    "django.middleware.common.CommonMiddleware",                # 6
+    "django.middleware.csrf.CsrfViewMiddleware",                # 7
+    "django.contrib.auth.middleware.AuthenticationMiddleware",  # 8 ★重要★
+    "django.contrib.messages.middleware.MessageMiddleware",     # 9
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",   # 10
+]
+```
+
+---
+
+### ステップ9: SessionMiddleware
+
+**処理内容**:
+```python
+# 1. Cookieからsessionid取得
+session_key = request.COOKIES.get("sessionid")
+# → ログイン前なので存在しない
+
+# 2. 新しい空セッションを作成
+request.session = {}
+```
+
+---
+
+### ステップ10: AuthenticationMiddleware
+
+**処理内容**:
+```python
+# 1. セッションから認証情報取得
+user_id = request.session.get("_auth_user_id")
+backend_path = request.session.get("_auth_user_backend")
+# → ログイン前なので存在しない
+
+# 2. 未認証ユーザーとして設定
+request.user = AnonymousUser()
+```
+
+---
+
+### ステップ11: URLルーティング
+
+**ファイル**: `backend/config/urls.py`
+
+```python
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("api/auth/", include("accounts.urls")),  # ★ここにマッチ★
+]
+```
+
+**ファイル**: `backend/accounts/urls.py`
+
+```python
+urlpatterns = [
+    path("csrf/", CSRFView.as_view(), name="csrf"),
+    path("groups/", GroupListAPIView.as_view(), name="groups"),
+    path("login/", LoginAPIView.as_view(), name="login"),  # ★ここにマッチ★
+    path("logout/", LogoutAPIView.as_view(), name="logout"),
+    path("me/", MeAPIView.as_view(), name="me"),
+]
+```
+
+**結果**:
+```
+POST /api/auth/login/ → LoginAPIView.post() が実行される
+```
+
+---
+
+## 📍 LoginAPIView処理
+
+### ステップ12: LoginAPIView.post()
+
+**ファイル**: `backend/accounts/views.py`
+
+```python
+class LoginAPIView(APIView):
+    permission_classes = [AllowAny]  # 認証不要
+    authentication_classes = [CSRFEnforcedSessionAuthentication]  # CSRF検証強制
+
+    def post(self, request):
+        # ========================================
+        # 1. バリデーション
+        # ========================================
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        user_id = serializer.validated_data["user_id"]      # "user001"
+        password = serializer.validated_data["password"]    # "password123"
+        group_id = serializer.validated_data["group_id"]    # "group001"
+```
+
+---
+
+### ステップ13: CSRFEnforcedSessionAuthentication
+
+**ファイル**: `backend/accounts/views.py`
+
+```python
+class CSRFEnforcedSessionAuthentication(SessionAuthentication):
+    def authenticate(self, request):
+        # 1. CSRF検証を強制（未認証ユーザーも実行）
+        self.enforce_csrf(request)
+        
+        # 2. セッションベース認証を実行（ログイン前なのでNone）
+        return super().authenticate(request)
+```
+
+**enforce_csrf() の処理内容**:
+```python
+def enforce_csrf(self, request):
+    # 1. Cookieからcsrftoken取得
+    csrf_token_cookie = request.COOKIES.get("csrftoken")
+    
+    # 2. ヘッダーからX-CSRFToken取得
+    csrf_token_header = request.META.get("HTTP_X_CSRFTOKEN")
+    
+    # 3. 比較
+    if csrf_token_cookie != csrf_token_header:
+        raise PermissionDenied("CSRF verification failed")
+```
+
+**重要ポイント**:
+- **標準のSessionAuthentication**: 未認証ユーザーはCSRF検証をスキップ（脆弱性）
+- **CSRFEnforcedSessionAuthentication**: **全てのユーザーでCSRF検証**（安全）
+
+---
+
+### ステップ14: LoginSerializer
+
+**ファイル**: `backend/accounts/serializers.py`
+
+```python
+class LoginSerializer(serializers.Serializer):
+    group_id = serializers.CharField(max_length=50, required=True)
+    user_id = serializers.CharField(max_length=50, required=True)
+    password = serializers.CharField(write_only=True, required=True)
+
+    def validate(self, attrs):
+        # 空白入力の防止
+        group_id = attrs.get("group_id")
+        user_id = attrs.get("user_id")
+        password = attrs.get("password")
+
+        if not group_id or not user_id or not password:
+            raise ValidationError("グループID、ユーザーID、パスワードは必須です")
+
+        return attrs
+```
+
+**バリデーション成功**:
+```python
+validated_data = {
+    "group_id": "group001",
+    "user_id": "user001",
+    "password": "password123"
+}
+```
+
+---
+
+### ステップ15: LoginAttemptService（ブルートフォース対策）
+
+**ファイル**: `backend/accounts/views.py`
+
+```python
+# アカウントロックチェック
+if LoginAttemptService.is_locked(user_id, group_id):
+    return Response({
+        "detail": "ログイン試行が10回失敗しました。60秒後に再度お試しください"
+    }, status=429)
+```
+
+**ファイル**: `backend/accounts/services.py`
+
+```python
+class LoginAttemptService:
+    @classmethod
+    def is_locked(cls, user_id, group_id):
+        key = f"login_locked:{group_id}:{user_id}"
+        return cache.get(key, False)
+```
+
+**処理内容**:
+```python
+# Djangoキャッシュから取得
+cache.get("login_locked:group001:user001")
+# → False（ロックされていない）
+```
+
+---
+
+### ステップ16: authenticate() 実行
+
+**ファイル**: `backend/accounts/views.py`
+
+```python
+user = authenticate(
+    request=request,
+    username=user_id,  # ★Django規約でパラメータ名はusername★
+    password=password,
+    group_id=group_id,
+)
+```
+
+**Django内部処理**:
+```python
+# django.contrib.auth.authenticate()
+
+# 1. settings.AUTHENTICATION_BACKENDS を取得
+backends = settings.AUTHENTICATION_BACKENDS
+# → ["accounts.backends.GroupUserAuthBackend"]
+
+# 2. バックエンドをロード
+backend = load_backend("accounts.backends.GroupUserAuthBackend")
+
+# 3. authenticate() 実行
+user = backend.authenticate(request, username=user_id, password=password, group_id=group_id)
+
+# 4. user が None でなければ返す
+if user is not None:
+    return user
+```
+
+---
+
+## 🎯 認証バックエンド処理
+
+### ステップ17: GroupUserAuthBackend.authenticate()
+
+**ファイル**: `backend/accounts/backends.py`
+
+```python
+class GroupUserAuthBackend(BaseBackend):
+    def authenticate(self, request, username=None, password=None, group_id=None, **kwargs):
+        # usernameパラメータの値を内部的にuser_idとして扱う
+        user_id = username  # "user001"
+
+        # 必須パラメータチェック
+        if not user_id or not password or not group_id:
+            return None
+
+        try:
+            # ========================================
+            # 1️⃣ ユーザー取得
+            # ========================================
+            user = User.objects.filter(user_id=user_id).first()
+```
+
+**SQL実行**:
+```sql
+SELECT * FROM legacy_schema.m_user 
+WHERE user_id = 'user001' 
+LIMIT 1;
+```
+
+**結果**:
+```python
+user = MUser(
+    user_id='user001',
+    password='pbkdf2_sha256$600000$salt$hash',
+    username='山田太郎',
+    is_active=True,
+    is_superuser=False,
+    is_staff=False
+)
+```
+
+---
+
+### ステップ18: タイミング攻撃対策
+
+```python
+# ユーザー不在の場合
+if user is None:
+    # ★タイミング攻撃対策★
+    # ダミー処理で同じ時間を消費（約0.1秒）
+    User().set_password(password)
+    return None
+```
+
+**重要ポイント**:
+- ユーザーが存在しない場合も、パスワードハッシュ計算を実行
+- これにより、ユーザーの存在有無をレスポンス時間から推測できなくする
+
+---
+
+### ステップ19: パスワード検証
+
+```python
+# ★2. パスワード検証★
+if not user.check_password(password):
+    return None
+```
+
+**ファイル**: `backend/common/models.py`
+
+```python
+class MUser(models.Model):
+    def check_password(self, raw_password):
+        """
+        PBKDF2-SHA256でハッシュ検証
+        """
+        return check_password(raw_password, self.password)
+```
+
+**処理内容**:
+```python
+# 1. データベースのハッシュ
+stored_hash = "pbkdf2_sha256$600000$salt$hash"
+
+# 2. 入力されたパスワード
+raw_password = "password123"
+
+# 3. 同じアルゴリズムでハッシュ化
+input_hash = pbkdf2_sha256(raw_password, salt, iterations=600000)
+
+# 4. 比較
+if stored_hash == input_hash:
+    return True  # ✅ パスワード一致
+else:
+    return False  # ❌ パスワード不一致
+```
+
+---
+
+### ステップ20: グループ所属チェック
+
+```python
+# ★3. グループ所属チェック（手動JOIN）★
+group_exists = MUserGroup.objects.filter(
+    user_id=user.user_id,
+    group_id=group_id,
+    is_active=True
+).exists()
+
+if not group_exists:
+    return None
+```
+
+**SQL実行**:
+```sql
+SELECT EXISTS(
+    SELECT 1 FROM legacy_schema.m_user_group 
+    WHERE user_id = 'user001' 
+    AND group_id = 'group001' 
+    AND is_active = TRUE
+);
+```
+
+**結果**:
+```python
+group_exists = True  # ✅ グループに所属している
+```
+
+---
+
+### ステップ21: アクティブチェック
+
+```python
+# ★4. ユーザーアクティブチェック★
+if not user.is_active:
+    return None
+```
+
+**結果**:
+```python
+user.is_active = True  # ✅ ユーザーは有効
+```
+
+---
+
+### ステップ22: 認証成功
+
+```python
+# すべてのチェックをパス
+return user
+```
+
+**authenticate() から LoginAPIView に戻る**:
+```python
+user = authenticate(...)
+# → user = MUser(user_id='user001', ...)
+```
+
+---
+
+## 🔑 セッション作成
+
+### ステップ23: login() 実行
+
+**ファイル**: `backend/accounts/views.py`
+
+```python
+if user is not None:
+    # --- 認証成功 ---
+    LoginAttemptService.reset_attempts(user_id, group_id)
+    login(request, user)  # ★セッション作成★
+    
+    # セッションにグループIDを保存
+    request.session["current_group_id"] = group_id
+```
+
+---
+
+### ステップ24: login() の内部処理
+
+**ファイル**: `django.contrib.auth.login()`
+
+```python
+def login(request, user, backend=None):
+    # 1. セッションキー生成
+    if not request.session.session_key:
+        request.session.create()
+    
+    session_key = request.session.session_key  # "abc123xyz..."
+    
+    # 2. セッションにユーザー情報保存
+    request.session["_auth_user_id"] = user.user_id  # "user001"
+    request.session["_auth_user_backend"] = "accounts.backends.GroupUserAuthBackend"
+    request.session["_auth_user_hash"] = user.get_session_auth_hash()
+    
+    # 3. request.userを更新
+    request.user = user
+    
+    # 4. セッションをDBに保存
+    request.session.save()
+```
+
+---
+
+### ステップ25: django_session テーブルに保存
+
+**SQL実行**:
+```sql
+INSERT INTO django_session (session_key, session_data, expire_date)
+VALUES (
+    'abc123xyz...',
+    'Base64エンコード済みセッションデータ',
+    '2025-12-15 12:00:00'
+);
+```
+
+**session_data の内容（デコード後）**:
+```python
+{
+    "_auth_user_id": "user001",
+    "_auth_user_backend": "accounts.backends.GroupUserAuthBackend",
+    "_auth_user_hash": "abcdef123456...",
+    "current_group_id": "group001"
+}
+```
+
+---
+
+### ステップ26: Cookieにセッションキーをセット
+
+**レスポンスヘッダー**:
+```http
+Set-Cookie: sessionid=abc123xyz...; HttpOnly; SameSite=Lax; Max-Age=86400
+```
+
+**重要ポイント**:
+- `HttpOnly`: JavaScriptからアクセス不可（XSS対策）
+- `SameSite=Lax`: CSRF対策
+- `Max-Age=86400`: 24時間有効
+
+---
+
+## 📝 レスポンス処理
+
+### ステップ27: UserSerializer
+
+**ファイル**: `backend/accounts/views.py`
+
+```python
+return Response({
+    "detail": "logged_in",
+    "user": UserSerializer(user, context={"request": request}).data,
+})
+```
+
+**ファイル**: `backend/accounts/serializers.py`
+
+```python
+class UserSerializer(serializers.ModelSerializer):
+    current_group = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
+
+    def get_is_admin(self, obj):
+        # is_superuser=True または is_staff=True なら管理者
+        return bool(obj.is_superuser or obj.is_staff)
+
+    def get_current_group(self, obj):
+        # セッションから現在のグループ情報を取得
+        request = self.context.get("request")
+        group_id = request.session.get("current_group_id")
+        
+        if not group_id:
+            return None
+        
+        # グループ情報取得
+        group_obj = MGroup.objects.get(group_id=group_id, is_active=True)
+        
+        return {
+            "group_id": group_obj.group_id,
+            "group_name": group_obj.group_name,
+        }
+```
+
+---
+
+### ステップ28: レスポンス生成
+
+**HTTPレスポンス**:
+```http
+HTTP/1.1 200 OK
+Set-Cookie: sessionid=abc123xyz...; HttpOnly; SameSite=Lax
+Content-Type: application/json
+
+{
+  "detail": "logged_in",
+  "user": {
+    "user_id": "user001",
+    "username": "山田太郎",
+    "is_active": true,
+    "is_superuser": false,
+    "is_staff": false,
+    "is_admin": false,
+    "current_group": {
+      "group_id": "group001",
+      "group_name": "営業部"
+    }
+  }
+}
+```
+
+---
+
+### ステップ29: Axiosレスポンス処理
+
+**ファイル**: `frontend/src/stores/auth.js`
+
+```javascript
+async function loginSession(groupId, userId, password) {
+    try {
+        // API呼び出し（ここまでの処理）
+        await authAPI.login(groupId, userId, password);
+        
+        // グループID保存
+        currentGroupId.value = groupId;
+        
+        // ユーザー情報取得
+        await fetchUser();
+        
+    } finally {
+        loading.value = false;
+    }
+}
+
+async function fetchUser() {
+    const response = await authAPI.me();
+    user.value = response.data;
+    
+    // バックエンドから返されたグループ情報を保存
+    if (response.data.current_group) {
+        currentGroupId.value = response.data.current_group.group_id;
+        currentGroupName.value = response.data.current_group.group_name;
+    }
+}
+```
+
+---
+
+### ステップ30: localStorage永続化
+
+**pinia-plugin-persistedstate**が自動実行:
+
+```javascript
+// localStorage に保存
+localStorage.setItem("auth", JSON.stringify({
+    user: {
+        user_id: "user001",
+        username: "山田太郎",
+        is_admin: false,
+        current_group: {
+            group_id: "group001",
+            group_name: "営業部"
+        }
+    },
+    currentGroupId: "group001",
+    currentGroupName: "営業部"
+}));
+```
+
+---
+
+### ステップ31: ルーター遷移
+
+**ファイル**: `frontend/src/views/Login.vue`
+
+```javascript
+setTimeout(async () => {
+    const redirect = route.query.next || ROUTE_NAMES.HOME;
+    await router.push(redirect);
+}, 150);
+```
+
+**結果**:
+```
+ホーム画面（/）に遷移
+```
+
+---
+
+## 🎉 ログイン完了！
+
+### ログイン後の状態
+
+#### 1. ブラウザCookie
+```
+csrftoken: abc123xyz...  （CSRF検証用）
+sessionid: xyz789abc...  （セッションID）
+```
+
+#### 2. django_session テーブル
+```sql
+SELECT * FROM django_session WHERE session_key = 'xyz789abc...';
+
+session_key  | session_data                      | expire_date
+-------------|-----------------------------------|-------------------
+xyz789abc... | Base64エンコード済みセッションデータ | 2025-12-15 12:00:00
+```
+
+#### 3. localStorage
+```javascript
+{
+  "auth": {
+    "user": {
+      "user_id": "user001",
+      "username": "山田太郎",
+      "is_admin": false,
+      "current_group": {
+        "group_id": "group001",
+        "group_name": "営業部"
+      }
+    },
+    "currentGroupId": "group001",
+    "currentGroupName": "営業部"
+  }
+}
+```
+
+#### 4. Pinia Store
+```javascript
+authStore.user.value = {
+    user_id: "user001",
+    username: "山田太郎",
+    is_admin: false,
+    current_group: { ... }
+}
+authStore.isAuthenticated = true
+authStore.currentGroupId = "group001"
+```
+
+---
+
+## 📚 まとめ
+
+### ログインフローのキーポイント
+
+1. **CSRF自動取得**: Axiosが自動的にCSRFトークンを取得
+2. **3点認証**: user_id + password + group_id の全てが一致
+3. **タイミング攻撃対策**: ユーザー不在でもダミー処理で時間消費
+4. **セッション作成**: django_sessionテーブルに保存、Cookieにsessionid
+5. **localStorage永続化**: ページリロードしても状態維持
+
+### 重要なファイル
+
+| ファイル | 役割 |
+|---------|------|
+| `Login.vue` | ログイン画面 |
+| `stores/auth.js` | 認証状態管理 |
+| `plugins/axios.js` | CSRF自動取得 |
+| `accounts/views.py` | LoginAPIView |
+| `accounts/backends.py` | GroupUserAuthBackend |
+| `accounts/serializers.py` | UserSerializer |
+| `common/models.py` | MUser |
+
+これで、ログインフローの全体が理解できるはず！(｀・ω・´)ゞ

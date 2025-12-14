@@ -1,0 +1,634 @@
+# 🔍 認証フロー重要コード詳細解説
+
+## 目次
+1. [settings.pyの重要設定](#settingspy)
+2. [ミドルウェアの実行順序](#ミドルウェア)
+3. [認証バックエンドの詳細](#認証バックエンド)
+4. [セッション管理の仕組み](#セッション管理)
+5. [CSRF保護の仕組み](#csrf保護)
+
+---
+
+## 📄 settings.py
+
+### 1️⃣ 認証システム設定
+
+```python
+# config/settings.py
+
+# ========================================
+# カスタムユーザーモデル（★超重要★）
+# ========================================
+AUTH_USER_MODEL = "common.MUser"
+# Djangoが認証に使うモデルを指定
+# デフォルトは "auth.User" だが、レガシーシステムでは "common.MUser" を使用
+
+# ========================================
+# 認証バックエンド（★超重要★）
+# ========================================
+AUTHENTICATION_BACKENDS = [
+    "accounts.backends.GroupUserAuthBackend",
+]
+# authenticate() が呼ばれた時に実行されるバックエンドを指定
+# 複数指定可能（上から順に試行される）
+```
+
+**動作の流れ**:
+```python
+# views.py
+user = authenticate(request, username=user_id, password=password, group_id=group_id)
+
+# Django内部で実行される処理
+for backend_path in settings.AUTHENTICATION_BACKENDS:
+    backend = load_backend(backend_path)  # "accounts.backends.GroupUserAuthBackend"
+    user = backend.authenticate(request, username=user_id, password=password, group_id=group_id)
+    if user is not None:
+        return user
+return None
+```
+
+---
+
+### 2️⃣ セッション設定
+
+```python
+# config/settings.py
+
+# ========================================
+# セッション設定
+# ========================================
+SESSION_COOKIE_AGE = 86400
+# セッションの有効期限（秒）
+# 86400秒 = 24時間
+
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+# ブラウザを閉じたらセッションを破棄
+# True: ブラウザ終了時にCookieを削除
+# False: 期限まで保持
+
+SESSION_SAVE_EVERY_REQUEST = False
+# リクエストごとにセッションを保存するか
+# False: 変更があった時のみ保存（DB負荷軽減）
+
+SESSION_COOKIE_SECURE = False
+# HTTPSのみCookie送信
+# 開発環境: False（HTTPでも送信）
+# 本番環境: True（HTTPSのみ）
+
+SESSION_COOKIE_HTTPONLY = True
+# JavaScriptからCookieアクセス不可
+# セキュリティ上、常にTrueを推奨
+
+SESSION_COOKIE_SAMESITE = "Lax"
+# CSRF対策
+# Lax: 通常のナビゲーションでCookie送信、クロスサイトPOSTでは送信しない
+# Strict: 同一サイトのみCookie送信
+# None: 常にCookie送信（Secure=Trueが必要）
+```
+
+**セッションの保存場所**:
+```python
+# デフォルトはデータベース（django_session テーブル）
+# 変更する場合:
+SESSION_ENGINE = "django.contrib.sessions.backends.db"  # データベース（デフォルト）
+# SESSION_ENGINE = "django.contrib.sessions.backends.cache"  # キャッシュ
+# SESSION_ENGINE = "django.contrib.sessions.backends.file"  # ファイル
+```
+
+---
+
+### 3️⃣ CSRF設定
+
+```python
+# config/settings.py
+
+# ========================================
+# CSRF設定
+# ========================================
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+]
+# クロスオリジンでCSRFトークンを信頼するオリジン
+# SPAの場合、フロントエンドのURLを指定
+
+CSRF_COOKIE_HTTPONLY = False
+# JavaScriptからCookieアクセス可能にする
+# ★重要★ Axiosが自動的にcsrftokenを読むため、Falseが必要
+
+CSRF_COOKIE_SECURE = False
+# HTTPSのみCookie送信
+# 開発環境: False
+# 本番環境: True
+
+CSRF_COOKIE_SAMESITE = "Lax"
+# CSRF対策
+# Lax推奨
+```
+
+---
+
+### 4️⃣ CORS設定
+
+```python
+# config/settings.py
+
+# ========================================
+# CORS設定
+# ========================================
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
+# クロスオリジンリクエストを許可するオリジン
+# 本番環境では実際のフロントエンドURLを指定
+
+CORS_ALLOW_CREDENTIALS = True
+# Cookie送信を許可
+# ★超重要★ セッション認証では必須
+
+CORS_EXPOSE_HEADERS = [
+    "Content-Disposition",
+]
+# JavaScriptからアクセス可能なレスポンスヘッダー
+```
+
+---
+
+### 5️⃣ パスワードハッシュ設定
+
+```python
+# config/settings.py
+
+# ========================================
+# パスワードハッシュアルゴリズム
+# ========================================
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",  # ★Django標準（追加パッケージ不要）★
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",  # レガシー互換用
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",  # bcrypt使用（要インストール）
+]
+# 最初のアルゴリズムが make_password() で使用される
+# パスワード検証時は、保存されたハッシュ形式に応じて自動選択
+```
+
+**ハッシュ形式**:
+```python
+# PBKDF2-SHA256（Django標準）
+# 形式: pbkdf2_sha256$600000$salt$hash
+# 例: pbkdf2_sha256$600000$abc123$xyz789...
+
+# PBKDF2-SHA1（レガシー）
+# 形式: pbkdf2_sha1$iterations$salt$hash
+```
+
+---
+
+### 6️⃣ ログイン制限設定
+
+```python
+# config/settings.py
+
+# ========================================
+# ログイン制限（カスタム設定）
+# ========================================
+LOGIN_MAX_ATTEMPTS = 10
+# ログイン失敗の最大試行回数
+
+LOGIN_LOCKOUT_DURATION = 60
+# アカウントロック時間（秒）
+# 60秒 = 1分
+
+# 使用箇所:
+# accounts/services.py - LoginAttemptService
+```
+
+---
+
+## 🔄 ミドルウェア
+
+### ミドルウェアの実行順序
+
+```python
+# config/settings.py
+
+MIDDLEWARE = [
+    # 1. SecurityMiddleware
+    "django.middleware.security.SecurityMiddleware",
+    
+    # 2. SessionMiddleware（★超重要★）
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    
+    # 3. CorsMiddleware（CORS設定）
+    "corsheaders.middleware.CorsMiddleware",
+    
+    # 4. LocaleMiddleware（言語設定）
+    "common.middleware.LanguageMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
+    
+    # 5. CommonMiddleware
+    "django.middleware.common.CommonMiddleware",
+    
+    # 6. CsrfViewMiddleware（CSRF検証）
+    "django.middleware.csrf.CsrfViewMiddleware",
+    
+    # 7. AuthenticationMiddleware（★超重要★）
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    
+    # 8. MessageMiddleware
+    "django.contrib.messages.middleware.MessageMiddleware",
+    
+    # 9. ClickjackingMiddleware
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+```
+
+---
+
+### 各ミドルウェアの役割
+
+#### 1️⃣ SessionMiddleware
+
+**役割**: セッションの読み込みと保存
+
+**処理内容**:
+```python
+# リクエスト処理（process_request）
+session_key = request.COOKIES.get("sessionid")  # Cookieからsessionid取得
+
+if session_key:
+    session_data = Session.objects.get(session_key=session_key)  # DBから取得
+    request.session = deserialize(session_data)
+else:
+    request.session = {}
+
+# レスポンス処理（process_response）
+if request.session.modified:
+    Session.objects.update(session_key, serialize(request.session))
+    response.set_cookie("sessionid", session_key)
+```
+
+**重要ポイント**:
+- **リクエスト時**: Cookieの`sessionid`からセッションデータを復元
+- **レスポンス時**: セッションに変更があればDBに保存
+- **新規セッション**: `login()`で作成、`logout()`で削除
+
+---
+
+#### 2️⃣ AuthenticationMiddleware
+
+**役割**: `request.user`の設定
+
+**処理内容**:
+```python
+# リクエスト処理
+user_id = request.session.get("_auth_user_id")
+backend_path = request.session.get("_auth_user_backend")
+
+if user_id and backend_path:
+    backend = load_backend(backend_path)  # GroupUserAuthBackend
+    user = backend.get_user(user_id)  # ★ get_user() が呼ばれる ★
+    request.user = user if user else AnonymousUser()
+else:
+    request.user = AnonymousUser()
+```
+
+**重要ポイント**:
+- **SessionMiddlewareの後**に実行される（セッションデータが必要）
+- **get_user()**を呼び出してユーザーを復元
+- **未認証の場合**: `request.user = AnonymousUser()`
+
+---
+
+#### 3️⃣ CsrfViewMiddleware
+
+**役割**: CSRF検証（ビュークラスでCSRFEnforcedが実行される前の処理）
+
+**処理内容**:
+```python
+# POST/PUT/PATCH/DELETEリクエストの場合
+csrf_token_cookie = request.COOKIES.get("csrftoken")
+csrf_token_header = request.META.get("HTTP_X_CSRFTOKEN")
+
+if csrf_token_cookie != csrf_token_header:
+    raise PermissionDenied("CSRF verification failed")
+
+# GETリクエストはスキップ
+```
+
+**重要ポイント**:
+- **CSRFEnforcedSessionAuthentication**との違い:
+  - CsrfViewMiddleware: 認証済みユーザーのみ検証
+  - CSRFEnforcedSessionAuthentication: **全てのユーザーで検証**
+
+---
+
+## 🔐 認証バックエンド
+
+### GroupUserAuthBackend の詳細
+
+```python
+# accounts/backends.py
+
+class GroupUserAuthBackend(BaseBackend):
+    
+    def authenticate(self, request, username=None, password=None, group_id=None, **kwargs):
+        """
+        ★Django規約★
+        - パラメータ名は必ず "username" を使用
+        - 内部的に user_id として扱う
+        """
+        user_id = username  # パラメータ名変換
+        
+        # ========================================
+        # 1️⃣ ユーザー取得
+        # ========================================
+        user = User.objects.filter(user_id=user_id).first()
+        # ★文字列PK★ user_id は VARCHAR(50)
+        
+        if user is None:
+            # ★タイミング攻撃対策★
+            User().set_password(password)
+            # ダミー処理で同じ時間消費（約0.1秒）
+            return None
+        
+        # ========================================
+        # 2️⃣ パスワード検証
+        # ========================================
+        if not user.check_password(password):
+            # PBKDF2-SHA256でハッシュ検証
+            return None
+        
+        # ========================================
+        # 3️⃣ グループ所属チェック
+        # ========================================
+        group_exists = MUserGroup.objects.filter(
+            user_id=user.user_id,
+            group_id=group_id,
+            is_active=True
+        ).exists()
+        
+        if not group_exists:
+            return None
+        
+        # ========================================
+        # 4️⃣ アクティブチェック
+        # ========================================
+        if not user.is_active:
+            return None
+        
+        # ✅ 全チェック通過
+        return user
+    
+    def get_user(self, user_id):
+        """
+        ★超重要★ セッションからユーザー復元
+        
+        呼び出し元:
+        - AuthenticationMiddleware（リクエストごと）
+        """
+        try:
+            user = User.objects.get(pk=user_id)
+            # ★文字列PK★ 整数変換しない
+            
+            if user.is_active:
+                return user
+            return None
+            
+        except User.DoesNotExist:
+            return None
+```
+
+---
+
+### authenticate() と get_user() の違い
+
+| メソッド | 呼び出しタイミング | 目的 | 引数 |
+|---------|-----------------|------|-----|
+| `authenticate()` | ログイン時 | パスワード検証 + グループチェック | `username`, `password`, `group_id` |
+| `get_user()` | リクエストごと | セッションからユーザー復元 | `user_id` |
+
+---
+
+## 🔑 セッション管理
+
+### login() の内部処理
+
+```python
+# django.contrib.auth.login()
+
+def login(request, user, backend=None):
+    """
+    ユーザーをログイン状態にする
+    """
+    # 1. セッションキー生成
+    if not request.session.session_key:
+        request.session.create()
+    
+    session_key = request.session.session_key  # "abc123xyz..."
+    
+    # 2. セッションにユーザー情報保存
+    request.session["_auth_user_id"] = user.user_id  # "user001"
+    request.session["_auth_user_backend"] = "accounts.backends.GroupUserAuthBackend"
+    request.session["_auth_user_hash"] = user.get_session_auth_hash()
+    
+    # 3. request.userを更新
+    request.user = user
+    
+    # 4. セッションをDBに保存
+    request.session.save()
+    
+    # 5. CookieにセッションIDをセット
+    response.set_cookie(
+        "sessionid",
+        session_key,
+        max_age=settings.SESSION_COOKIE_AGE,  # 86400秒
+        httponly=True,
+        samesite="Lax"
+    )
+```
+
+---
+
+### logout() の内部処理
+
+```python
+# django.contrib.auth.logout()
+
+def logout(request):
+    """
+    ユーザーをログアウト状態にする
+    """
+    # 1. セッションデータを全削除
+    request.session.flush()
+    # → django_session テーブルからレコード削除
+    # → メモリ上のセッションデータクリア
+    
+    # 2. request.userをAnonymousUserに変更
+    request.user = AnonymousUser()
+    
+    # 3. Cookieを削除（レスポンス時）
+    response.set_cookie(
+        "sessionid",
+        "",
+        max_age=0,
+        expires="Thu, 01 Jan 1970 00:00:00 GMT"
+    )
+```
+
+---
+
+### django_session テーブル構造
+
+```sql
+CREATE TABLE django_session (
+    session_key VARCHAR(40) PRIMARY KEY,  -- セッションID（ランダム文字列）
+    session_data TEXT,                    -- セッションデータ（Base64エンコード済み）
+    expire_date TIMESTAMP                 -- 有効期限
+);
+
+-- session_data の内容（デシリアライズ後）
+{
+    "_auth_user_id": "user001",
+    "_auth_user_backend": "accounts.backends.GroupUserAuthBackend",
+    "_auth_user_hash": "abcdef123456...",
+    "current_group_id": "group001"
+}
+```
+
+---
+
+## 🛡️ CSRF保護
+
+### CSRFEnforcedSessionAuthentication の仕組み
+
+```python
+# accounts/views.py
+
+class CSRFEnforcedSessionAuthentication(SessionAuthentication):
+    def authenticate(self, request):
+        """
+        ★重要★ 未認証ユーザーもCSRF検証を実行
+        """
+        # 1. CSRF検証を強制
+        self.enforce_csrf(request)
+        # → Cookieの csrftoken と ヘッダーの X-CSRFToken を比較
+        
+        # 2. セッション認証を実行
+        user = super().authenticate(request)
+        # → 未認証の場合は None が返る
+        
+        return user
+```
+
+---
+
+### Axiosの自動CSRF処理
+
+```javascript
+// plugins/axios.js
+
+const api = axios.create({
+    xsrfCookieName: 'csrftoken',     // Cookieの名前
+    xsrfHeaderName: 'X-CSRFToken',   // ヘッダーの名前
+    withXSRFToken: true,             // 開発環境のみ
+});
+
+// Axiosの内部処理
+// 1. Cookieから csrftoken を読む
+const csrftoken = getCookie('csrftoken');
+
+// 2. X-CSRFToken ヘッダーに自動設定
+config.headers['X-CSRFToken'] = csrftoken;
+
+// 3. リクエスト送信
+// POST /api/auth/login/
+// Cookie: csrftoken=xxx
+// X-CSRFToken: xxx
+```
+
+---
+
+### CSRFトークンの流れ
+
+```
+1. フロントエンド
+   GET /api/auth/csrf/
+   
+2. バックエンド
+   Set-Cookie: csrftoken=xxx
+   
+3. フロントエンド（Axios自動処理）
+   POST /api/auth/login/
+   Cookie: csrftoken=xxx
+   X-CSRFToken: xxx
+   
+4. バックエンド（CSRFEnforcedSessionAuthentication）
+   enforce_csrf(request)
+   → Cookie と Header を比較
+   → 一致すれば検証成功
+```
+
+---
+
+## 🎯 まとめ
+
+### 認証フロー全体図（コードレベル）
+
+```
+ログインボタンクリック
+↓
+authStore.loginSession()
+↓
+axios.post('/api/auth/login/')
+├─ リクエストインターセプター
+│  └─ csrfManager.ensureToken()
+│     └─ GET /api/auth/csrf/ → Set-Cookie: csrftoken
+↓
+Django処理
+├─ Middleware
+│  ├─ SessionMiddleware → request.session読み込み
+│  ├─ AuthenticationMiddleware → request.user設定
+│  └─ CsrfViewMiddleware → 認証済みユーザーのみCSRF検証
+├─ LoginAPIView.post()
+│  ├─ CSRFEnforcedSessionAuthentication
+│  │  └─ enforce_csrf() → 全ユーザーでCSRF検証
+│  ├─ LoginSerializer.validate()
+│  ├─ LoginAttemptService.is_locked()
+│  ├─ authenticate()
+│  │  └─ GroupUserAuthBackend.authenticate()
+│  │     ├─ User.objects.filter(user_id=...).first()
+│  │     ├─ user.check_password(password)
+│  │     ├─ MUserGroup.objects.filter(...).exists()
+│  │     └─ return user
+│  ├─ login(request, user)
+│  │  ├─ セッションキー生成
+│  │  ├─ django_session テーブルに保存
+│  │  └─ Set-Cookie: sessionid
+│  └─ UserSerializer(user)
+↓
+authStore.user = response.data.user
+localStorage保存（pinia-plugin-persistedstate）
+router.push("/")
+```
+
+---
+
+### 重要なコードファイル一覧
+
+| ファイル | 役割 | 重要度 |
+|---------|------|--------|
+| `config/settings.py` | 全体設定 | ★★★★★ |
+| `accounts/backends.py` | カスタム認証 | ★★★★★ |
+| `accounts/views.py` | 認証API | ★★★★★ |
+| `common/models.py` | カスタムユーザーモデル | ★★★★★ |
+| `plugins/axios.js` | CSRF自動取得 | ★★★★☆ |
+| `stores/auth.js` | 認証状態管理 | ★★★★☆ |
+| `router/auth-guard.js` | 認証ガード | ★★★☆☆ |
+
+---
+
+## 📚 参考資料
+
+- Django認証システム: https://docs.djangoproject.com/en/5.2/topics/auth/
+- セッション管理: https://docs.djangoproject.com/en/5.2/topics/http/sessions/
+- CSRF保護: https://docs.djangoproject.com/en/5.2/ref/csrf/
+- Axios: https://axios-http.com/docs/intro

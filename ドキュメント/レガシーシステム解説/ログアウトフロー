@@ -1,0 +1,880 @@
+# 3️⃣ ログアウトフロー詳細解説
+
+## 📋 目次
+1. [フロー全体図](#フロー全体図)
+2. [フロントエンド処理](#フロントエンド処理)
+3. [Axiosリクエスト](#axiosリクエスト)
+4. [Django Middleware処理](#django-middleware処理)
+5. [LogoutAPIView処理](#logoutapiview処理)
+6. [セッション破棄](#セッション破棄)
+7. [クライアント側クリーンアップ](#クライアント側クリーンアップ)
+8. [ログアウト後の状態](#ログアウト後の状態)
+
+---
+
+## 🎯 フロー全体図
+
+```
+👤 ユーザー
+  ↓ ログアウトボタンクリック
+  
+🎨 Vue.js
+  ↓ ヘッダーコンポーネント
+  
+💾 authStore
+  ↓ logout()
+  ↓ loading.value = true
+  
+📡 Axios
+  ↓ CSRF確認（既に取得済みならスキップ）
+  ↓ POST /api/auth/logout/
+  ↓ Cookie: sessionid=abc123xyz...
+  
+⚙️ Django
+  ↓ Middleware処理
+  ├─ SessionMiddleware（セッション読み込み）
+  └─ AuthenticationMiddleware（request.user設定）
+  
+📍 LogoutAPIView
+  ↓ IsAuthenticated（認証チェック）
+  ↓ CSRFEnforcedSessionAuthentication
+  ↓ audit_logger（監査ログ記録）
+  ↓ logout(request)
+  
+🔑 セッション破棄
+  ├─ request.session.flush()
+  ├─ django_session テーブルからレコード削除
+  ├─ request.user = AnonymousUser
+  └─ Set-Cookie: sessionid=""; Max-Age=0
+  
+📡 Axios
+  ↓ レスポンス受信
+  
+💾 authStore
+  ↓ finally句実行
+  ├─ user.value = null
+  ├─ currentGroupId.value = null
+  ├─ localStorage削除
+  ├─ CSRFトークンリセット
+  └─ router.push("/login")
+  
+🎨 Vue.js
+  ↓ ログイン画面表示
+  
+🎉 ログアウト完了！
+```
+
+---
+
+## 🎨 フロントエンド処理
+
+### ステップ1: ログアウトボタンクリック
+
+**ファイル**: `frontend/src/components/Header.vue`（例）
+
+```vue
+<template>
+  <v-app-bar>
+    <v-spacer />
+    
+    <!-- ログアウトボタン -->
+    <v-btn @click="handleLogout" :loading="auth.loading">
+      {{ t('auth.logout') }}
+    </v-btn>
+  </v-app-bar>
+</template>
+
+<script setup>
+import { useAuthStore } from '@/stores/auth';
+
+const auth = useAuthStore();
+
+async function handleLogout() {
+    await auth.logout();
+}
+</script>
+```
+
+---
+
+### ステップ2: authStore.logout()
+
+**ファイル**: `frontend/src/stores/auth.js`
+
+```javascript
+async function logout(redirect = true) {
+    loading.value = true;
+
+    try {
+        // 1. ログアウトAPI実行
+        if (user.value) {
+            await authAPI.logout();
+        }
+        
+    } catch (e) {
+        // ログアウトAPIが失敗してもクライアント側の状態はクリア
+        console.error('Logout API failed:', e);
+        
+    } finally {
+        // 2. クライアント側クリーンアップ（必ず実行）
+        user.value = null;
+        error.value = null;
+        currentGroupId.value = null;
+        currentGroupName.value = null;
+        loading.value = false;
+        
+        // 3. CSRFトークンリセット
+        resetCSRFToken();
+
+        // 4. ログイン画面へリダイレクト
+        if (redirect && router.currentRoute.value.name !== ROUTE_NAMES.LOGIN) {
+            router.push({ name: ROUTE_NAMES.LOGIN }).catch(() => {});
+        }
+    }
+}
+```
+
+**重要ポイント**:
+- **finally句**: API失敗してもクライアント側の状態をクリア
+- **redirect**: ルーターリダイレクトの制御
+
+---
+
+## 📡 Axiosリクエスト
+
+### ステップ3: authAPI.logout()
+
+**ファイル**: `frontend/src/api/auth.js`
+
+```javascript
+export const authAPI = {
+    async logout() {
+        const response = await api.post('auth/logout/');
+        return response;
+    },
+};
+```
+
+---
+
+### ステップ4: Axiosリクエストインターセプター
+
+**ファイル**: `frontend/src/plugins/axios.js`
+
+```javascript
+api.interceptors.request.use(async (config) => {
+    // Accept-Languageヘッダーの設定
+    const localeStore = useLocaleStore();
+    config.headers['Accept-Language'] = localeStore.locale;
+
+    // CSRFトークンが必要なメソッドの場合、事前取得
+    const method = config.method.toLowerCase();
+    const methodsRequiringCsrf = ['post', 'put', 'patch', 'delete'];
+
+    if (methodsRequiringCsrf.includes(method)) {
+        try {
+            await csrfManager.ensureToken();
+        } catch (error) {
+            console.warn('Failed to fetch CSRF token:', error);
+        }
+    }
+
+    return config;
+});
+```
+
+**処理内容**:
+```javascript
+// 1. POSTメソッドなのでCSRF確認
+config.method === 'post'
+
+// 2. csrfManager.ensureToken()
+if (tokenFetched === true) {
+    return;  // 既に取得済みなのでスキップ
+}
+
+// 3. リクエスト送信
+```
+
+---
+
+### ステップ5: ログアウトリクエスト送信
+
+**HTTPリクエスト**:
+```http
+POST /api/auth/logout/ HTTP/1.1
+Host: localhost:8000
+Cookie: sessionid=abc123xyz...; csrftoken=xxx...
+X-CSRFToken: xxx...
+Accept-Language: ja
+```
+
+**重要ポイント**:
+- **POSTメソッド**: CSRF検証が必要
+- **Cookie送信**: sessionid（セッションID）
+- **X-CSRFToken**: CSRFトークン
+
+---
+
+## ⚙️ Django Middleware処理
+
+### ステップ6: Middleware実行順序
+
+**ファイル**: `backend/config/settings.py`
+
+```python
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",            # 1
+    "django.contrib.sessions.middleware.SessionMiddleware",     # 2 ★重要★
+    "corsheaders.middleware.CorsMiddleware",                    # 3
+    "common.middleware.LanguageMiddleware",                     # 4
+    "django.middleware.locale.LocaleMiddleware",                # 5
+    "django.middleware.common.CommonMiddleware",                # 6
+    "django.middleware.csrf.CsrfViewMiddleware",                # 7
+    "django.contrib.auth.middleware.AuthenticationMiddleware",  # 8 ★重要★
+    "django.contrib.messages.middleware.MessageMiddleware",     # 9
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",   # 10
+]
+```
+
+---
+
+### ステップ7: SessionMiddleware
+
+**処理内容**:
+```python
+# 1. Cookieからsessionid取得
+session_key = request.COOKIES.get("sessionid")
+# → "abc123xyz..."
+
+# 2. django_sessionテーブルから取得
+session_data = Session.objects.get(
+    session_key=session_key,
+    expire_date__gt=timezone.now()
+)
+
+# 3. セッションデータをデシリアライズ
+request.session = deserialize(session_data.session_data)
+```
+
+**SQL実行**:
+```sql
+SELECT session_data, expire_date 
+FROM django_session 
+WHERE session_key = 'abc123xyz...'
+AND expire_date > NOW();
+```
+
+**結果**:
+```python
+request.session = {
+    "_auth_user_id": "user001",
+    "_auth_user_backend": "accounts.backends.GroupUserAuthBackend",
+    "_auth_user_hash": "abcdef123456...",
+    "current_group_id": "group001"
+}
+```
+
+---
+
+### ステップ8: AuthenticationMiddleware
+
+**処理内容**:
+```python
+# 1. セッションから認証情報取得
+user_id = request.session.get("_auth_user_id")
+backend_path = request.session.get("_auth_user_backend")
+# → "user001", "accounts.backends.GroupUserAuthBackend"
+
+# 2. バックエンドをロード
+backend = load_backend(backend_path)
+
+# 3. get_user() を実行
+user = backend.get_user(user_id)
+# → MUser(user_id='user001', ...)
+
+# 4. request.userを設定
+request.user = user
+```
+
+---
+
+### ステップ9: URLルーティング
+
+**ファイル**: `backend/config/urls.py`
+
+```python
+urlpatterns = [
+    path("api/auth/", include("accounts.urls")),  # ★ここにマッチ★
+]
+```
+
+**ファイル**: `backend/accounts/urls.py`
+
+```python
+urlpatterns = [
+    path("logout/", LogoutAPIView.as_view(), name="logout"),  # ★ここにマッチ★
+]
+```
+
+**結果**:
+```
+POST /api/auth/logout/ → LogoutAPIView.post() が実行される
+```
+
+---
+
+## 📍 LogoutAPIView処理
+
+### ステップ10: LogoutAPIView.post()
+
+**ファイル**: `backend/accounts/views.py`
+
+```python
+class LogoutAPIView(APIView):
+    """
+    ログアウトAPI
+
+    機能:
+    - セッション破棄
+    - 監査ログ記録
+    """
+
+    permission_classes = [IsAuthenticated]  # ★認証必須★
+    authentication_classes = [CSRFEnforcedSessionAuthentication]
+
+    def post(self, request):
+        """ログアウト処理"""
+        user_id = request.user.user_id  # "user001"
+```
+
+---
+
+### ステップ11: IsAuthenticated（認証チェック）
+
+**処理内容**:
+```python
+# permission_classes = [IsAuthenticated]
+
+# request.user.is_authenticated をチェック
+if not request.user or not request.user.is_authenticated:
+    # 未認証（AnonymousUser）
+    raise PermissionDenied("認証されていません")
+```
+
+**認証済みの場合**:
+```python
+request.user = MUser(user_id='user001', ...)
+request.user.is_authenticated = True
+# → 認証チェック通過
+```
+
+---
+
+### ステップ12: CSRFEnforcedSessionAuthentication
+
+```python
+# authentication_classes = [CSRFEnforcedSessionAuthentication]
+
+def authenticate(self, request):
+    # 1. CSRF検証
+    self.enforce_csrf(request)
+    
+    # 2. セッション認証
+    return super().authenticate(request)
+```
+
+**enforce_csrf() の処理内容**:
+```python
+def enforce_csrf(self, request):
+    # 1. Cookieからcsrftoken取得
+    csrf_token_cookie = request.COOKIES.get("csrftoken")
+    
+    # 2. ヘッダーからX-CSRFToken取得
+    csrf_token_header = request.META.get("HTTP_X_CSRFTOKEN")
+    
+    # 3. 比較
+    if csrf_token_cookie != csrf_token_header:
+        raise PermissionDenied("CSRF verification failed")
+```
+
+**CSRF検証成功**:
+```python
+csrf_token_cookie == csrf_token_header
+# → CSRF検証通過
+```
+
+---
+
+### ステップ13: 監査ログ記録
+
+**ファイル**: `backend/accounts/views.py`
+
+```python
+# 監査ログ
+audit_logger.info(
+    "ユーザーがログアウトしました",
+    extra={
+        "user_id": user_id,
+        "action": "LOGOUT",
+        "model": "Auth",
+        "object_id": None,
+        "ip": self._get_client_ip(request),
+        "changes": "{}",
+        "endpoint": request.path,
+        "http_method": request.method,
+        "http_referer": request.META.get("HTTP_REFERER", ""),
+        "http_status": 200,
+        "view_name": self.__class__.__name__,
+    },
+)
+```
+
+**ログファイル出力**:
+```json
+{
+  "timestamp": "2025-12-14 12:00:00",
+  "level": "INFO",
+  "action": "LOGOUT",
+  "user_id": "user001",
+  "ip": "192.168.1.100",
+  "endpoint": "/api/auth/logout/",
+  "http_method": "POST",
+  "http_status": 200
+}
+```
+
+---
+
+## 🔑 セッション破棄
+
+### ステップ14: logout(request)
+
+**ファイル**: `backend/accounts/views.py`
+
+```python
+# セッション破棄
+logout(request)
+```
+
+**ファイル**: `django.contrib.auth.logout()`
+
+```python
+def logout(request):
+    """
+    ユーザーをログアウト状態にする
+    """
+    # 1. セッションデータを全削除
+    request.session.flush()
+    
+    # 2. request.userをAnonymousUserに変更
+    request.user = AnonymousUser()
+```
+
+---
+
+### ステップ15: request.session.flush()
+
+**処理内容**:
+```python
+def flush(self):
+    # 1. セッションキー取得
+    session_key = self.session_key  # "abc123xyz..."
+    
+    # 2. django_sessionテーブルから削除
+    self.delete(session_key)
+    
+    # 3. メモリ上のセッションデータクリア
+    self.clear()
+    
+    # 4. 新しいセッションキー生成（空セッション）
+    self.create()
+```
+
+**SQL実行**:
+```sql
+DELETE FROM django_session 
+WHERE session_key = 'abc123xyz...';
+```
+
+**削除前**:
+```sql
+SELECT * FROM django_session WHERE session_key = 'abc123xyz...';
+
+session_key  | session_data                      | expire_date
+-------------|-----------------------------------|-------------------
+abc123xyz... | Base64エンコード済みセッションデータ | 2025-12-15 12:00:00
+```
+
+**削除後**:
+```sql
+SELECT * FROM django_session WHERE session_key = 'abc123xyz...';
+
+-- 結果: 0行（削除済み）
+```
+
+---
+
+### ステップ16: request.userをAnonymousUserに変更
+
+```python
+request.user = AnonymousUser()
+```
+
+**結果**:
+```python
+# ログアウト前
+request.user = MUser(user_id='user001', ...)
+request.user.is_authenticated = True
+
+# ログアウト後
+request.user = AnonymousUser()
+request.user.is_authenticated = False
+```
+
+---
+
+### ステップ17: レスポンス生成
+
+**ファイル**: `backend/accounts/views.py`
+
+```python
+return Response({"detail": "logged_out"})
+```
+
+**HTTPレスポンス**:
+```http
+HTTP/1.1 200 OK
+Set-Cookie: sessionid=""; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT
+Content-Type: application/json
+
+{
+  "detail": "logged_out"
+}
+```
+
+**重要ポイント**:
+- `Set-Cookie: sessionid=""`: Cookieを削除
+- `Max-Age=0`: 即座に期限切れ
+- `Expires`: 1970年（過去の日時）
+
+---
+
+## 🧹 クライアント側クリーンアップ
+
+### ステップ18: authStore.logout() のfinally句
+
+**ファイル**: `frontend/src/stores/auth.js`
+
+```javascript
+async function logout(redirect = true) {
+    loading.value = true;
+
+    try {
+        if (user.value) {
+            await authAPI.logout();
+        }
+    } catch (e) {
+        // ログアウトAPIが失敗してもクライアント側の状態はクリア
+    } finally {
+        // ========================================
+        // クライアント側クリーンアップ（必ず実行）
+        // ========================================
+        
+        // 1. ユーザー情報クリア
+        user.value = null;
+        error.value = null;
+        currentGroupId.value = null;
+        currentGroupName.value = null;
+        loading.value = false;
+        
+        // 2. CSRFトークンリセット
+        resetCSRFToken();
+
+        // 3. ログイン画面へリダイレクト
+        if (redirect && router.currentRoute.value.name !== ROUTE_NAMES.LOGIN) {
+            router.push({ name: ROUTE_NAMES.LOGIN }).catch(() => {});
+        }
+    }
+}
+```
+
+---
+
+### ステップ19: localStorage削除
+
+**pinia-plugin-persistedstate** が自動実行:
+
+```javascript
+// localStorage から削除
+localStorage.removeItem("auth");
+```
+
+**削除前**:
+```javascript
+localStorage.getItem("auth")
+// → "{\"user\":{...},\"currentGroupId\":\"group001\",...}"
+```
+
+**削除後**:
+```javascript
+localStorage.getItem("auth")
+// → null
+```
+
+---
+
+### ステップ20: CSRFトークンリセット
+
+**ファイル**: `frontend/src/plugins/axios.js`
+
+```javascript
+export const resetCSRFToken = () => {
+    csrfManager.reset();
+};
+```
+
+**csrfManager.reset() の処理内容**:
+```javascript
+class CSRFManager {
+    reset() {
+        this.tokenFetched = false;
+        this.fetchingPromise = null;
+    }
+}
+```
+
+**結果**:
+```javascript
+// リセット前
+csrfManager.tokenFetched = true
+
+// リセット後
+csrfManager.tokenFetched = false
+// → 次回ログイン時に再取得される
+```
+
+---
+
+### ステップ21: ログイン画面へリダイレクト
+
+```javascript
+if (redirect && router.currentRoute.value.name !== ROUTE_NAMES.LOGIN) {
+    router.push({ name: ROUTE_NAMES.LOGIN }).catch(() => {});
+}
+```
+
+**結果**:
+```
+/login → ログイン画面表示
+```
+
+---
+
+## 📊 ログアウト後の状態
+
+### 1. django_session テーブル
+
+**削除後**:
+```sql
+SELECT * FROM django_session WHERE session_key = 'abc123xyz...';
+
+-- 結果: 0行（セッションレコード削除済み）
+```
+
+---
+
+### 2. ブラウザCookie
+
+**削除後**:
+```
+sessionid → 削除済み（Max-Age=0で即座に期限切れ）
+csrftoken → 残存（次回ログイン時に再利用可能）
+```
+
+**ブラウザ開発者ツール > Application > Cookies**:
+```
+Name       | Value
+-----------|-------
+csrftoken  | xxx...  ← 残存
+sessionid  | (削除済み)
+```
+
+---
+
+### 3. localStorage
+
+**削除後**:
+```javascript
+localStorage.getItem("auth")
+// → null（削除済み）
+```
+
+---
+
+### 4. Pinia Store
+
+**クリーンアップ後**:
+```javascript
+authStore.user.value = null
+authStore.currentGroupId.value = null
+authStore.currentGroupName.value = null
+authStore.isAuthenticated = false  // computed
+```
+
+---
+
+### 5. CSRFManager
+
+**リセット後**:
+```javascript
+csrfManager.tokenFetched = false
+csrfManager.fetchingPromise = null
+
+// 次回ログイン時:
+// POST /api/auth/login/ 実行前に
+// GET /api/auth/csrf/ で再取得
+```
+
+---
+
+### 6. request.user
+
+**ログアウト後**:
+```python
+request.user = AnonymousUser()
+request.user.is_authenticated = False
+```
+
+---
+
+## 🎉 ログアウト完了！
+
+### ログアウトフローのキーポイント
+
+1. **監査ログ記録**: ログアウトイベントを記録
+2. **logout(request)**: Djangoのセッション破棄処理
+3. **session.flush()**: django_sessionテーブルからレコード削除
+4. **Cookie削除**: Set-Cookie: sessionid=""; Max-Age=0
+5. **finally句**: API失敗してもクライアント側クリーンアップ実行
+6. **localStorage削除**: pinia-plugin-persistedstateが自動実行
+7. **CSRFトークンリセット**: 次回ログイン時に再取得
+
+---
+
+## 🔄 次回ログイン時の動作
+
+### ステップ1: ログイン画面表示
+
+```
+localStorage.getItem("auth") → null
+authStore.user → null
+authStore.isAuthenticated → false
+```
+
+---
+
+### ステップ2: ログインボタンクリック
+
+```javascript
+// Axiosリクエストインターセプター
+config.method === 'post'  // ログインリクエスト
+
+// csrfManager.ensureToken()
+if (tokenFetched === false) {
+    // ★CSRF再取得★
+    await api.get('auth/csrf/');
+    tokenFetched = true;
+}
+
+// ログインリクエスト送信
+POST /api/auth/login/
+Cookie: csrftoken=xxx...  ← 再取得したトークン
+X-CSRFToken: xxx...
+```
+
+---
+
+### ステップ3: ログイン成功
+
+```javascript
+// 新しいセッションID発行
+Set-Cookie: sessionid=new123xyz...
+
+// django_sessionテーブルに新規レコード作成
+INSERT INTO django_session (session_key, session_data, expire_date)
+VALUES ('new123xyz...', '...', '2025-12-15 12:00:00');
+
+// localStorage復元
+localStorage.setItem("auth", JSON.stringify({
+    user: { ... },
+    currentGroupId: "group001"
+}));
+```
+
+---
+
+## 📚 まとめ
+
+### ログアウトフローの流れ
+
+```
+1. ログアウトボタンクリック
+   ↓
+2. authStore.logout()
+   ↓
+3. POST /api/auth/logout/
+   ├─ CSRF検証
+   ├─ 認証チェック
+   ├─ 監査ログ記録
+   └─ logout(request)
+       ├─ session.flush()（django_sessionから削除）
+       ├─ request.user = AnonymousUser()
+       └─ Set-Cookie: sessionid=""; Max-Age=0
+   ↓
+4. finally句（必ず実行）
+   ├─ user.value = null
+   ├─ currentGroupId.value = null
+   ├─ localStorage.removeItem("auth")
+   ├─ resetCSRFToken()
+   └─ router.push("/login")
+   ↓
+5. ログイン画面表示
+```
+
+---
+
+### 重要なファイル
+
+| ファイル | 役割 |
+|---------|------|
+| `Header.vue` | ログアウトボタン |
+| `stores/auth.js` | logout() |
+| `plugins/axios.js` | resetCSRFToken() |
+| `accounts/views.py` | LogoutAPIView |
+| `django.contrib.auth` | logout() |
+
+---
+
+### API失敗時の挙動
+
+**ログアウトAPIが失敗しても**:
+```javascript
+try {
+    await authAPI.logout();  // ← ここで失敗
+} catch (e) {
+    // エラーをキャッチするが何もしない
+} finally {
+    // ★finally句は必ず実行される★
+    user.value = null;
+    localStorage.removeItem("auth");
+    router.push("/login");
+}
+```
+
+**結果**:
+- **サーバー側**: セッションが残る可能性がある
+- **クライアント側**: 完全にクリーンアップされる
+- **セキュリティ**: クライアント側が重要（Cookie削除、localStorage削除）
+
+これで、ログアウトフローの全体が理解できるはず！(｀・ω・´)ゞ

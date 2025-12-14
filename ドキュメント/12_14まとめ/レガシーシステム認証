@@ -1,0 +1,576 @@
+# 🔐 レガシーシステム認証 完全解説
+
+## 📋 目次
+1. [全体構成](#全体構成)
+2. [フロントエンド: Vue.js部分](#フロントエンド)
+3. [バックエンド: Django部分](#バックエンド)
+4. [認証バックエンド詳細](#認証バックエンド)
+5. [セキュリティ対策](#セキュリティ対策)
+6. [データフロー図](#データフロー)
+
+---
+
+## 🏗️ 全体構成
+
+```
+📁 プロジェクト構成
+├── frontend/          # Vue.js 3.x SPA
+│   ├── src/
+│   │   ├── views/Login.vue           # ログイン画面
+│   │   ├── stores/auth.js            # Pinia認証ストア
+│   │   ├── plugins/axios.js          # AxiosインスタンスとCSRF管理
+│   │   ├── router/
+│   │   │   ├── index.js              # メインルーター
+│   │   │   ├── auth-guard.js         # 認証ガード
+│   │   │   └── admin-guard.js        # 管理者ガード
+│   │   └── api/auth.js               # 認証API呼び出し
+│
+└── backend/           # Django 5.2 + DRF
+    ├── config/
+    │   ├── settings.py               # 全体設定
+    │   └── urls.py                   # ルートURL
+    ├── accounts/
+    │   ├── views.py                  # 認証APIエンドポイント
+    │   ├── serializers.py            # データバリデーション
+    │   ├── backends.py               # カスタム認証バックエンド
+    │   ├── services.py               # ビジネスロジック
+    │   ├── permissions.py            # 権限チェック
+    │   └── urls.py                   # accounts用URL
+    └── common/
+        └── models.py                 # レガシーDB用モデル
+```
+
+---
+
+## 🎨 フロントエンド: Vue.js部分
+
+### 1️⃣ ログイン画面（Login.vue）
+
+**役割**: ユーザーがログイン情報を入力する画面
+
+```javascript
+// 主な処理フロー
+onMounted → fetchGroups() → グループ選択肢取得
+↓
+ユーザー入力: groupId, userId, password
+↓
+onSubmit() → form.validate() → バリデーション
+↓
+authStore.loginSession() → API呼び出し
+```
+
+**重要ポイント**:
+- `fetchGroups()`: ログイン画面表示時にグループ一覧を取得（認証不要）
+- `v-select`: グループIDをプルダウンで選択
+- バリデーション: 空白入力をフロントで事前チェック
+
+---
+
+### 2️⃣ Axiosプラグイン（plugins/axios.js）
+
+**役割**: HTTPリクエストの自動CSRF保護
+
+```javascript
+// CSRFトークン管理の仕組み
+
+1. インスタンス作成
+   withCredentials: true  → Cookie送受信を有効化
+   xsrfCookieName: 'csrftoken'  → Django標準のCSRF Cookie名
+   xsrfHeaderName: 'X-CSRFToken'  → DjangoのCSRFヘッダー名
+
+2. リクエストインターセプター
+   POST/PUT/PATCH/DELETEリクエスト時
+   → csrfManager.ensureToken() 実行
+   → GET /api/auth/csrf/ でトークン取得
+   → Cookieにcsrftokenがセットされる
+   → Axiosが自動的にX-CSRFTokenヘッダーに追加
+
+3. レスポンスインターセプター
+   401/403エラー → 自動ログアウト
+   CSRF失敗 → トークンリセット
+```
+
+**重要ポイント**:
+- **CSRFManager**: 重複リクエストを防ぐため、1回だけトークン取得
+- **開発環境**: `withXSRFToken: true`（クロスオリジン対応）
+- **本番環境**: `withXSRFToken: undefined`（リバースプロキシで同一オリジン）
+
+---
+
+### 3️⃣ Pinia認証ストア（stores/auth.js）
+
+**役割**: ログイン状態とユーザー情報の永続化
+
+```javascript
+// 主要なステート
+user: null,                    // ユーザー情報（MUser）
+currentGroupId: null,          // 現在のグループID
+currentGroupName: null,        // 現在のグループ名
+isAdmin: computed              // 管理者権限（is_superuser || is_staff）
+
+// 主要なアクション
+loginSession()    → ログイン処理
+fetchUser()       → ユーザー情報取得（/api/auth/me/）
+logout()          → ログアウト + セッション破棄
+```
+
+**重要ポイント**:
+- **persist**: `pinia-plugin-persistedstate`でlocalStorageに自動保存
+- **isAdmin**: バックエンドの`is_admin`フィールド（計算プロパティ）を取得
+
+---
+
+### 4️⃣ ルーターガード（router/auth-guard.js, admin-guard.js）
+
+**役割**: ページ遷移時の認証チェック
+
+```javascript
+// auth-guard.js（認証ガード）
+ページ遷移
+↓
+to.meta.requiresAuth === true?
+↓ Yes
+auth.user が存在する?
+↓ No
+fetchUser() → /api/auth/me/ でセッション確認
+↓
+user === null → LOGIN画面へリダイレクト
+user !== null → 次の処理へ
+
+// admin-guard.js（管理者ガード）
+ページ遷移
+↓
+to.meta.requiresAdmin === true?
+↓ Yes
+auth.isAdmin === true?
+↓ No
+HOME画面へリダイレクト（query: unauthorized=admin）
+```
+
+---
+
+## ⚙️ バックエンド: Django部分
+
+### 1️⃣ URLルーティング（config/urls.py → accounts/urls.py）
+
+```python
+# リクエストの流れ
+POST /api/auth/login/
+↓
+config/urls.py: path("api/auth/", include("accounts.urls"))
+↓
+accounts/urls.py: path("login/", LoginAPIView.as_view())
+↓
+accounts/views.py: LoginAPIView.post()
+```
+
+---
+
+### 2️⃣ LoginAPIView（accounts/views.py）
+
+**役割**: ログインリクエストの受付と処理
+
+```python
+# 処理フロー（超重要！）
+
+1. CSRFEnforcedSessionAuthentication
+   → enforce_csrf(request) でCSRF検証強制
+
+2. LoginSerializer
+   → バリデーション（空白チェック、型チェック）
+
+3. LoginAttemptService.is_locked()
+   → アカウントロック中か確認
+   → ロック中なら 429 Too Many Requests
+
+4. authenticate(
+       request=request,
+       username=user_id,      # ★Django規約でusernameパラメータ★
+       password=password,
+       group_id=group_id
+   )
+   → GroupUserAuthBackend.authenticate() を実行
+
+5. user is None（認証失敗）
+   → LoginAttemptService.increment_attempts()
+   → 失敗回数が上限に達したら lock_user()
+   → 401 Unauthorized
+
+6. user is not None（認証成功）
+   → LoginAttemptService.reset_attempts()
+   → login(request, user)  # Djangoセッション作成
+   → request.session["current_group_id"] = group_id
+   → UserSerializer でレスポンス生成
+   → 200 OK
+```
+
+**重要ポイント**:
+- **CSRFEnforcedSessionAuthentication**: 未認証ユーザーのPOSTもCSRF検証
+- **authenticate()**: Django標準の認証関数（パラメータ名は`username`固定）
+- **login()**: セッションIDをCookieにセット
+- **監査ログ**: 成功・失敗・ロックを全て記録
+
+---
+
+### 3️⃣ GroupUserAuthBackend（accounts/backends.py）
+
+**役割**: カスタム認証ロジック（3点認証）
+
+```python
+# authenticate() の処理フロー（超重要！）
+
+def authenticate(self, request, username=None, password=None, group_id=None):
+    user_id = username  # ★usernameパラメータをuser_idとして扱う★
+    
+    # ========================================
+    # 1️⃣ ユーザー取得（文字列PKで検索）
+    # ========================================
+    user = User.objects.filter(user_id=user_id).first()
+    
+    if user is None:
+        # ★タイミング攻撃対策★
+        User().set_password(password)  # ダミー処理で同じ時間消費
+        return None
+    
+    # ========================================
+    # 2️⃣ パスワード検証
+    # ========================================
+    if not user.check_password(password):
+        return None
+    
+    # ========================================
+    # 3️⃣ グループ所属チェック（手動JOIN）
+    # ========================================
+    group_exists = MUserGroup.objects.filter(
+        user_id=user.user_id,
+        group_id=group_id,
+        is_active=True
+    ).exists()
+    
+    if not group_exists:
+        return None
+    
+    # ========================================
+    # 4️⃣ ユーザーアクティブチェック
+    # ========================================
+    if not user.is_active:
+        return None
+    
+    # すべてのチェックをパス
+    return user
+```
+
+**重要ポイント**:
+- **文字列PK**: `user_id`は文字列型の主キー（整数変換しない）
+- **タイミング攻撃対策**: ユーザー不在でも同じ処理時間を確保
+- **手動JOIN**: ForeignKeyを使わず、文字列フィールドで直接検索
+- **3点認証**: user_id + password + group_id の全てが一致する必要
+
+---
+
+### 4️⃣ get_user() メソッド（超重要！）
+
+**役割**: セッションからユーザーを復元
+
+```python
+def get_user(self, user_id):
+    """
+    Django内部で呼ばれるメソッド
+    セッションIDからユーザーを復元する
+    """
+    try:
+        # ★文字列PKでユーザー取得★
+        user = User.objects.get(pk=user_id)
+        
+        if user.is_active:
+            return user
+        return None
+        
+    except User.DoesNotExist:
+        return None
+```
+
+**重要ポイント**:
+- **自動呼び出し**: `request.user`アクセス時にDjangoが自動実行
+- **文字列PK**: `user_id`を整数に変換しない
+- **セッション管理**: Djangoが`django_session`テーブルで管理
+
+---
+
+### 5️⃣ MUser モデル（common/models.py）
+
+**役割**: レガシーDBのユーザーテーブル
+
+```python
+# PostgreSQLテーブル構造
+m_user:
+- user_id (VARCHAR, PRIMARY KEY)     # 文字列主キー
+- password (VARCHAR)                  # Django形式のハッシュ
+- username (VARCHAR)
+- is_active (BOOLEAN)
+- is_superuser (BOOLEAN)              # ✅ 管理者権限
+- is_staff (BOOLEAN)                  # ✅ 管理画面アクセス権
+- last_login (TIMESTAMP)
+- created_at (TIMESTAMP)
+- updated_at (TIMESTAMP)
+
+# Django認証システム必須設定
+USERNAME_FIELD = "user_id"            # ログイン時のユーザー識別子
+REQUIRED_FIELDS = []
+
+# 認証プロパティ
+is_authenticated → True（常に）
+is_anonymous → False（常に）
+is_admin → bool(is_superuser or is_staff)  # ★計算プロパティ★
+
+# パスワード管理
+check_password(raw_password)          # PBKDF2-SHA256で検証
+set_password(raw_password)            # ハッシュ化して保存
+
+# 権限管理（is_superuser or is_staff ベース）
+has_perm(perm, obj=None)
+has_perms(perm_list, obj=None)
+has_module_perms(app_label)
+```
+
+**重要ポイント**:
+- **managed = False**: Djangoのマイグレーション対象外
+- **inspectdb取り込み**: PostgreSQLテーブルをそのまま使用
+- **is_adminプロパティ**: 後方互換性のため、is_superuser || is_staff を計算
+- **文字列主キー**: user_id は VARCHAR(50)
+
+---
+
+### 6️⃣ UserSerializer（accounts/serializers.py）
+
+**役割**: ユーザー情報をJSON形式でレスポンス
+
+```python
+class UserSerializer(serializers.ModelSerializer):
+    current_group = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
+    
+    def get_is_admin(self, obj):
+        """
+        管理者権限チェック
+        is_superuser=True または is_staff=True なら True
+        """
+        return bool(obj.is_superuser or obj.is_staff)
+    
+    def get_current_group(self, obj):
+        """
+        セッションから現在のグループ情報を取得
+        """
+        request = self.context.get("request")
+        group_id = request.session.get("current_group_id")
+        
+        # MUserGroup + MGroup を手動JOIN
+        ...
+        
+        return {
+            "group_id": group_obj.group_id,
+            "group_name": group_obj.group_name
+        }
+```
+
+**レスポンス例**:
+```json
+{
+  "user_id": "user001",
+  "username": "山田太郎",
+  "is_active": true,
+  "is_superuser": false,
+  "is_staff": false,
+  "is_admin": false,
+  "current_group": {
+    "group_id": "group001",
+    "group_name": "営業部"
+  }
+}
+```
+
+---
+
+## 🔐 セキュリティ対策
+
+### 1️⃣ CSRF保護（クロスサイトリクエストフォージェリ対策）
+
+```
+フロントエンド                    バックエンド
+     │                                │
+     │  GET /api/auth/csrf/           │
+     │─────────────────────────────→  │
+     │                                │
+     │  Set-Cookie: csrftoken=xxx     │
+     │←─────────────────────────────  │
+     │                                │
+     │  POST /api/auth/login/         │
+     │  Cookie: csrftoken=xxx         │
+     │  X-CSRFToken: xxx              │
+     │─────────────────────────────→  │
+     │                                │
+     │  CSRFEnforcedSessionAuth       │
+     │  enforce_csrf() で検証         │
+     │                                │
+     │  200 OK / 403 Forbidden        │
+     │←─────────────────────────────  │
+```
+
+**重要ポイント**:
+- **CSRFEnforcedSessionAuthentication**: 未認証ユーザーもCSRF検証
+- **Cookieとヘッダー**: csrftokenを両方で送信（Axiosが自動処理）
+- **Same-Origin**: 本番環境ではリバースプロキシで同一オリジン化
+
+---
+
+### 2️⃣ ブルートフォース攻撃対策
+
+```python
+# LoginAttemptService（キャッシュベース）
+
+失敗回数カウント:
+  login_attempts:group001:user001 → 1
+  
+失敗 → increment_attempts() → 2
+失敗 → increment_attempts() → 3
+...
+失敗 → increment_attempts() → 10（上限）
+
+should_lock() → True
+lock_user()
+  login_locked:group001:user001 → True (60秒間)
+
+is_locked() → 429 Too Many Requests
+
+60秒後にキャッシュ期限切れ → 自動ロック解除
+```
+
+**重要ポイント**:
+- **キャッシュ管理**: Djangoの`django.core.cache`を使用
+- **グループ単位**: 同じユーザーIDでもグループが違えば別カウント
+- **自動解除**: 一定時間後に自動的にロック解除
+- **監査ログ**: ロックイベントを全て記録
+
+---
+
+### 3️⃣ タイミング攻撃対策
+
+```python
+# GroupUserAuthBackend.authenticate()
+
+# ❌ 脆弱なコード（タイミング攻撃に弱い）
+user = User.objects.filter(user_id=user_id).first()
+if user is None:
+    return None  # ★ここで即座にreturnすると処理時間が短い★
+
+# ✅ 安全なコード（タイミング攻撃対策）
+user = User.objects.filter(user_id=user_id).first()
+if user is None:
+    User().set_password(password)  # ★ダミー処理で時間を消費★
+    return None
+```
+
+**攻撃シナリオ**:
+1. 攻撃者がユーザーIDをブルートフォース
+2. 存在しないユーザーIDは即座にエラー（0.01秒）
+3. 存在するユーザーIDはパスワードチェック（0.1秒）
+4. レスポンス時間の違いからユーザーIDの存在を推測
+
+**対策**:
+- ユーザー不在でも同じ処理時間を確保
+- `set_password()`でPBKDF2ハッシュ計算を実行
+
+---
+
+## 📊 データフロー図
+
+### ログイン成功時のデータフロー
+
+```
+1. ユーザー入力
+   group_id: "group001"
+   user_id: "user001"
+   password: "password123"
+
+2. POST /api/auth/login/
+   {
+     "group_id": "group001",
+     "user_id": "user001",
+     "password": "password123"
+   }
+
+3. GroupUserAuthBackend.authenticate()
+   ↓
+   User.objects.filter(user_id="user001").first()
+   → user = MUser(user_id="user001", password="pbkdf2_sha256$...", ...)
+   ↓
+   user.check_password("password123")
+   → True
+   ↓
+   MUserGroup.objects.filter(
+       user_id="user001",
+       group_id="group001",
+       is_active=True
+   ).exists()
+   → True
+   ↓
+   return user
+
+4. login(request, user)
+   ↓
+   セッションID生成: "abc123xyz..."
+   ↓
+   django_session テーブルに保存:
+   {
+     "session_key": "abc123xyz...",
+     "session_data": "user_id:user001, current_group_id:group001",
+     "expire_date": "2025-12-15 12:00:00"
+   }
+   ↓
+   Set-Cookie: sessionid=abc123xyz...; HttpOnly; SameSite=Lax
+
+5. UserSerializer
+   ↓
+   {
+     "user_id": "user001",
+     "username": "山田太郎",
+     "is_admin": false,
+     "current_group": {
+       "group_id": "group001",
+       "group_name": "営業部"
+     }
+   }
+
+6. フロントエンド
+   ↓
+   authStore.user = { user_id: "user001", ... }
+   authStore.currentGroupId = "group001"
+   ↓
+   localStorage保存（pinia-plugin-persistedstate）
+   ↓
+   router.push("/") → HOME画面
+```
+
+---
+
+## 🎯 重要ポイントまとめ
+
+### バックエンド
+1. **CSRFEnforcedSessionAuthentication**: 全てのリクエストでCSRF検証
+2. **GroupUserAuthBackend**: 3点認証（user_id + password + group_id）
+3. **文字列主キー**: user_idは整数変換しない
+4. **タイミング攻撃対策**: ユーザー不在でもダミー処理
+5. **セッション管理**: django_sessionテーブルで管理
+6. **is_adminプロパティ**: is_superuser || is_staff の計算結果
+
+### フロントエンド
+1. **Axios自動CSRF**: リクエストインターセプターで自動取得
+2. **Pinia永続化**: localStorageで認証状態を保持
+3. **ルーターガード**: 認証・管理者権限を遷移前にチェック
+4. **エラーハンドリング**: 401/403で自動ログアウト
+
+### セキュリティ
+1. **CSRF保護**: CookieとヘッダーでDouble Submit Pattern
+2. **ブルートフォース対策**: 失敗回数制限とアカウントロック
+3. **タイミング攻撃対策**: 常に一定の処理時間を確保
+4. **監査ログ**: 全ての認証イベントを記録

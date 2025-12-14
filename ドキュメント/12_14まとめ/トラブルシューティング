@@ -1,0 +1,582 @@
+# 🔧 トラブルシューティングガイド
+
+## 目次
+1. [CSRF関連エラー](#csrf関連エラー)
+2. [認証エラー](#認証エラー)
+3. [セッション関連エラー](#セッション関連エラー)
+4. [管理者権限エラー](#管理者権限エラー)
+5. [デバッグ方法](#デバッグ方法)
+
+---
+
+## 🛡️ CSRF関連エラー
+
+### エラー: `403 Forbidden - CSRF verification failed`
+
+**原因**:
+- CSRFトークンが取得されていない
+- CSRFトークンがCookieとヘッダーで一致しない
+- 開発環境で`withXSRFToken`が正しく設定されていない
+
+**解決方法**:
+
+1. **Axiosプラグインの設定確認**
+```javascript
+// plugins/axios.js
+const api = axios.create({
+    withCredentials: true,           // ✅ 必須
+    xsrfCookieName: 'csrftoken',     // ✅ Django標準
+    xsrfHeaderName: 'X-CSRFToken',   // ✅ Django標準
+    withXSRFToken: import.meta.env.DEV ? true : undefined,  // ✅ 開発環境のみ
+});
+```
+
+2. **CSRFトークン取得の確認**
+```javascript
+// ブラウザ開発者ツール > Network タブ
+// POST /api/auth/login/ の Request Headers を確認
+
+Cookie: csrftoken=xxx...          // ✅ Cookieに存在
+X-CSRFToken: xxx...               // ✅ ヘッダーに存在
+
+// 両方が同じ値でなければならない
+```
+
+3. **Djangoの設定確認**
+```python
+# config/settings.py
+
+# ✅ クロスオリジン許可
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
+CORS_ALLOW_CREDENTIALS = True
+
+# ✅ CSRF信頼オリジン
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+]
+
+# ✅ CSRF Cookie設定
+CSRF_COOKIE_HTTPONLY = False  # JSから読む必要がある
+CSRF_COOKIE_SECURE = False    # 開発環境はHTTP
+```
+
+4. **CSRFEnforcedSessionAuthenticationの確認**
+```python
+# accounts/views.py
+class LoginAPIView(APIView):
+    authentication_classes = [CSRFEnforcedSessionAuthentication]  # ✅
+```
+
+---
+
+## 🔐 認証エラー
+
+### エラー: `401 Unauthorized - ユーザーIDまたはパスワードが正しくありません`
+
+**原因**:
+1. ユーザーが存在しない
+2. パスワードが不一致
+3. グループに所属していない
+4. ユーザーが無効化されている
+
+**デバッグ方法**:
+
+1. **ユーザー存在確認**
+```sql
+-- PostgreSQL
+SELECT * FROM legacy_schema.m_user WHERE user_id = 'user001';
+
+-- 結果が空 → ユーザー不在
+```
+
+2. **パスワードハッシュ確認**
+```sql
+-- パスワードフィールドの確認
+SELECT user_id, password FROM legacy_schema.m_user WHERE user_id = 'user001';
+
+-- ✅ 正しい形式: pbkdf2_sha256$600000$...
+-- ❌ 間違い: password123（平文）
+```
+
+3. **パスワード再ハッシュ化**
+```python
+# Djangoシェル
+python manage.py shell
+
+from common.models import MUser
+from django.contrib.auth.hashers import make_password
+
+user = MUser.objects.get(user_id='user001')
+user.password = make_password('password123')
+user.save()
+
+# 確認
+print(user.password)
+# → pbkdf2_sha256$600000$...
+```
+
+4. **グループ所属確認**
+```sql
+-- PostgreSQL
+SELECT * FROM legacy_schema.m_user_group 
+WHERE user_id = 'user001' AND group_id = 'group001' AND is_active = TRUE;
+
+-- 結果が空 → グループ未所属
+```
+
+5. **グループ所属追加**
+```sql
+-- PostgreSQL
+INSERT INTO legacy_schema.m_user_group (user_id, group_id, is_active, created_at)
+VALUES ('user001', 'group001', TRUE, NOW());
+```
+
+6. **アクティブフラグ確認**
+```sql
+-- PostgreSQL
+SELECT user_id, is_active FROM legacy_schema.m_user WHERE user_id = 'user001';
+
+-- is_active = FALSE → ユーザー無効化
+```
+
+---
+
+### エラー: `User.DoesNotExist`
+
+**原因**:
+- `user_id`の型が一致していない（文字列 vs 整数）
+
+**解決方法**:
+
+1. **user_idの型確認**
+```sql
+-- PostgreSQL
+\d legacy_schema.m_user
+
+-- user_id の型を確認
+-- ✅ character varying(50) → 文字列
+-- ❌ integer → 整数
+```
+
+2. **Djangoモデルの型確認**
+```python
+# common/models.py
+class MUser(models.Model):
+    user_id = models.CharField(primary_key=True, max_length=50)  # ✅ 文字列
+    # user_id = models.IntegerField(primary_key=True)  # ❌ 整数
+```
+
+3. **バックエンドの検索方法確認**
+```python
+# accounts/backends.py
+def authenticate(self, request, username=None, password=None, group_id=None):
+    user_id = username
+    
+    # ✅ 正しい
+    user = User.objects.filter(user_id=user_id).first()
+    
+    # ❌ 間違い（整数に変換してしまう）
+    user = User.objects.filter(user_id=int(user_id)).first()
+```
+
+---
+
+## 🔑 セッション関連エラー
+
+### エラー: ページリロードで毎回ログアウトされる
+
+**原因**:
+- セッションが保存されていない
+- Cookieが保存されていない
+- `withCredentials`が設定されていない
+
+**解決方法**:
+
+1. **Axiosの設定確認**
+```javascript
+// plugins/axios.js
+const api = axios.create({
+    withCredentials: true,  // ✅ 必須（Cookie送受信）
+});
+```
+
+2. **ブラウザCookieの確認**
+```
+開発者ツール > Application > Cookies > http://localhost:5173
+
+✅ csrftoken: xxx...
+✅ sessionid: xxx...
+
+両方のCookieが存在することを確認
+```
+
+3. **Djangoセッション設定確認**
+```python
+# config/settings.py
+
+SESSION_COOKIE_AGE = 86400  # 24時間
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # ブラウザを閉じたら破棄
+SESSION_COOKIE_SECURE = False  # 開発環境はHTTP
+SESSION_COOKIE_HTTPONLY = True  # JSからアクセス不可
+SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF対策
+```
+
+4. **django_sessionテーブルの確認**
+```sql
+-- PostgreSQL
+SELECT * FROM django_session WHERE expire_date > NOW();
+
+-- セッションが存在することを確認
+```
+
+---
+
+### エラー: `request.user` が `AnonymousUser` になる
+
+**原因**:
+- `get_user()` メソッドが正しく実装されていない
+- セッションが期限切れ
+
+**解決方法**:
+
+1. **get_user()の実装確認**
+```python
+# accounts/backends.py
+class GroupUserAuthBackend(BaseBackend):
+    def get_user(self, user_id):
+        """
+        ★超重要★ セッションからユーザー復元
+        """
+        try:
+            user = User.objects.get(pk=user_id)  # ✅ 文字列PKで取得
+            if user.is_active:
+                return user
+            return None
+        except User.DoesNotExist:
+            return None
+```
+
+2. **セッション期限切れの確認**
+```sql
+-- PostgreSQL
+SELECT session_key, expire_date, expire_date < NOW() AS is_expired
+FROM django_session
+WHERE session_key = 'abc123xyz...';
+
+-- is_expired = TRUE → セッション期限切れ
+```
+
+---
+
+## 👑 管理者権限エラー
+
+### エラー: `admin-guard.js` で管理者でもリダイレクトされる
+
+**原因**:
+- `is_admin` プロパティが正しく計算されていない
+- バックエンドが `is_admin` フィールドを返していない
+
+**解決方法**:
+
+1. **PostgreSQLの is_superuser / is_staff 確認**
+```sql
+-- PostgreSQL
+SELECT user_id, is_superuser, is_staff 
+FROM legacy_schema.m_user 
+WHERE user_id = 'admin001';
+
+-- ✅ is_superuser = TRUE または is_staff = TRUE
+-- ❌ 両方とも FALSE → 管理者ではない
+```
+
+2. **管理者権限を付与**
+```sql
+-- PostgreSQL
+UPDATE legacy_schema.m_user 
+SET is_superuser = TRUE, is_staff = TRUE 
+WHERE user_id = 'admin001';
+```
+
+3. **Djangoモデルの is_admin プロパティ確認**
+```python
+# common/models.py
+class MUser(models.Model):
+    @property
+    def is_admin(self):
+        """
+        is_superuser=True または is_staff=True なら管理者
+        """
+        return bool(self.is_superuser or self.is_staff)
+```
+
+4. **UserSerializerの is_admin 計算確認**
+```python
+# accounts/serializers.py
+class UserSerializer(serializers.ModelSerializer):
+    is_admin = serializers.SerializerMethodField()
+    
+    def get_is_admin(self, obj):
+        """
+        管理者権限チェック
+        """
+        return bool(obj.is_superuser or obj.is_staff)
+```
+
+5. **フロントエンドのレスポンス確認**
+```javascript
+// ブラウザ開発者ツール > Network > /api/auth/me/
+{
+  "user_id": "admin001",
+  "is_superuser": true,
+  "is_staff": true,
+  "is_admin": true  // ✅ このフィールドが true であることを確認
+}
+```
+
+6. **admin-guard.jsの確認**
+```javascript
+// router/admin-guard.js
+export const adminGuard = async (to, from) => {
+    if (!to.meta.requiresAdmin) {
+        return true;
+    }
+    
+    const auth = useAuthStore();
+    
+    // ✅ computed の isAdmin を使用
+    if (!auth.isAdmin) {
+        return {
+            name: ROUTE_NAMES.HOME,
+            replace: true,
+            query: { unauthorized: 'admin' }
+        };
+    }
+    
+    return true;
+};
+```
+
+---
+
+## 🔍 デバッグ方法
+
+### 1️⃣ ブラウザ開発者ツール
+
+```
+F12 → Network タブ
+
+POST /api/auth/login/ をクリック
+
+【Request Headers】
+Cookie: csrftoken=xxx; sessionid=yyy
+X-CSRFToken: xxx
+
+【Request Payload】
+{
+  "group_id": "group001",
+  "user_id": "user001",
+  "password": "password123"
+}
+
+【Response】
+Status: 200 OK
+{
+  "detail": "logged_in",
+  "user": { ... }
+}
+```
+
+---
+
+### 2️⃣ Djangoシェルでの確認
+
+```python
+python manage.py shell
+
+# ユーザー取得
+from common.models import MUser
+user = MUser.objects.get(user_id='user001')
+
+# パスワード検証
+user.check_password('password123')  # True/False
+
+# グループ所属確認
+from common.models import MUserGroup
+MUserGroup.objects.filter(
+    user_id='user001',
+    group_id='group001',
+    is_active=True
+).exists()  # True/False
+
+# 管理者権限確認
+user.is_admin  # True/False
+user.is_superuser  # True/False
+user.is_staff  # True/False
+```
+
+---
+
+### 3️⃣ PostgreSQL直接確認
+
+```sql
+-- ユーザー情報
+SELECT * FROM legacy_schema.m_user WHERE user_id = 'user001';
+
+-- グループ所属
+SELECT * FROM legacy_schema.m_user_group 
+WHERE user_id = 'user001' AND is_active = TRUE;
+
+-- グループ一覧
+SELECT * FROM legacy_schema.m_group WHERE is_active = TRUE;
+
+-- セッション
+SELECT * FROM django_session WHERE expire_date > NOW();
+```
+
+---
+
+### 4️⃣ ログファイルの確認
+
+```bash
+# Djangoログ（開発環境）
+tail -f backend/logs/audit.log
+
+# ログイン成功
+{"action": "LOGIN_SUCCESS", "user_id": "user001", "group_id": "group001"}
+
+# ログイン失敗
+{"action": "LOGIN_FAILURE", "user_id": "user001", "attempts": 3}
+
+# アカウントロック
+{"action": "ACCOUNT_LOCKED", "user_id": "user001"}
+```
+
+---
+
+## 🎯 よくある質問
+
+### Q1: セッションはどこに保存されるの？
+
+**A**: PostgreSQLの`django_session`テーブルに保存されます。
+
+```sql
+SELECT * FROM django_session;
+
+session_key          | session_data | expire_date
+---------------------|--------------|-------------------
+abc123xyz...         | (暗号化)      | 2025-12-15 12:00:00
+```
+
+---
+
+### Q2: パスワードはどうやってハッシュ化されるの？
+
+**A**: Djangoの`make_password()`がPBKDF2-SHA256でハッシュ化します。
+
+```python
+from django.contrib.auth.hashers import make_password
+
+# 平文パスワード
+password = "password123"
+
+# ハッシュ化
+hashed = make_password(password)
+# → pbkdf2_sha256$600000$xxxxx$yyyyy
+
+# 検証
+user.check_password("password123")  # True
+```
+
+---
+
+### Q3: グループ認証ってどういう仕組み？
+
+**A**: ユーザーは複数のグループに所属でき、ログイン時にどのグループでアクセスするかを選択します。
+
+```
+ユーザー: user001
+所属グループ: [group001, group002, group003]
+
+ログイン時:
+- グループ選択: group001
+- 認証: user001 + password + group001
+- セッション: current_group_id = group001
+
+別のグループでログイン:
+- グループ選択: group002
+- 認証: user001 + password + group002
+- セッション: current_group_id = group002
+```
+
+---
+
+### Q4: is_admin はどうやって判定されるの？
+
+**A**: `is_superuser=True` または `is_staff=True` なら管理者とみなします。
+
+```python
+# models.py
+@property
+def is_admin(self):
+    return bool(self.is_superuser or self.is_staff)
+
+# 判定例
+is_superuser=True,  is_staff=False  → is_admin=True
+is_superuser=False, is_staff=True   → is_admin=True
+is_superuser=True,  is_staff=True   → is_admin=True
+is_superuser=False, is_staff=False  → is_admin=False
+```
+
+---
+
+## 🚨 緊急時の対処
+
+### ログイン試行回数をリセット
+
+```python
+python manage.py shell
+
+from django.core.cache import cache
+
+# 特定ユーザーのロック解除
+cache.delete("login_attempts:group001:user001")
+cache.delete("login_locked:group001:user001")
+
+# 全キャッシュクリア
+cache.clear()
+```
+
+---
+
+### セッション全削除
+
+```sql
+-- PostgreSQL
+DELETE FROM django_session;
+```
+
+---
+
+### パスワードリセット
+
+```python
+python manage.py shell
+
+from common.models import MUser
+
+user = MUser.objects.get(user_id='user001')
+user.set_password('newpassword123')
+user.save()
+```
+
+---
+
+## 📚 参考資料
+
+- Django認証システム: https://docs.djangoproject.com/en/5.2/topics/auth/
+- DRF認証: https://www.django-rest-framework.org/api-guide/authentication/
+- Axios: https://axios-http.com/docs/intro
+- Pinia: https://pinia.vuejs.org/
+- Vue Router: https://router.vuejs.org/

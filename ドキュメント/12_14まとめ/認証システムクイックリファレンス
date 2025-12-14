@@ -1,0 +1,551 @@
+# 🚀 認証システム実装クイックリファレンス
+
+## 📋 実装チェックリスト
+
+### バックエンド（Django）
+
+- [ ] PostgreSQLテーブル作成（m_user, m_group, m_user_group）
+- [ ] inspectdbでモデル取り込み
+- [ ] MUserモデルに認証メソッド追加
+- [ ] GroupUserAuthBackendの実装
+- [ ] LoginAPIViewの実装
+- [ ] CSRFEnforcedSessionAuthenticationの設定
+- [ ] LoginAttemptServiceの実装
+- [ ] settings.pyの設定（CORS, CSRF, SESSION）
+- [ ] URLルーティングの設定
+- [ ] マイグレーション実行（sessionテーブル）
+
+### フロントエンド（Vue.js）
+
+- [ ] Axiosプラグインの設定（CSRF自動取得）
+- [ ] Pinia認証ストアの実装
+- [ ] ログイン画面の実装
+- [ ] ルーターガードの実装（auth-guard, admin-guard）
+- [ ] 認証API呼び出しの実装
+- [ ] localStorage永続化の設定
+
+---
+
+## 🎯 重要コードスニペット
+
+### 1️⃣ ユーザー作成（PostgreSQL）
+
+```sql
+-- ユーザーテーブル作成
+CREATE TABLE legacy_schema.m_user (
+    user_id VARCHAR(50) PRIMARY KEY,
+    password VARCHAR(128) NOT NULL,
+    username VARCHAR(50) NOT NULL,
+    last_login TIMESTAMP,
+    is_active BOOLEAN DEFAULT TRUE,
+    is_superuser BOOLEAN DEFAULT FALSE,
+    is_staff BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- グループテーブル作成
+CREATE TABLE legacy_schema.m_group (
+    group_id VARCHAR(50) PRIMARY KEY,
+    group_name VARCHAR(100) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ユーザーグループ関連テーブル作成
+CREATE TABLE legacy_schema.m_user_group (
+    user_id VARCHAR(50) NOT NULL,
+    group_id VARCHAR(50) NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (user_id, group_id)
+);
+
+-- テストユーザー作成（パスワード: password123）
+INSERT INTO legacy_schema.m_user (user_id, password, username, is_active, is_superuser, is_staff)
+VALUES ('admin001', 'pbkdf2_sha256$600000$xxxxx$yyyyy', '管理者', TRUE, TRUE, TRUE);
+
+-- テストグループ作成
+INSERT INTO legacy_schema.m_group (group_id, group_name, is_active)
+VALUES ('group001', '営業部', TRUE);
+
+-- ユーザーをグループに所属させる
+INSERT INTO legacy_schema.m_user_group (user_id, group_id, is_active)
+VALUES ('admin001', 'group001', TRUE);
+```
+
+---
+
+### 2️⃣ Djangoでパスワードハッシュ化
+
+```python
+# Djangoシェルで実行
+python manage.py shell
+
+from django.contrib.auth.hashers import make_password
+
+# パスワードをハッシュ化
+hashed = make_password('password123')
+print(hashed)
+# → pbkdf2_sha256$600000$xxxxx$yyyyy
+
+# PostgreSQLに保存
+from common.models import MUser
+user = MUser.objects.get(user_id='admin001')
+user.password = hashed
+user.save()
+```
+
+---
+
+### 3️⃣ ログインAPIの呼び出し（Vue.js）
+
+```javascript
+// api/auth.js
+import api from '@/plugins/axios';
+
+export const authAPI = {
+    async login(groupId, userId, password) {
+        const response = await api.post('auth/login/', {
+            group_id: groupId,
+            user_id: userId,
+            password,
+        });
+        return response;
+    },
+};
+
+// stores/auth.js
+async function loginSession(groupId, userId, password) {
+    try {
+        await authAPI.login(groupId, userId, password);
+        await fetchUser();
+        router.push('/');
+    } catch (error) {
+        console.error(error);
+    }
+}
+```
+
+---
+
+### 4️⃣ 管理者権限チェック（Vue.js）
+
+```javascript
+// stores/auth.js
+const isAdmin = computed(() => user.value?.is_admin ?? false);
+
+// 使用例
+if (auth.isAdmin) {
+    // 管理者専用処理
+}
+
+// router/admin-guard.js
+if (!auth.isAdmin) {
+    return { name: 'Home', query: { unauthorized: 'admin' } };
+}
+```
+
+---
+
+### 5️⃣ ログアウト処理
+
+```javascript
+// stores/auth.js
+async function logout(redirect = true) {
+    try {
+        await authAPI.logout();
+    } finally {
+        user.value = null;
+        currentGroupId.value = null;
+        resetCSRFToken();
+        
+        if (redirect) {
+            router.push({ name: 'Login' });
+        }
+    }
+}
+```
+
+---
+
+## 🔐 セキュリティ設定
+
+### Django（config/settings.py）
+
+```python
+# CORS設定
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+]
+CORS_ALLOW_CREDENTIALS = True
+CORS_EXPOSE_HEADERS = ["Content-Disposition"]
+
+# CSRF設定
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+]
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SECURE = False  # 開発環境
+
+# セッション設定
+SESSION_COOKIE_AGE = 86400
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_SECURE = False  # 開発環境
+
+# ログイン制限
+LOGIN_MAX_ATTEMPTS = 10
+LOGIN_LOCKOUT_DURATION = 60
+
+# 認証バックエンド
+AUTHENTICATION_BACKENDS = [
+    'accounts.backends.GroupUserAuthBackend',
+]
+
+# カスタムユーザーモデル
+AUTH_USER_MODEL = 'common.MUser'
+```
+
+---
+
+### Axios（plugins/axios.js）
+
+```javascript
+const api = axios.create({
+    baseURL: import.meta.env.VITE_API_BASE_URL,
+    withCredentials: true,
+    timeout: 10000,
+    xsrfCookieName: 'csrftoken',
+    xsrfHeaderName: 'X-CSRFToken',
+    withXSRFToken: import.meta.env.DEV ? true : undefined,
+});
+
+// リクエストインターセプター
+api.interceptors.request.use(async (config) => {
+    const localeStore = useLocaleStore();
+    config.headers['Accept-Language'] = localeStore.locale;
+    
+    // CSRF自動取得
+    if (['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase())) {
+        await csrfManager.ensureToken();
+    }
+    
+    return config;
+});
+
+// レスポンスインターセプター
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        if ([401, 403].includes(error.response?.status)) {
+            const auth = useAuthStore();
+            if (auth.isAuthenticated) {
+                await auth.logout();
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+```
+
+---
+
+## 🛡️ ルーターガード設定
+
+### auth-guard.js（認証チェック）
+
+```javascript
+export const authGuard = async (to, from) => {
+    const auth = useAuthStore();
+    
+    // ログイン済みユーザーがログインページにアクセス
+    if (to.meta.hideForAuth && auth.user) {
+        return { name: 'Home', replace: true };
+    }
+    
+    // 認証が必要なページ
+    if (to.meta.requiresAuth) {
+        if (!auth.initialized) {
+            await auth.initialize();
+        }
+        
+        if (!auth.user) {
+            return {
+                name: 'Login',
+                query: { next: to.fullPath },
+                replace: true,
+            };
+        }
+    }
+    
+    return true;
+};
+```
+
+---
+
+### admin-guard.js（管理者チェック）
+
+```javascript
+export const adminGuard = async (to, from) => {
+    if (!to.meta.requiresAdmin) {
+        return true;
+    }
+    
+    const auth = useAuthStore();
+    
+    if (!auth.isAdmin) {
+        return {
+            name: 'Home',
+            replace: true,
+            query: { unauthorized: 'admin' },
+        };
+    }
+    
+    return true;
+};
+```
+
+---
+
+## 📊 データベース確認コマンド
+
+```sql
+-- ユーザー一覧
+SELECT user_id, username, is_active, is_superuser, is_staff 
+FROM legacy_schema.m_user;
+
+-- グループ一覧
+SELECT group_id, group_name, is_active 
+FROM legacy_schema.m_group;
+
+-- ユーザーのグループ所属
+SELECT ug.user_id, u.username, ug.group_id, g.group_name
+FROM legacy_schema.m_user_group ug
+JOIN legacy_schema.m_user u ON ug.user_id = u.user_id
+JOIN legacy_schema.m_group g ON ug.group_id = g.group_id
+WHERE ug.is_active = TRUE;
+
+-- セッション確認
+SELECT session_key, expire_date, expire_date > NOW() AS is_valid
+FROM django_session
+ORDER BY expire_date DESC;
+
+-- 管理者一覧
+SELECT user_id, username, is_superuser, is_staff
+FROM legacy_schema.m_user
+WHERE is_superuser = TRUE OR is_staff = TRUE;
+```
+
+---
+
+## 🔧 よく使うDjangoコマンド
+
+```bash
+# マイグレーション実行（sessionテーブル作成）
+python manage.py migrate
+
+# Djangoシェル起動
+python manage.py shell
+
+# スーパーユーザー作成（使わないがデバッグ用）
+python manage.py createsuperuser
+
+# 開発サーバー起動
+python manage.py runserver 0.0.0.0:8000
+```
+
+---
+
+## 🎨 よく使うVue.jsコマンド
+
+```bash
+# 開発サーバー起動
+npm run dev
+
+# ビルド
+npm run build
+
+# 型チェック
+npm run type-check
+
+# リント
+npm run lint
+```
+
+---
+
+## 🚨 緊急時のコマンド
+
+### キャッシュクリア
+
+```python
+python manage.py shell
+
+from django.core.cache import cache
+cache.clear()  # 全キャッシュクリア
+```
+
+---
+
+### 全セッション削除
+
+```sql
+DELETE FROM django_session;
+```
+
+---
+
+### パスワードリセット
+
+```python
+python manage.py shell
+
+from common.models import MUser
+user = MUser.objects.get(user_id='admin001')
+user.set_password('newpassword')
+user.save()
+```
+
+---
+
+### ログイン試行回数リセット
+
+```python
+python manage.py shell
+
+from django.core.cache import cache
+cache.delete('login_attempts:group001:user001')
+cache.delete('login_locked:group001:user001')
+```
+
+---
+
+## 📝 環境変数設定
+
+### .env（バックエンド）
+
+```bash
+# Django
+SECRET_KEY=django-insecure-your-secret-key
+DEBUG=True
+ALLOWED_HOSTS=localhost,127.0.0.1
+
+# PostgreSQL
+DB_NAME=your_db_name
+DB_USER=your_username
+DB_PASSWORD=your_password
+DB_HOST=localhost
+DB_PORT=5432
+
+# ログイン制限
+LOGIN_MAX_ATTEMPTS=10
+LOGIN_LOCKOUT_DURATION=60
+```
+
+---
+
+### .env（フロントエンド）
+
+```bash
+# API
+VITE_API_BASE_URL=http://localhost:8000/api/
+VITE_API_TIMEOUT=10000
+```
+
+---
+
+## 🎯 テスト用データ
+
+### 管理者ユーザー
+
+```
+user_id: admin001
+password: password123
+username: 管理者
+is_superuser: TRUE
+is_staff: TRUE
+group_id: group001
+```
+
+---
+
+### 一般ユーザー
+
+```
+user_id: user001
+password: password123
+username: 一般ユーザー
+is_superuser: FALSE
+is_staff: FALSE
+group_id: group001
+```
+
+---
+
+## 📚 重要なファイルパス
+
+```
+backend/
+├── config/
+│   ├── settings.py          # 全体設定
+│   └── urls.py              # ルートURL
+├── accounts/
+│   ├── views.py             # 認証API
+│   ├── backends.py          # カスタム認証
+│   ├── serializers.py       # バリデーション
+│   ├── services.py          # ビジネスロジック
+│   ├── permissions.py       # 権限チェック
+│   └── urls.py              # URL定義
+└── common/
+    └── models.py            # カスタムユーザーモデル
+
+frontend/
+├── src/
+│   ├── views/
+│   │   └── Login.vue        # ログイン画面
+│   ├── stores/
+│   │   └── auth.js          # 認証ストア
+│   ├── plugins/
+│   │   └── axios.js         # Axios設定
+│   ├── router/
+│   │   ├── index.js         # メインルーター
+│   │   ├── auth-guard.js    # 認証ガード
+│   │   └── admin-guard.js   # 管理者ガード
+│   └── api/
+│       └── auth.js          # 認証API
+```
+
+---
+
+## 🔗 よく使うURL
+
+```
+フロントエンド:
+- http://localhost:5173/          # ホーム
+- http://localhost:5173/login     # ログイン
+
+バックエンド:
+- http://localhost:8000/api/auth/csrf/       # CSRF取得
+- http://localhost:8000/api/auth/groups/     # グループ一覧
+- http://localhost:8000/api/auth/login/      # ログイン
+- http://localhost:8000/api/auth/logout/     # ログアウト
+- http://localhost:8000/api/auth/me/         # ユーザー情報
+- http://localhost:8000/admin/               # Django管理画面
+```
+
+---
+
+## ✅ 動作確認手順
+
+1. PostgreSQLでテーブルとデータを作成
+2. Djangoでマイグレーション実行（`python manage.py migrate`）
+3. Djangoサーバー起動（`python manage.py runserver`）
+4. Vue.jsサーバー起動（`npm run dev`）
+5. ブラウザで http://localhost:5173/login にアクセス
+6. グループを選択、ユーザーID・パスワードを入力
+7. ログインボタンをクリック
+8. ホーム画面が表示されることを確認
+9. ページをリロード → ログイン状態が維持されることを確認
+10. ログアウトボタンをクリック → ログイン画面に戻ることを確認

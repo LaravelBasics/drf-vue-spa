@@ -1,0 +1,951 @@
+# 2️⃣ ユーザー情報取得フロー詳細解説（MeAPIView）
+
+## 📋 目次
+1. [フロー全体図](#フロー全体図)
+2. [ページリロード時の処理](#ページリロード時の処理)
+3. [Axiosリクエスト](#axiosリクエスト)
+4. [Django Middleware処理](#django-middleware処理)
+5. [MeAPIView処理](#meapiview処理)
+6. [レスポンス処理](#レスポンス処理)
+7. [セッション無効時の処理](#セッション無効時の処理)
+
+---
+
+## 🎯 フロー全体図
+
+```
+👤 ユーザー
+  ↓ ページリロード（F5）または API実行
+  
+🎨 Vue.js
+  ↓ main.js - initializeApp()
+  
+💾 authStore
+  ↓ initialize()
+  ↓ localStorage復元（pinia-plugin-persistedstate）
+  ↓ fetchUser()
+  
+📡 Axios
+  ↓ GET /api/auth/me/
+  ↓ Cookie: sessionid=abc123xyz...
+  
+⚙️ Django
+  ↓ Middleware処理
+  ├─ SessionMiddleware（セッション読み込み）★重要★
+  └─ AuthenticationMiddleware（request.user設定）★超重要★
+      ├─ get_user() 実行
+      └─ User復元
+  
+📍 MeAPIView
+  ↓ IsAuthenticated（認証チェック）
+  ↓ CSRFEnforcedSessionAuthentication
+  ↓ UserSerializer
+  
+💾 PostgreSQL
+  ↓ m_user テーブルから情報取得
+  ↓ m_group テーブルから情報取得
+  
+📡 Axios
+  ↓ レスポンス受信
+  
+💾 authStore
+  ↓ user.value = response.data
+  ↓ localStorage保存
+  
+🎨 Vue.js
+  ↓ ログイン状態維持
+  
+✅ セッション有効確認完了！
+```
+
+---
+
+## 🎨 ページリロード時の処理
+
+### ステップ1: アプリケーション初期化
+
+**ファイル**: `frontend/src/main.js`
+
+```javascript
+const initializeApp = async () => {
+    let initializationError = null;
+
+    try {
+        const authStore = useAuthStore();
+        useLocaleStore();
+
+        // 認証状態を初期化
+        await authStore.initialize();
+        
+    } catch (error) {
+        console.error('Initialization error:', error);
+        initializationError = error;
+    } finally {
+        app.mount('#app');
+        isAppMounted = true;
+        
+        if (initializationError) {
+            // エラー通知
+        }
+    }
+};
+
+initializeApp();
+```
+
+**実行タイミング**:
+- ページリロード（F5）
+- 初回アクセス
+- ブラウザを開いた時
+
+---
+
+### ステップ2: authStore.initialize()
+
+**ファイル**: `frontend/src/stores/auth.js`
+
+```javascript
+async function initialize() {
+    // 既に初期化済みなら何もしない
+    if (initialized.value) {
+        return;
+    }
+
+    loading.value = true;
+
+    try {
+        // user.value が存在するか確認
+        if (user.value) {
+            // ★localStorage復元後★
+            // セッションの有効性を確認するため、ユーザー情報を再取得
+            try {
+                await fetchUser();
+            } catch (error) {
+                if (error.response?.status === 403) {
+                    // セッション無効
+                    user.value = null;
+                    error.value = null;
+                    currentGroupId.value = null;
+                    currentGroupName.value = null;
+                }
+            }
+        }
+    } finally {
+        initialized.value = true;
+        loading.value = false;
+    }
+}
+```
+
+---
+
+### ステップ3: localStorage復元
+
+**pinia-plugin-persistedstate** が自動実行:
+
+```javascript
+// ページリロード時、localStorageから自動復元
+const storedData = localStorage.getItem("auth");
+
+if (storedData) {
+    const parsed = JSON.parse(storedData);
+    
+    // Pinia Storeに復元
+    user.value = parsed.user;
+    currentGroupId.value = parsed.currentGroupId;
+    currentGroupName.value = parsed.currentGroupName;
+}
+```
+
+**復元されるデータ**:
+```javascript
+{
+    user: {
+        user_id: "user001",
+        username: "山田太郎",
+        is_admin: false,
+        current_group: {
+            group_id: "group001",
+            group_name: "営業部"
+        }
+    },
+    currentGroupId: "group001",
+    currentGroupName: "営業部"
+}
+```
+
+---
+
+### ステップ4: authStore.fetchUser()
+
+**ファイル**: `frontend/src/stores/auth.js`
+
+```javascript
+async function fetchUser() {
+    if (loading.value) return;
+
+    loading.value = true;
+    try {
+        // ★ユーザー情報取得API実行★
+        const response = await authAPI.me();
+        user.value = response.data;
+
+        // バックエンドから返されたグループ情報を保存
+        if (response.data.current_group) {
+            currentGroupId.value = response.data.current_group.group_id;
+            currentGroupName.value = response.data.current_group.group_name;
+        }
+        error.value = null;
+        
+    } catch (err) {
+        if (err.response?.status === 403) {
+            // セッション無効
+            user.value = null;
+            currentGroupId.value = null;
+            currentGroupName.value = null;
+        } else {
+            error.value = 'ユーザー情報の取得に失敗しました';
+        }
+    } finally {
+        loading.value = false;
+    }
+}
+```
+
+---
+
+## 📡 Axiosリクエスト
+
+### ステップ5: authAPI.me()
+
+**ファイル**: `frontend/src/api/auth.js`
+
+```javascript
+export const authAPI = {
+    async me() {
+        const response = await api.get('auth/me/');
+        return response;
+    },
+};
+```
+
+---
+
+### ステップ6: Axiosリクエスト送信
+
+**HTTPリクエスト**:
+```http
+GET /api/auth/me/ HTTP/1.1
+Host: localhost:8000
+Cookie: sessionid=abc123xyz...; csrftoken=xxx...
+Accept-Language: ja
+```
+
+**重要ポイント**:
+- **GETメソッド**: CSRF検証は不要
+- **Cookie送信**: `withCredentials: true` により自動送信
+- `sessionid`: セッションID（ログイン時に発行）
+
+---
+
+## ⚙️ Django Middleware処理
+
+### ステップ7: Middleware実行順序
+
+**ファイル**: `backend/config/settings.py`
+
+```python
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",            # 1
+    "django.contrib.sessions.middleware.SessionMiddleware",     # 2 ★超重要★
+    "corsheaders.middleware.CorsMiddleware",                    # 3
+    "common.middleware.LanguageMiddleware",                     # 4
+    "django.middleware.locale.LocaleMiddleware",                # 5
+    "django.middleware.common.CommonMiddleware",                # 6
+    "django.middleware.csrf.CsrfViewMiddleware",                # 7
+    "django.contrib.auth.middleware.AuthenticationMiddleware",  # 8 ★超重要★
+    "django.contrib.messages.middleware.MessageMiddleware",     # 9
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",   # 10
+]
+```
+
+---
+
+### ステップ8: SessionMiddleware（セッション読み込み）
+
+**処理内容**:
+```python
+# 1. Cookieからsessionid取得
+session_key = request.COOKIES.get("sessionid")
+# → "abc123xyz..."
+
+# 2. django_sessionテーブルから取得
+try:
+    session_data = Session.objects.get(
+        session_key=session_key,
+        expire_date__gt=timezone.now()
+    )
+except Session.DoesNotExist:
+    # セッション期限切れまたは存在しない
+    request.session = {}
+    return
+
+# 3. セッションデータをデシリアライズ
+request.session = deserialize(session_data.session_data)
+```
+
+**SQL実行**:
+```sql
+SELECT session_data, expire_date 
+FROM django_session 
+WHERE session_key = 'abc123xyz...'
+AND expire_date > NOW();
+```
+
+**結果**:
+```python
+session_data = {
+    "_auth_user_id": "user001",
+    "_auth_user_backend": "accounts.backends.GroupUserAuthBackend",
+    "_auth_user_hash": "abcdef123456...",
+    "current_group_id": "group001"
+}
+
+request.session = session_data
+```
+
+**セッション期限切れの場合**:
+```python
+# expire_date < NOW() の場合
+request.session = {}  # 空セッション
+# → 後続のAuthenticationMiddlewareでAnonymousUserになる
+```
+
+---
+
+### ステップ9: AuthenticationMiddleware（ユーザー復元）
+
+**処理内容**:
+```python
+# 1. セッションから認証情報取得
+user_id = request.session.get("_auth_user_id")
+backend_path = request.session.get("_auth_user_backend")
+
+if not user_id or not backend_path:
+    # セッションに認証情報がない（未ログイン）
+    request.user = AnonymousUser()
+    return
+
+# 2. バックエンドをロード
+backend = load_backend(backend_path)
+# → GroupUserAuthBackend
+
+# 3. get_user() を実行してユーザーを復元
+user = backend.get_user(user_id)
+
+if user is None:
+    # ユーザーが存在しない、または無効化されている
+    request.user = AnonymousUser()
+else:
+    # ユーザー復元成功
+    request.user = user
+```
+
+**重要ポイント**:
+- **get_user()が呼ばれる**: リクエストごとに実行される
+- **user_id**: セッションに保存された文字列PK（"user001"）
+
+---
+
+### ステップ10: GroupUserAuthBackend.get_user()
+
+**ファイル**: `backend/accounts/backends.py`
+
+```python
+def get_user(self, user_id):
+    """
+    ★超重要★ セッションからユーザー復元
+
+    呼び出し元:
+    - AuthenticationMiddleware（リクエストごと）
+
+    Args:
+        user_id: ユーザーID（文字列型の主キー）
+
+    Returns:
+        User: ユーザー情報
+        None: ユーザー不在
+    """
+    try:
+        # ★文字列PKでユーザー取得★
+        user = User.objects.get(pk=user_id)
+
+        # is_activeチェック
+        if user.is_active:
+            return user
+        return None
+
+    except User.DoesNotExist:
+        return None
+```
+
+**SQL実行**:
+```sql
+SELECT * FROM legacy_schema.m_user 
+WHERE user_id = 'user001';
+```
+
+**結果**:
+```python
+user = MUser(
+    user_id='user001',
+    password='pbkdf2_sha256$600000$...',
+    username='山田太郎',
+    is_active=True,
+    is_superuser=False,
+    is_staff=False,
+    last_login='2025-12-14 12:00:00',
+    created_at='2025-01-01 00:00:00',
+    updated_at='2025-12-14 12:00:00'
+)
+```
+
+**AuthenticationMiddlewareに戻る**:
+```python
+request.user = user  # MUser(user_id='user001', ...)
+```
+
+---
+
+### ステップ11: URLルーティング
+
+**ファイル**: `backend/config/urls.py`
+
+```python
+urlpatterns = [
+    path("api/auth/", include("accounts.urls")),  # ★ここにマッチ★
+]
+```
+
+**ファイル**: `backend/accounts/urls.py`
+
+```python
+urlpatterns = [
+    path("me/", MeAPIView.as_view(), name="me"),  # ★ここにマッチ★
+]
+```
+
+**結果**:
+```
+GET /api/auth/me/ → MeAPIView.get() が実行される
+```
+
+---
+
+## 📍 MeAPIView処理
+
+### ステップ12: MeAPIView.get()
+
+**ファイル**: `backend/accounts/views.py`
+
+```python
+class MeAPIView(APIView):
+    """
+    現在のユーザー情報取得API
+
+    用途:
+    - ページリロード時のユーザー情報復元
+    - セッション有効性確認
+    - グループ情報取得
+    - 管理者権限確認（is_admin）
+    """
+
+    permission_classes = [IsAuthenticated]  # ★認証必須★
+    authentication_classes = [CSRFEnforcedSessionAuthentication]
+
+    def get(self, request):
+        """現在のログインユーザー情報を返す"""
+        serializer = UserSerializer(request.user, context={"request": request})
+        return Response(serializer.data)
+```
+
+---
+
+### ステップ13: IsAuthenticated（認証チェック）
+
+**処理内容**:
+```python
+# permission_classes = [IsAuthenticated]
+
+# 1. request.user.is_authenticated をチェック
+if not request.user or not request.user.is_authenticated:
+    # 未認証（AnonymousUser）
+    raise PermissionDenied("認証されていません")
+```
+
+**request.user の種類**:
+
+| 状態 | request.user | is_authenticated |
+|------|-------------|-----------------|
+| ログイン中 | MUser(user_id='user001', ...) | True |
+| 未ログイン | AnonymousUser() | False |
+| セッション期限切れ | AnonymousUser() | False |
+
+**未認証の場合**:
+```python
+# 403 Forbidden を返す
+return Response({
+    "detail": "認証されていません"
+}, status=403)
+```
+
+---
+
+### ステップ14: CSRFEnforcedSessionAuthentication
+
+```python
+# authentication_classes = [CSRFEnforcedSessionAuthentication]
+
+def authenticate(self, request):
+    # 1. CSRF検証（GETメソッドはスキップ）
+    if request.method not in ['GET', 'HEAD', 'OPTIONS']:
+        self.enforce_csrf(request)
+    
+    # 2. セッション認証（既にrequest.userがセット済み）
+    return super().authenticate(request)
+```
+
+**重要ポイント**:
+- **GETメソッド**: CSRF検証はスキップ
+- **request.user**: AuthenticationMiddlewareで既にセット済み
+
+---
+
+### ステップ15: UserSerializer
+
+**ファイル**: `backend/accounts/serializers.py`
+
+```python
+class UserSerializer(serializers.ModelSerializer):
+    current_group = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "user_id",
+            "username",
+            "is_active",
+            "is_superuser",
+            "is_staff",
+            "is_admin",
+            "current_group",
+        ]
+        read_only_fields = fields
+
+    def get_is_admin(self, obj):
+        """
+        管理者権限チェック
+        is_superuser=True または is_staff=True なら管理者
+        """
+        return bool(obj.is_superuser or obj.is_staff)
+
+    def get_current_group(self, obj):
+        """
+        セッションから現在のグループ情報を取得
+        """
+        request = self.context.get("request")
+
+        if not request or not hasattr(request, "session"):
+            return None
+
+        group_id = request.session.get("current_group_id")
+        if not group_id:
+            return None
+
+        try:
+            # ユーザー所属確認
+            MUserGroup.objects.get(
+                user_id=obj.user_id,
+                group_id=group_id,
+                is_active=True,
+            )
+
+            # グループ情報取得
+            group_obj = MGroup.objects.get(
+                group_id=group_id,
+                is_active=True,
+            )
+
+            return {
+                "group_id": group_obj.group_id,
+                "group_name": group_obj.group_name,
+            }
+
+        except (MUserGroup.DoesNotExist, MGroup.DoesNotExist):
+            return None
+```
+
+---
+
+### ステップ16: get_is_admin()
+
+**処理内容**:
+```python
+def get_is_admin(self, obj):
+    # obj = MUser(user_id='user001', ...)
+    
+    # is_superuser または is_staff なら True
+    return bool(obj.is_superuser or obj.is_staff)
+```
+
+**例**:
+```python
+# 一般ユーザー
+is_superuser=False, is_staff=False → is_admin=False
+
+# 管理者
+is_superuser=True, is_staff=False → is_admin=True
+is_superuser=False, is_staff=True → is_admin=True
+is_superuser=True, is_staff=True → is_admin=True
+```
+
+---
+
+### ステップ17: get_current_group()
+
+**処理内容**:
+```python
+def get_current_group(self, obj):
+    # 1. セッションからグループID取得
+    group_id = request.session.get("current_group_id")
+    # → "group001"
+    
+    # 2. ユーザー所属確認
+    MUserGroup.objects.get(
+        user_id=obj.user_id,    # "user001"
+        group_id=group_id,      # "group001"
+        is_active=True,
+    )
+```
+
+**SQL実行（ユーザー所属確認）**:
+```sql
+SELECT * FROM legacy_schema.m_user_group 
+WHERE user_id = 'user001' 
+AND group_id = 'group001' 
+AND is_active = TRUE;
+```
+
+```python
+    # 3. グループ情報取得
+    group_obj = MGroup.objects.get(
+        group_id=group_id,
+        is_active=True,
+    )
+```
+
+**SQL実行（グループ情報取得）**:
+```sql
+SELECT * FROM legacy_schema.m_group 
+WHERE group_id = 'group001' 
+AND is_active = TRUE;
+```
+
+**結果**:
+```python
+return {
+    "group_id": "group001",
+    "group_name": "営業部",
+}
+```
+
+---
+
+## 📝 レスポンス処理
+
+### ステップ18: レスポンス生成
+
+**HTTPレスポンス**:
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "user_id": "user001",
+  "username": "山田太郎",
+  "is_active": true,
+  "is_superuser": false,
+  "is_staff": false,
+  "is_admin": false,
+  "current_group": {
+    "group_id": "group001",
+    "group_name": "営業部"
+  }
+}
+```
+
+---
+
+### ステップ19: Axiosレスポンス処理
+
+**ファイル**: `frontend/src/stores/auth.js`
+
+```javascript
+async function fetchUser() {
+    try {
+        const response = await authAPI.me();
+        
+        // ユーザー情報を保存
+        user.value = response.data;
+        
+        // グループ情報を保存
+        if (response.data.current_group) {
+            currentGroupId.value = response.data.current_group.group_id;
+            currentGroupName.value = response.data.current_group.group_name;
+        }
+        
+        error.value = null;
+        
+    } catch (err) {
+        if (err.response?.status === 403) {
+            // セッション無効
+            user.value = null;
+            currentGroupId.value = null;
+            currentGroupName.value = null;
+        }
+    }
+}
+```
+
+---
+
+### ステップ20: localStorage永続化
+
+**pinia-plugin-persistedstate** が自動実行:
+
+```javascript
+// localStorage に保存
+localStorage.setItem("auth", JSON.stringify({
+    user: {
+        user_id: "user001",
+        username: "山田太郎",
+        is_admin: false,
+        current_group: {
+            group_id: "group001",
+            group_name: "営業部"
+        }
+    },
+    currentGroupId: "group001",
+    currentGroupName: "営業部"
+}));
+```
+
+---
+
+### ステップ21: ログイン状態維持
+
+**結果**:
+```javascript
+authStore.user.value = {
+    user_id: "user001",
+    username: "山田太郎",
+    is_admin: false,
+    current_group: { ... }
+}
+authStore.isAuthenticated = true  // computed
+```
+
+---
+
+## ❌ セッション無効時の処理
+
+### ステップ22: セッション期限切れ
+
+**django_sessionテーブル**:
+```sql
+SELECT * FROM django_session 
+WHERE session_key = 'abc123xyz...'
+AND expire_date > NOW();
+
+-- 結果: 0行（期限切れ）
+```
+
+**SessionMiddlewareの処理**:
+```python
+# セッションが見つからない
+request.session = {}
+```
+
+**AuthenticationMiddlewareの処理**:
+```python
+user_id = request.session.get("_auth_user_id")
+# → None
+
+request.user = AnonymousUser()
+```
+
+---
+
+### ステップ23: 403 Forbidden
+
+**MeAPIView**:
+```python
+# permission_classes = [IsAuthenticated]
+
+if not request.user.is_authenticated:
+    raise PermissionDenied("認証されていません")
+```
+
+**HTTPレスポンス**:
+```http
+HTTP/1.1 403 Forbidden
+Content-Type: application/json
+
+{
+  "detail": "認証されていません"
+}
+```
+
+---
+
+### ステップ24: Axiosレスポンスインターセプター
+
+**ファイル**: `frontend/src/plugins/axios.js`
+
+```javascript
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const { response, config } = error;
+
+        if (response) {
+            // 認証エラー時の自動ログアウト処理
+            if ([401, 403].includes(response.status)) {
+                const isLogoutRequest = config.url?.endsWith('auth/logout/');
+
+                // ログアウトリクエスト自体のエラーは無視
+                if (!isLogoutRequest) {
+                    // 動的importで循環依存を回避
+                    const { useAuthStore } = await import('@/stores/auth');
+                    const { useNotificationStore } = await import('@/stores/notification');
+                    const auth = useAuthStore();
+
+                    if (auth.isAuthenticated) {
+                        const notification = useNotificationStore();
+                        notification.warning(response.data?.detail, 5000);
+                        await auth.logout(true);
+                    }
+                }
+            }
+        }
+
+        return Promise.reject(error);
+    },
+);
+```
+
+**処理内容**:
+```javascript
+// 1. 403エラー検知
+error.response.status === 403
+
+// 2. authStore.logout() 実行
+await auth.logout(true);
+
+// 3. ログアウト処理
+user.value = null;
+currentGroupId.value = null;
+localStorage.removeItem("auth");
+
+// 4. ログイン画面へリダイレクト
+router.push({ name: "Login" });
+```
+
+---
+
+## 🎉 完了！
+
+### セッション有効時の状態
+
+#### 1. ブラウザCookie
+```
+sessionid: abc123xyz...（有効）
+```
+
+#### 2. django_session テーブル
+```sql
+session_key = 'abc123xyz...'
+expire_date > NOW()  -- True（有効）
+```
+
+#### 3. request.user
+```python
+request.user = MUser(user_id='user001', ...)
+request.user.is_authenticated = True
+```
+
+#### 4. Pinia Store
+```javascript
+authStore.user = {user_id: "user001", ...}
+authStore.isAuthenticated = true
+```
+
+---
+
+### セッション無効時の状態
+
+#### 1. django_session テーブル
+```sql
+expire_date < NOW()  -- True（期限切れ）
+```
+
+#### 2. request.user
+```python
+request.user = AnonymousUser()
+request.user.is_authenticated = False
+```
+
+#### 3. Pinia Store（自動ログアウト後）
+```javascript
+authStore.user = null
+authStore.isAuthenticated = false
+```
+
+#### 4. ルーター
+```javascript
+router.push({ name: "Login" })
+```
+
+---
+
+## 📚 まとめ
+
+### MeAPIViewフローのキーポイント
+
+1. **localStorage復元**: pinia-plugin-persistedstateが自動実行
+2. **SessionMiddleware**: django_sessionテーブルからセッション読み込み
+3. **AuthenticationMiddleware**: get_user()でユーザー復元（毎回実行）
+4. **IsAuthenticated**: request.user.is_authenticated をチェック
+5. **UserSerializer**: current_group取得、is_admin計算
+6. **403エラー時**: 自動ログアウト → ログイン画面へ
+
+### 重要なファイル
+
+| ファイル | 役割 |
+|---------|------|
+| `main.js` | アプリ初期化 |
+| `stores/auth.js` | fetchUser() |
+| `plugins/axios.js` | レスポンスインターセプター |
+| `accounts/backends.py` | get_user() |
+| `accounts/views.py` | MeAPIView |
+| `accounts/serializers.py` | UserSerializer |
+
+### authenticate() と get_user() の違い
+
+| メソッド | 呼び出しタイミング | 目的 | 引数 |
+|---------|-----------------|------|-----|
+| `authenticate()` | ログイン時（1回） | パスワード検証 | `username`, `password`, `group_id` |
+| `get_user()` | リクエストごと（毎回） | ユーザー復元 | `user_id` |
+
+これで、ユーザー情報取得フローの全体が理解できるはず！(｀・ω・´)ゞ
