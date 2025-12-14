@@ -1,0 +1,362 @@
+パターン2：django-axesに移行（推奨🌟）
+pip install django-axes
+# settings.py
+INSTALLED_APPS = [
+    'axes',
+    'accounts',
+    'common',
+]
+
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    # ...
+    'axes.middleware.AxesMiddleware',  # ← 追加
+]
+
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesBackend',  # ← 先頭に追加
+    'accounts.backends.GroupUserAuthBackend',
+]
+
+# Axes設定
+AXES_FAILURE_LIMIT = 3
+AXES_COOLOFF_TIME = timedelta(minutes=1)
+AXES_LOCKOUT_PARAMETERS = ['username', 'ip_address']  # group_idは手動で追加
+AXES_HANDLER = 'axes.handlers.cache.AxesCacheHandler'  # キャッシュ使用
+```
+
+**views.pyは変更不要！** Axesが自動で処理してくれます✨
+
+---
+
+## 🎯 結論とアドバイス
+
+### 数十人規模のあなたへ：
+
+1. **短期的（今すぐ）：** `cache.incr()`に修正（5分で完了）
+2. **中期的（余裕あれば）：** django-axesに移行（1時間程度）
+3. **長期的（規模拡大時）：** Redisに切り替え
+
+### 現状のリスク評価：
+
+- **バグる可能性：** 低い（同時アクセス稀）
+- **セキュリティリスク：** 中程度（Race Condition）
+- **スケーラビリティ：** サーバー1台限定
+
+### 緊急度：
+```
+優先度： 中 ⭐⭐⭐☆☆
+理由： 数十人なら実害は少ないが、将来的に改善推奨
+
+-----------------------------------------------------------
+
+はい！ただし条件付きです。グループID対応のために少しカスタマイズが必要です💡
+🗑️ 削除できるコード
+✅ 完全削除OK
+python# services.py から丸ごと削除
+class LoginAttemptService:
+    """これ全部いらなくなる"""
+    # ...約100行削除！
+✅ views.pyから削除できる部分
+python# LoginAPIView から削除できる
+class LoginAPIView(APIView):
+    def post(self, request):
+        # ❌ 削除: アカウントロックチェック
+        # if LoginAttemptService.is_locked(user_id, group_id):
+        #     return Response(...)
+        
+        user = authenticate(...)
+        
+        if user is not None:
+            # ❌ 削除: 失敗回数リセット
+            # LoginAttemptService.reset_attempts(user_id, group_id)
+            login(request, user)
+            return Response(...)
+        
+        # ❌ 削除: 失敗回数インクリメント
+        # LoginAttemptService.increment_attempts(user_id, group_id)
+        
+        # ❌ 削除: ロック判定
+        # if LoginAttemptService.should_lock(user_id, group_id):
+        #     LoginAttemptService.lock_user(user_id, group_id)
+
+⚠️ 問題点：グループID対応
+django-axesは標準でusername + IPの組み合わせのみ対応
+あなたのコードはgroup_id + user_idでロックしてるので、カスタマイズが必要です(´・ω・｀)
+
+🔧 解決策：2パターン
+パターンA：AXES_USERNAME_CALLABLEで対応（推奨✨）
+python# settings.py に追加
+AXES_USERNAME_CALLABLE = 'accounts.utils.get_group_username'
+python# accounts/utils.py (新規作成)
+def get_group_username(request, credentials):
+    """
+    group_id + user_id を結合してユニークな識別子を作る
+    例: "group001:user123"
+    """
+    group_id = credentials.get('group_id', '')
+    username = credentials.get('username', '')
+    
+    if group_id:
+        return f"{group_id}:{username}"
+    return username
+python# settings.py
+INSTALLED_APPS = [
+    'axes',
+    'accounts',
+    'common',
+]
+
+MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'common.middleware.LanguageMiddleware',
+    'django.middleware.locale.LocaleMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'axes.middleware.AxesMiddleware',  # ← 追加
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'common.middleware.AuditMiddleware',
+]
+
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesBackend',  # ← 先頭に追加
+    'accounts.backends.GroupUserAuthBackend',
+]
+
+# Axes設定
+AXES_FAILURE_LIMIT = int(os.getenv("LOGIN_MAX_ATTEMPTS", 3))
+AXES_COOLOFF_TIME = timedelta(seconds=int(os.getenv("LOGIN_LOCKOUT_DURATION", 60)))
+AXES_LOCKOUT_PARAMETERS = ["username"]  # usernameだけ（group_id込みのカスタムusername）
+AXES_HANDLER = 'axes.handlers.cache.AxesCacheHandler'  # キャッシュ使用
+AXES_USERNAME_CALLABLE = 'accounts.utils.get_group_username'  # ← カスタム関数
+簡略化されたviews.py（最終形）
+pythonclass LoginAPIView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = [CSRFEnforcedSessionAuthentication]
+
+    def post(self, request):
+        # 1. バリデーション
+        serializer = LoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        user_id = serializer.validated_data["user_id"]
+        password = serializer.validated_data["password"]
+        group_id = serializer.validated_data["group_id"]
+
+        # 2. 認証（Axesが自動でブルートフォース対策）
+        user = authenticate(
+            request=request,
+            username=user_id,
+            password=password,
+            group_id=group_id,
+        )
+
+        # 3. 認証結果処理
+        if user is not None and user.is_active:
+            login(request, user)
+            request.session["current_group_id"] = group_id
+            return Response({
+                "detail": "logged_in",
+                "user": UserSerializer(user, context={"request": request}).data,
+            })
+
+        # 失敗レスポンス（Axesが自動カウント）
+        return Response(
+            {"detail": str(_("ユーザーIDまたはパスワードが正しくありません"))},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+削減コード量：約80行！ (｀･ω･´)ゞ
+
+パターンB：手書き実装を維持（推奨しない）
+理由：
+
+django-axesの方がテスト済み＆本番実績多数
+メンテナンスコストが高い
+将来のバグリスクあり
+
+
+📊 削除まとめ
+ファイル削除できるもの行数services.pyLoginAttemptService全体~100行views.pyロック判定処理（5箇所）~60行合計約160行削除✨
+
+⚡ 移行手順（10分で完了）
+bash# 1. インストール
+pip install django-axes
+
+# 2. ファイル作成
+touch backend/accounts/utils.py
+python# accounts/utils.py
+def get_group_username(request, credentials):
+    """Group + User の複合キー生成"""
+    group_id = credentials.get('group_id', '')
+    username = credentials.get('username', '')
+    return f"{group_id}:{username}" if group_id else username
+python# settings.py に追加（上記のパターンA参照）
+python# services.py から LoginAttemptService を削除
+# views.py から LoginAttemptService 関連コードを削除
+bash# 3. マイグレーション実行（Axesのテーブル作成）
+python manage.py migrate
+
+# 4. 動作確認
+python manage.py runserver
+
+🎯 結論
+YES！ほぼ丸ごと削除できます🎉
+
+LoginAttemptService → 完全削除
+views.pyのロック処理 → 完全削除
+コード量 → 約160行削減
+
+ただし：
+
+AXES_USERNAME_CALLABLEでgroup_id対応が必須
+.envの設定値はAxes設定に移行
+
+------------------------------------------------------------------------------------------------------
+
+分離する方が良いです(｀･ω･´)
+理由を説明しますね💡
+📂 推奨：ファイル分離
+common/signals.py   → モデル監査（データ変更の追跡）
+accounts/signals.py → 認証監査（ログイン関連イベント）
+理由：
+項目common/signals.pyaccounts/signals.py責務DB変更の監査認証イベントの監査トリガーpost_save, post_deleteuser_locked_out, user_logged_in依存関係Django標準シグナルAxes + django.contrib.authスコープ全アプリ共通accountsアプリ固有
+
+✅ 推奨構成
+accounts/signals.py（新規作成）
+python"""
+認証イベント監査シグナル
+
+責務:
+- ログイン成功/失敗
+- アカウントロックアウト
+- ログアウト（必要なら）
+"""
+
+import logging
+from django.dispatch import receiver
+from django.contrib.auth.signals import user_logged_in, user_login_failed
+from axes.signals import user_locked_out
+from common.context import get_client_ip
+
+audit_logger = logging.getLogger("audit")
+
+
+@receiver(user_locked_out)
+def log_axes_lockout(sender, request, username, ip_address, **kwargs):
+    """
+    Axesによるアカウントロック時の監査ログ
+    
+    Args:
+        username: カスタムusername（group_id:user_id形式）
+        ip_address: IPアドレス
+    """
+    # group_id:user_id を分解
+    parts = username.split(':', 1) if ':' in username else [None, username]
+    group_id = parts[0] if len(parts) == 2 else None
+    user_id = parts[1] if len(parts) == 2 else parts[0]
+    
+    audit_logger.error(
+        f"アカウントロック: user_id={user_id}, group_id={group_id}",
+        extra={
+            "action": "ACCOUNT_LOCKED",
+            "user": user_id,
+            "group_id": group_id,
+            "ip": ip_address,
+            "request_id": getattr(request, "_request_id", "N/A"),
+            "model": "Auth",
+            "object_id": None,
+            "changes": "{}",
+        },
+    )
+
+
+@receiver(user_login_failed)
+def log_login_failed(sender, request, credentials, **kwargs):
+    """ログイン失敗の監査ログ"""
+    username = credentials.get('username', 'unknown')
+    
+    audit_logger.warning(
+        f"ログイン失敗: username={username}",
+        extra={
+            "action": "LOGIN_FAILED",
+            "user": username,
+            "ip": get_client_ip(request),
+            "request_id": getattr(request, "_request_id", "N/A"),
+            "model": "Auth",
+            "object_id": None,
+            "changes": "{}",
+        },
+    )
+
+
+@receiver(user_logged_in)
+def log_login_success(sender, request, user, **kwargs):
+    """ログイン成功の監査ログ"""
+    audit_logger.info(
+        f"ログイン成功: user_id={user.user_id}",
+        extra={
+            "action": "LOGIN_SUCCESS",
+            "user": user.user_id,
+            "ip": get_client_ip(request),
+            "request_id": getattr(request, "_request_id", "N/A"),
+            "model": "Auth",
+            "object_id": user.pk,
+            "changes": "{}",
+        },
+    )
+accounts/apps.py（修正）
+pythonfrom django.apps import AppConfig
+
+
+class AccountsConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "accounts"
+
+    def ready(self):
+        """アプリ起動時にシグナルをインポート"""
+        import accounts.signals  # noqa: F401
+common/signals.py（変更なし）
+python# そのまま維持（モデル監査専用）
+
+🤔 統合する場合（非推奨だけど可能）
+もしどうしても1ファイルにまとめたいなら：
+python# common/signals.py の最後に追加
+
+# === 認証イベント監査 ===
+from django.contrib.auth.signals import user_logged_in, user_login_failed
+from axes.signals import user_locked_out
+
+@receiver(user_locked_out)
+def log_axes_lockout(sender, request, username, ip_address, **kwargs):
+    # ... 上記と同じ
+デメリット：
+
+ファイルが200行超えて肥大化
+commonアプリがaccountsに依存（Axesのインポート必要）
+責務が混在して保守性低下
+
+
+🎯 結論
+accounts/signals.py を新規作成して分離する！
+理由：
+
+責務の明確化: データ監査 vs 認証監査
+依存関係の分離: commonアプリはAxesを知らない
+保守性: 各ファイルが100行以内で管理しやすい
+拡張性: 将来、認証関連の監査を追加しやすい
+
+
+📋 移行チェックリスト
+
+ accounts/signals.py を作成
+ accounts/apps.py に ready() 追加
+ settings.py の INSTALLED_APPS を accounts.apps.AccountsConfig に変更
+ accounts/views.py から _log_lockout 削除
+ 動作確認（ログイン失敗3回→ロックアウトログ出力）

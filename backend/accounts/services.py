@@ -72,12 +72,18 @@ class LoginAttemptService:
 
         Returns:
             int: 現在の失敗回数
+        Race Condition対策版
         """
         key = cls.get_cache_key(user_id, group_id)
-        attempts = cache.get(key, 0) + 1
 
-        # 1時間キャッシュ
-        cache.set(key, attempts, 3600)
+        # cache.incr()でアトミックにインクリメント
+        try:
+            attempts = cache.incr(key)
+        except ValueError:
+            # キーが存在しない場合は新規作成
+            cache.set(key, 1, 3600)  # 1時間の有効期限
+            attempts = 1
+
         return attempts
 
     @classmethod
