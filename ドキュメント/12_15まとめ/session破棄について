@@ -1,0 +1,59 @@
+# accounts/views.py
+class LoginAPIView(APIView):
+    def post(self, request):
+        # ...認証処理...
+        
+        if user is not None and user.is_active:
+            # ★ 既存セッションを破棄 ★
+            from django.contrib.sessions.models import Session
+            from django.utils import timezone
+            
+            sessions = Session.objects.filter(expire_date__gte=timezone.now())
+            for session in sessions:
+                data = session.get_decoded()
+                if data.get('_auth_user_id') == str(user.user_id):
+                    session.delete()
+            
+            # ログイン
+            LoginAttemptService.reset_attempts(user_id, group_id)
+            login(request, user)
+            request.session['current_group_id'] = group_id
+            
+            self._log_success(request, user_id, group_id)
+            
+            return Response({
+                'detail': 'logged_in',
+                'user': UserSerializer(user, context={'request': request}).data
+            })
+```
+
+**これだけ！**
+
+---
+
+## 🎯 **効果**
+
+### **Before（現在）**
+```
+タブ1: ログイン → sessionid付与
+タブ1: 閉じる
+タブ2: まだ開いている → sessionid残る
+タブ1: 復元 → sessionidがあるのでログイン状態 ❌
+```
+
+### **After（実装後）**
+```
+タブ1: ログイン → 既存sessionid破棄 → 新しいsessionid付与
+タブ2: 次のリクエスト → 403 Forbidden（セッション無効）
+タブ1: 閉じる
+タブ1: 復元 → ログイン画面 ✅
+
+
+
+
+
+
+sessionid、settings.pyの方でブラウザ閉じるとセッション破棄する設定ならcookieから消えて、ログアウトボタンなら普通にlogout()関数でviews.pyで破棄されるはずだが、
+タブ１は閉じたがタブ２は残ってる場合session残るよね(´・ω・｀)
+この場合たぶ１復元や新規でもとたぶ１を開いても多分sessionidは残る...これの解決策ってDjango公式はなにかいってる？(´・ω・｀)もしくはweb業界に何か情報あるかネット調査頼む(´Д｀)
+個人的にはloginのviews.pyでsessionあるとき破棄する処理を追加する以外思いつかなくて_(:3 」∠)_
