@@ -1,0 +1,536 @@
+# Django select_related 完全ガイド（初心者向け）
+
+> **対象読者**: Djangoのリレーション（ForeignKey）初心者  
+> **目的**: N+1問題を防ぎ、パフォーマンスを最適化する
+
+---
+
+## 📚 目次
+
+1. [select_relatedとは？](#what-is-select-related)
+2. [N+1問題の理解](#n-plus-one-problem)
+3. [ForeignKeyの基本](#foreignkey-basics)
+4. [select_relatedの使い方](#how-to-use)
+5. [Pythonの変数名 vs DBカラム名](#python-vs-db)
+6. [結合条件の理解](#join-conditions)
+7. [実践例](#practical-examples)
+8. [よくある間違い](#common-mistakes)
+9. [チェックリスト](#checklist)
+
+---
+
+## <a name="what-is-select-related"></a>🎯 1. select_relatedとは？
+
+**一言で言うと**: 関連テーブルのデータを1回のSQLで取得する仕組み
+
+### Before（使わない場合）
+
+```python
+users = User.objects.all()  # 1回目のSQL
+
+for user in users:
+    print(user.group.group_name)  # ← 毎回SQL実行！
+    
+# 実行されるSQL:
+# SELECT * FROM m_user;                          ← 1回
+# SELECT * FROM m_group WHERE group_code = 'G001';  ← user1
+# SELECT * FROM m_group WHERE group_code = 'G002';  ← user2
+# SELECT * FROM m_group WHERE group_code = 'G003';  ← user3
+# ...
+# 合計: 1 + N 回（Nはユーザー数）
+```
+
+### After（使った場合）
+
+```python
+users = User.objects.select_related('group').all()  # 1回のSQL
+
+for user in users:
+    print(user.group.group_name)  # ← SQLなし！
+    
+# 実行されるSQL:
+# SELECT m_user.*, m_group.*
+# FROM m_user
+# INNER JOIN m_group ON (m_user.group_code = m_group.group_code);
+# 合計: 1回のみ！
+```
+
+**パフォーマンス改善**: 100ユーザーなら101回 → 1回（**101倍高速！**）
+
+---
+
+## <a name="n-plus-one-problem"></a>⚠️ 2. N+1問題とは？
+
+### 問題の可視化
+
+```
+【N+1問題の発生】
+
+ユーザー100人の所属グループ名を表示したい
+
+↓ select_relatedなし
+
+DB往復: 1回（ユーザー取得） + 100回（各グループ取得） = 101回
+時間: 101回 × 10ms = 1010ms = 約1秒
+
+↓ select_relatedあり
+
+DB往復: 1回（結合して一括取得）
+時間: 1回 × 20ms = 20ms = 0.02秒
+
+改善率: 50倍！
+```
+
+### なぜ問題なのか？
+
+1. **レスポンスが遅い**: ユーザー体験が悪化
+2. **DBに負荷**: 大量のクエリでDBが詰まる
+3. **スケールしない**: ユーザー数が増えるほど悪化
+
+---
+
+## <a name="foreignkey-basics"></a>🔗 3. ForeignKeyの基本
+
+### テーブル構造
+
+```sql
+-- グループテーブル
+CREATE TABLE m_group (
+    group_code VARCHAR(50) PRIMARY KEY,  -- 主キー
+    group_name VARCHAR(100)
+);
+
+-- ユーザーテーブル
+CREATE TABLE m_user (
+    user_id VARCHAR(50) PRIMARY KEY,
+    username VARCHAR(50),
+    group_code VARCHAR(50),              -- 外部キー
+    FOREIGN KEY (group_code) REFERENCES m_group(group_code)
+);
+```
+
+### データ例
+
+**m_group テーブル**
+
+| group_code | group_name |
+|------------|-----------|
+| G001 | 営業部 |
+| G002 | 開発部 |
+| G003 | 総務部 |
+
+**m_user テーブル**
+
+| user_id | username | group_code |
+|---------|----------|-----------|
+| U001 | 山田太郎 | G001 |
+| U002 | 佐藤花子 | G002 |
+| U003 | 鈴木一郎 | G001 |
+
+### 外部キーの意味
+
+```
+m_user.group_code は m_group.group_code を「参照」している
+
+↓
+
+山田太郎さんの group_code は 'G001'
+↓
+G001 は m_group の '営業部'
+↓
+山田太郎さんは営業部に所属
+```
+
+---
+
+## <a name="how-to-use"></a>🚀 4. select_relatedの使い方
+
+### Step 1: models.pyでForeignKeyを定義
+
+```python
+# models.py
+class MGroup(models.Model):
+    group_code = models.CharField(primary_key=True, max_length=50)
+    group_name = models.CharField(max_length=100)
+    
+    class Meta:
+        db_table = 'm_group'
+
+class MUser(models.Model):
+    user_id = models.CharField(primary_key=True, max_length=50)
+    username = models.CharField(max_length=50)
+    
+    # ★ForeignKeyを定義★
+    group = models.ForeignKey(
+        MGroup,                    # 参照先のモデル
+        on_delete=models.CASCADE,
+        db_column='group_code'     # DBのカラム名
+    )
+    #      ↑ Pythonの変数名
+    
+    class Meta:
+        db_table = 'm_user'
+```
+
+### Step 2: views.pyでselect_relatedを使う
+
+```python
+# views.py
+from common.models import MUser
+
+# ✅ 正しい使い方
+users = MUser.objects.select_related('group').all()
+#                                    ↑ models.pyの変数名
+
+for user in users:
+    print(user.username, user.group.group_name)
+    #                    ↑ SQLなし！すでに取得済み
+```
+
+### 実行されるSQL
+
+```sql
+SELECT 
+    m_user.user_id,
+    m_user.username,
+    m_user.group_code,
+    m_group.group_code,
+    m_group.group_name
+FROM m_user
+INNER JOIN m_group 
+    ON (m_user.group_code = m_group.group_code);
+```
+
+---
+
+## <a name="python-vs-db"></a>🔤 5. Pythonの変数名 vs DBカラム名
+
+### 重要な違い
+
+| 項目 | 説明 | 例 |
+|------|------|-----|
+| **Pythonの変数名** | models.pyで定義した名前 | `group` |
+| **DBカラム名** | データベースの実際のカラム名 | `group_code` |
+
+### 具体例
+
+```python
+# models.py
+class MUser(models.Model):
+    # Pythonの変数名 = group
+    # DBカラム名 = group_code
+    group = models.ForeignKey(
+        MGroup,
+        db_column='group_code'  # ← DBカラム名を明示
+    )
+```
+
+```python
+# views.py
+# ✅ 正解: Pythonの変数名を指定
+users = MUser.objects.select_related('group')
+
+# ❌ 間違い: DBカラム名を指定
+users = MUser.objects.select_related('group_code')  # エラー！
+```
+
+### 覚え方
+
+```
+select_related('???')
+              ↑
+              models.pyに書いた変数名
+              （DBカラム名ではない！）
+```
+
+---
+
+## <a name="join-conditions"></a>🔗 6. 結合条件の理解
+
+### ForeignKeyから自動生成される結合条件
+
+```python
+# models.py
+class MUser(models.Model):
+    group = models.ForeignKey(
+        MGroup,                 # ← ① 参照先テーブル
+        db_column='group_code'  # ← ② DBカラム名
+    )
+    # MGroup.group_code が主キー ← ③ 参照先の主キー
+```
+
+**↓ 自動で変換**
+
+```sql
+INNER JOIN m_group           -- ① 参照先テーブル
+    ON (m_user.group_code    -- ② DBカラム名
+        = m_group.group_code) -- ③ 参照先の主キー
+```
+
+### 視覚的理解
+
+```
+【m_user テーブル】
+┌─────────┬──────────┬───────────┐
+│ user_id │ username │ group_code│
+├─────────┼──────────┼───────────┤
+│ U001    │ 山田太郎 │ G001 ─────┼───┐
+│ U002    │ 佐藤花子 │ G002 ─────┼─┐ │
+│ U003    │ 鈴木一郎 │ G001 ─────┼┐│ │
+└─────────┴──────────┴───────────┘││ │
+                                  ││ │
+         【INNER JOIN】           ││ │
+         group_code で結合        ││ │
+                                  ↓↓ ↓
+【m_group テーブル】
+┌───────────┬────────────┐
+│ group_code│ group_name │
+├───────────┼────────────┤
+│ G001 ←────┴─ 営業部 ←──┘│ │
+│ G002 ←────┴─ 開発部 ←────┘ │
+│ G003      │ 総務部     │
+└───────────┴────────────┘
+```
+
+---
+
+## <a name="practical-examples"></a>💼 7. 実践例
+
+### 例1: 基本的な使い方
+
+```python
+# ユーザー一覧取得（グループ名も表示）
+users = MUser.objects.select_related('group').all()
+
+for user in users:
+    print(f"{user.username} ({user.group.group_name})")
+
+# 出力:
+# 山田太郎 (営業部)
+# 佐藤花子 (開発部)
+# 鈴木一郎 (営業部)
+```
+
+### 例2: 複数のForeignKey
+
+```python
+# models.py
+class MUser(models.Model):
+    group = models.ForeignKey(MGroup, ...)
+    manager = models.ForeignKey(MManager, ...)  # 2つ目
+
+# views.py
+users = MUser.objects.select_related('group', 'manager').all()
+#                                    ↑       ↑
+#                                    複数指定可能
+
+for user in users:
+    print(user.username, user.group.group_name, user.manager.manager_name)
+```
+
+### 例3: ネストしたリレーション
+
+```python
+# models.py
+class MCompany(models.Model):
+    company_code = models.CharField(primary_key=True)
+    company_name = models.CharField(max_length=100)
+
+class MGroup(models.Model):
+    group_code = models.CharField(primary_key=True)
+    company = models.ForeignKey(MCompany, ...)
+
+class MUser(models.Model):
+    group = models.ForeignKey(MGroup, ...)
+
+# views.py
+# ユーザー → グループ → 会社 を一度に取得
+users = MUser.objects.select_related('group__company').all()
+#                                    ↑ ダブルアンダースコアで辿る
+
+for user in users:
+    print(user.username, 
+          user.group.group_name, 
+          user.group.company.company_name)
+```
+
+### 例4: フィルタと組み合わせ
+
+```python
+# 営業部のアクティブなユーザーを取得
+users = MUser.objects.select_related('group').filter(
+    group__group_code='G001',
+    is_active=True
+)
+```
+
+### 例5: DRF（シリアライザー）
+
+```python
+# serializers.py
+class GroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MGroup
+        fields = ['group_code', 'group_name']
+
+class UserSerializer(serializers.ModelSerializer):
+    group = GroupSerializer()  # ネストしたシリアライザー
+    
+    class Meta:
+        model = MUser
+        fields = ['user_id', 'username', 'group']
+
+# views.py
+class UserViewSet(viewsets.ModelViewSet):
+    # ★select_relatedを忘れずに！★
+    queryset = MUser.objects.select_related('group')
+    serializer_class = UserSerializer
+```
+
+---
+
+## <a name="common-mistakes"></a>❌ 8. よくある間違い
+
+### 間違い1: DBカラム名を指定
+
+```python
+# ❌ 間違い
+users = MUser.objects.select_related('group_code')
+
+# ✅ 正解
+users = MUser.objects.select_related('group')
+```
+
+### 間違い2: select_relatedを忘れる
+
+```python
+# ❌ 悪い例（N+1問題）
+users = MUser.objects.all()
+for user in users:
+    print(user.group.group_name)  # 毎回SQL実行
+
+# ✅ 良い例
+users = MUser.objects.select_related('group').all()
+for user in users:
+    print(user.group.group_name)  # SQLなし
+```
+
+### 間違い3: ManyToManyにselect_relatedを使う
+
+```python
+# models.py
+class MUser(models.Model):
+    groups = models.ManyToManyField(MGroup)  # 多対多
+
+# ❌ 間違い
+users = MUser.objects.select_related('groups')  # エラー！
+
+# ✅ 正解（ManyToManyはprefetch_related）
+users = MUser.objects.prefetch_related('groups')
+```
+
+### 間違い4: テーブル名を指定
+
+```python
+# ❌ 間違い
+users = MUser.objects.select_related('m_group')
+
+# ✅ 正解
+users = MUser.objects.select_related('group')
+```
+
+---
+
+## <a name="checklist"></a>✅ 9. チェックリスト
+
+### 実装前チェック
+
+- [ ] models.pyでForeignKeyを定義した
+- [ ] `db_column`を正しく設定した（レガシーDBの場合）
+- [ ] Pythonの変数名を確認した
+
+### 実装時チェック
+
+- [ ] `select_related('変数名')`と書いた
+- [ ] 複数のFKがある場合は全て指定した
+- [ ] ネストする場合は`__`（ダブルアンダースコア）を使った
+
+### 動作確認
+
+- [ ] Django shellでSQLを確認した
+- [ ] クエリ数が減ったことを確認した
+- [ ] N+1問題が解消されたことを確認した
+
+### 確認コマンド
+
+```python
+# Django shell
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+
+with CaptureQueriesContext(connection) as queries:
+    users = MUser.objects.select_related('group').all()
+    for user in users:
+        print(user.group.group_name)
+
+# クエリ数を確認
+print(f"実行されたクエリ数: {len(queries)}")
+for q in queries:
+    print(q['sql'])
+```
+
+---
+
+## 📚 補足資料
+
+### select_related vs prefetch_related
+
+| 項目 | select_related | prefetch_related |
+|------|----------------|------------------|
+| **対象** | ForeignKey, OneToOne | ManyToMany, reverse ForeignKey |
+| **SQL** | INNER JOIN（1回） | 複数のSELECT（2回以上） |
+| **用途** | 1対1、多対1 | 1対多、多対多 |
+
+### パフォーマンス測定
+
+```python
+import time
+
+# 測定1: select_relatedなし
+start = time.time()
+users = MUser.objects.all()
+for user in users:
+    _ = user.group.group_name
+print(f"なし: {time.time() - start}秒")
+
+# 測定2: select_relatedあり
+start = time.time()
+users = MUser.objects.select_related('group').all()
+for user in users:
+    _ = user.group.group_name
+print(f"あり: {time.time() - start}秒")
+```
+
+---
+
+## 🎯 まとめ
+
+1. **select_relatedはパフォーマンス最適化の必須テクニック**
+2. **指定するのはmodels.pyのPythonの変数名**
+3. **DBカラム名ではない**
+4. **結合条件はDjangoが自動生成**
+5. **N+1問題を防ぐために必ず使う**
+
+---
+
+## 💬 困ったときは
+
+1. **エラーが出る** → models.pyの変数名を確認
+2. **効果がない** → SQLを確認（Django Debug Toolbar推奨）
+3. **ManyToMany** → prefetch_relatedを使う
+
+---
+
+**作成日**: 2025年  
+**対象バージョン**: Django 5.2+  
+**ライセンス**: チーム内共有自由
