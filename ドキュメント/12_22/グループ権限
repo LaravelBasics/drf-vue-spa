@@ -143,3 +143,161 @@ def login(request):
         'permissions': serializer.data
     })
 所属チェックあるから勝手に管理者グループID送っても弾かれる！
+
+
+----------------------------------------------------------------
+
+話はもどるけど、
+
+class PermissionSerializer(serializers.ModelSerializer):
+    permissions = serializers.SerializerMethodField()
+    
+    def get_permissions(self, obj):
+        result = []
+        # 11個の権限カラムをループ
+        for column in [obj.perm_column1, obj.perm_column2, ...]:
+            parts = column.split('_')
+            result.append({
+                'category': parts[0],    # A, B, C
+                'name': parts[1],        # ○○
+                'level': int(parts[2])   # 0, 1, 2
+            })
+        return result
+フロントエンド (Pinia + Vue)
+javascript
+
+// Pinia store
+const permissions = ref([
+  { category: 'A', name: '○○', level: 2 },
+  { category: 'B', name: '××', level: 1 },
+  // ... 11個
+])
+
+// 権限チェック関数
+const hasPermission = (category, name, requiredLevel = 1) => {
+  const perm = permissions.value.find(
+    p => p.category === category && p.name === name
+  )
+  return perm && perm.level >= requiredLevel
+}
+
+// v-ifで使う
+<button v-if="hasPermission('A', '○○', 2)">編集</button>
+
+// router guardで使う
+router.beforeEach((to) => {
+  if (to.meta.requiresPermission) {
+    if (!hasPermission('A', '○○', 1)) {
+      return { name: 'forbidden' }
+    }
+  }
+})
+これにする場合さ、ログイン時に保存だから、authStoreになるんだろうけど、
+辞書型ってどう定数に保存しとくの？(´・ω・｀)
+user=null
+で、
+user.value=response
+みたいなのと同じ？
+
+表示を減らす
+6:30
+
+権限データの保存方法をauthStoreで検討した。
+
+
+
+そうそう！同じですー(´・ω・｀)b
+
+authStore.js
+javascript
+import { ref } from 'vue'
+import { defineStore } from 'pinia'
+
+export const useAuthStore = defineStore('auth', () => {
+  // ユーザー情報
+  const user = ref(null)
+  
+  // 権限情報（配列）
+  const permissions = ref([])
+  
+  // ログイン関数
+  const login = async (credentials) => {
+    const response = await api.post('/login/', credentials)
+    
+    // ユーザー情報保存
+    user.value = response.data.user
+    
+    // 権限情報保存（配列の辞書）
+    permissions.value = response.data.permissions
+    // [
+    //   { category: 'A', name: '○○', level: 2 },
+    //   { category: 'B', name: '××', level: 1 },
+    // ]
+  }
+  
+  // 権限チェック関数
+  const hasPermission = (category, name, requiredLevel = 1) => {
+    const perm = permissions.value.find(
+      p => p.category === category && p.name === name
+    )
+    return perm && perm.level >= requiredLevel
+  }
+  
+  // ログアウト
+  const logout = () => {
+    user.value = null
+    permissions.value = []  // 空配列にリセット★**************
+  }
+  
+  return { user, permissions, login, logout, hasPermission }
+})
+使う時
+javascript
+// コンポーネント内
+const authStore = useAuthStore()
+
+// 権限チェック
+<button v-if="authStore.hasPermission('A', '○○', 2)">編集</button>
+user と同じ感じで permissions も ref で保存すればOK！(＾ω＾)
+
+*******************************************************
+
+開発環境 (.env.development)
+settings.py
+
+ADMIN_ORIGIN=http://localhost:5174
+
+python# views.py
+if origin == os.getenv('ADMIN_ORIGIN'):
+    # origin が 'http://localhost:5174' の時だけ権限追加
+本番環境 (.env.production)
+bashADMIN_ORIGIN=https://admin.example.com
+python# views.py（コードは同じ）
+if origin == os.getenv('ADMIN_ORIGIN'):
+    # origin が 'https://admin.example.com' の時だけ権限追加
+つまり
+
+コードは1つ
+環境変数だけ変える
+開発も本番も同じコードで動く
+
+'5174' in origin より厳密！
+
+'5174' in origin → '5174test.com' も通っちゃう(´・ω・`)
+origin == os.getenv('ADMIN_ORIGIN') → 完全一致だけ！
+
+import os
+# views.py
+def login(request):
+    # 認証処理...
+    
+    response_data = {'token': token}
+    
+    # 管理画面だけ権限追加
+    origin = request.META.get('HTTP_ORIGIN', '')
+    if origin == os.getenv('ADMIN_ORIGIN'):
+        permissions = GroupPermission.objects.filter(group_id=group_id)
+        serializer = PermissionSerializer(permissions, many=True)
+        response_data['permissions'] = serializer.data
+    
+    return Response(response_data)
