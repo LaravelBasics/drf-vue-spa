@@ -1,0 +1,193 @@
+# views.py
+from rest_framework.permissions import IsAuthenticated
+
+def login(request):
+    # 1. リクエストから取得（sessionにはまだない）
+    user_id = request.data.get('user_id')
+    password = request.data.get('password')
+    group_id = request.data.get('group_id')
+    
+    # 2. 認証
+    user = authenticate(username=user_id, password=password)
+    if not user:
+        return Response({'error': '認証失敗'}, 401)
+    
+    # 3. 所属チェック
+    if not UserGroup.objects.filter(user=user, group_id=group_id).exists():
+        return Response({'error': '所属していません'}, 403)
+    
+    # 4. ログイン（これでsession開始）
+    login_user(request, user)  # django.contrib.auth.login
+    
+    # 5. 5174判定
+    origin = request.META.get('HTTP_ORIGIN', '')
+    response_data = {'token': ...}
+    
+    if origin == os.getenv('ADMIN_ORIGIN'):
+        # 6. DBから権限取得
+        permissions_queryset = GroupPermission.objects.filter(group_id=group_id)
+        
+        # 7. 整形
+        permissions_data = []
+        for perm in permissions_queryset:
+            parts = perm.permission_column.split('_')
+            permissions_data.append({
+                'category': parts[0],
+                'name': parts[1],
+                'level': int(parts[2])
+            })
+        
+        # 8. sessionに保存（ここで初めて保存）
+        request.session['permissions'] = permissions_data
+        request.session['group_id'] = group_id
+        
+        response_data['permissions'] = permissions_data
+    
+    return Response(response_data)
+------------------------------------------------------
+
+    # permissions.py
+from rest_framework.permissions import BasePermission
+
+class HasSessionPermission(BasePermission):
+    """
+    sessionに保存された権限をチェック
+    """
+    def has_permission(self, request, view):
+        # view に必要な権限情報が定義されてるかチェック
+        required_category = getattr(view, 'required_category', None)
+        required_name = getattr(view, 'required_name', None)
+        required_level = getattr(view, 'required_level', 1)
+        
+        # 権限不要なら通す
+        if not required_category or not required_name:
+            return True
+        
+        # sessionから権限取得
+        permissions = request.session.get('permissions', [])
+        
+        # 権限チェック
+        return any(
+            p['category'] == required_category and
+            p['name'] == required_name and
+            p['level'] >= required_level
+            for p in permissions
+        )
+
+        ------------------------------------------------------
+
+使い方
+python# views.py
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from .permissions import HasSessionPermission
+
+class EditDataView(APIView):
+    # IsAuthenticated: ログインチェック
+    # HasSessionPermission: 権限チェック
+    permission_classes = [IsAuthenticated, HasSessionPermission]
+    
+    # 必要な権限を指定
+    required_category = 'A'
+    required_name = '編集'
+    required_level = 2
+    
+    def post(self, request):
+        # ここに来た時点で認証済み＆権限チェック済み
+        return Response({'message': '編集成功'})
+
+------------------------------------------------------
+
+ポイント
+python# ❌ 間違い
+「sessionに保存されてるはずのユーザーID」
+→ ログイン前はsessionに何もない
+
+# ⭕ 正しい
+「リクエストから取得したユーザーID」
+→ request.data.get('user_id')
+
+# その後
+login_user(request, user)  # sessionスタート
+request.session['permissions'] = ...  # session保存
+permission_classes = [IsAuthenticated, HasSessionPermission]
+
+sessionには「ユーザーの持ってる権限」が入ってる
+pythonrequest.session['permissions'] = [
+    {'category': 'A', 'name': '編集', 'level': 2},
+    {'category': 'A', 'name': '閲覧', 'level': 1},
+    {'category': 'B', 'name': '削除', 'level': 0},
+    # ... 11個の権限
+]
+これはユーザーが持ってる全権限
+でも、各APIで「必要な権限」は違う
+python# データ編集API → A_編集_2 が必要
+class EditDataView(APIView):
+    required_category = 'A'
+    required_name = '編集'
+    required_level = 2
+
+# データ閲覧API → A_閲覧_1 が必要
+class ViewDataView(APIView):
+    required_category = 'A'
+    required_name = '閲覧'
+    required_level = 1
+
+# データ削除API → B_削除_2 が必要
+class DeleteDataView(APIView):
+    required_category = 'B'
+    required_name = '削除'
+    required_level = 2
+HasSessionPermissionの中身
+pythonclass HasSessionPermission(BasePermission):
+    def has_permission(self, request, view):
+        # 1. このAPIに必要な権限を取得
+        required_category = getattr(view, 'required_category', None)
+        required_name = getattr(view, 'required_name', None)
+        required_level = getattr(view, 'required_level', 1)
+        
+        # 2. ユーザーの持ってる権限を取得
+        permissions = request.session.get('permissions', [])
+        
+        # 3. 照合
+        return any(
+            p['category'] == required_category and  # ←ここで照合
+            p['name'] == required_name and
+            p['level'] >= required_level
+            for p in permissions
+        )
+```
+
+## つまり
+```
+ユーザーの権限（session）:
+[A_編集_2, A_閲覧_1, B_削除_0, ...]
+
+EditDataView が要求する権限:
+A_編集_2
+
+HasSessionPermission:
+「このユーザーは A_編集_2 持ってる？」
+→ YES → 通す
+→ NO → 403エラー
+required_ がないと「どの権限をチェックすればいいか」分からない！*
+
+書く順番はどっちでもOK！
+python# パターンA（こっちで書いた）
+class EditDataView(APIView):
+    permission_classes = [IsAuthenticated, HasSessionPermission]
+    
+    # 必要な権限を指定
+    required_category = 'A'
+    required_name = '編集'
+    required_level = 2
+
+# パターンB（逆）
+class EditDataView(APIView):
+    # 必要な権限を指定
+    required_category = 'A'
+    required_name = '編集'
+    required_level = 2
+    
+    permission_classes = [IsAuthenticated, HasSessionPermission]
+どっちでも動きます！Pythonのクラス属性は順番関係ない
