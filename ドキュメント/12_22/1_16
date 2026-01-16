@@ -1,0 +1,218 @@
+なぜこの方法がベストか
+理由1: 責任分離が明確
+フロント: カテゴリと値を分離管理
+  ↓
+API: 分離したまま送信 {category: "A", level: 0}
+  ↓
+バックエンド: 結合＆検証 "A_NONE_0"
+  ↓
+DB: 最終形式で保存
+理由2: A_2みたいに先に結合するとデメリットだらけ
+javascript// ❌ アンチパターン: フロントで結合
+const toApiFormat = () => {
+  return {
+    permissions: ["A_2", "B_0", "C_1", ...]  // 文字列で送る
+  }
+}
+
+// バックエンドで再度分解が必要...
+def validate_permissions(self, value):
+    for perm_code in value:
+        # "A_2" → category="A", level=2 に分解
+        parts = perm_code.split('_')
+        category = parts[0]
+        level = int(parts[1])
+        
+        # またLEVEL_MAPで "A_NONE_0" に変換...
+        full_code = f"{category}_{self.LEVEL_MAP[level]}_{level}"
+        # 無駄な処理が増える
+理由3: 分離状態なら柔軟性が高い
+python# ✅ 分離状態なら、こういう処理も簡単
+def validate_permissions(self, value):
+    for perm in value:
+        category = perm['category']  # そのまま使える
+        level = perm['level']        # そのまま使える
+        
+        # レベルごとの制御も簡単
+        if level == 2 and category in ['J', 'K']:  # システム設定/ログは更新権限厳しく
+            # 追加検証
+            pass
+最終的なベストプラクティス
+フロント側
+javascript// permissions.js
+export const PERMISSION_CONFIG = {
+  A: { label: '顧客管理', icon: 'mdi-account' },
+  B: { label: '商品管理', icon: 'mdi-package' },
+  C: { label: '受注管理', icon: 'mdi-cart' },
+  D: { label: '在庫管理', icon: 'mdi-warehouse' },
+  E: { label: '売上分析', icon: 'mdi-chart-line' },
+  F: { label: 'ユーザー管理', icon: 'mdi-account-cog' },
+  G: { label: 'グループ管理', icon: 'mdi-account-multiple' },
+  H: { label: 'マスタ管理', icon: 'mdi-database' },
+  I: { label: 'レポート出力', icon: 'mdi-file-chart' },
+  J: { label: 'システム設定', icon: 'mdi-cog' },
+  K: { label: 'ログ閲覧', icon: 'mdi-text-box-search' }
+}
+
+// composables/useGroupPermissions.js
+const permissions = ref({
+  A: { value: 0 },  // カテゴリと値だけ
+  B: { value: 2 },
+  C: { value: 1 },
+  // ... 11個
+})
+
+// API送信時: 分離したまま
+const toApiFormat = () => {
+  return {
+    permissions: Object.entries(permissions.value).map(([category, data]) => ({
+      category: category,  // "A"
+      level: data.value    // 0, 1, 2
+    }))
+  }
+}
+
+// 送信JSONイメージ
+{
+  "permissions": [
+    { "category": "A", "level": 0 },
+    { "category": "B", "level": 2 },
+    ...
+  ]
+}
+バックエンド側
+python# serializers.py
+class GroupPermissionUpdateSerializer(serializers.Serializer):
+    permissions = serializers.ListField(
+        child=serializers.DictField(),
+        min_length=11,
+        max_length=11
+    )
+    
+    LEVEL_MAP = {
+        0: 'NONE',
+        1: 'READ',
+        2: 'UPDATE'
+    }
+    
+    def _to_permission_code(self, category, level):
+        """
+        分離された状態から結合
+        category="A", level=0 → "A_NONE_0"
+        """
+        return f"{category}_{self.LEVEL_MAP[level]}_{level}"
+    
+    def validate_permissions(self, value):
+        for perm in value:
+            category = perm['category']  # そのまま取得
+            level = perm['level']        # そのまま取得
+            
+            # 結合して検証
+            permission_code = self._to_permission_code(category, level)
+            
+            # DBに存在するかチェック
+            if not PermissionMaster.objects.filter(code=permission_code).exists():
+                raise serializers.ValidationError(
+                    f"権限 '{permission_code}' が存在しません"
+                )
+        
+        return value
+    
+    def save_permissions(self, group_id):
+        from django.db import transaction
+        
+        with transaction.atomic():
+            GroupPermission.objects.filter(group_id=group_id).delete()
+            
+            bulk_list = []
+            for perm in self.validated_data['permissions']:
+                # ここで最終形式に変換
+                permission_code = self._to_permission_code(
+                    perm['category'], 
+                    perm['level']
+                )
+                
+                bulk_list.append(GroupPermission(
+                    group_id=group_id,
+                    permission_code=permission_code  # "A_NONE_0"
+                ))
+            
+            GroupPermission.objects.bulk_create(bulk_list)
+まとめ
+段階データ形式理由フロント保持{ A: { value: 0 } }シンプル、扱いやすいAPI送信{ category: "A", level: 0 }分離状態 = 柔軟性高いシリアライザー"A_NONE_0" に変換ここで結合＆検証DB保存permission_code = "A_NONE_0"最終形式
+先に結合しない = 正解！(´・ω・`)b
+分離状態で送って、バックエンドで結合するのが最も保守性・拡張性が高いです！
+
+
+views.py の実装イメージ
+# views.py
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+
+from .models import Group, GroupPermission, PermissionMaster
+from .serializers import (
+    GroupSerializer,
+    GroupPermissionUpdateSerializer,
+    GroupPermissionListSerializer
+)
+
+
+class GroupViewSet(viewsets.ModelViewSet):
+    """グループのCRUD"""
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
+    
+    @action(detail=True, methods=['get', 'put'], url_path='permissions')
+    def permissions(self, request, pk=None):
+        """
+        グループ権限の取得・更新
+        
+        GET  /api/groups/{id}/permissions/  → 11個の権限取得
+        PUT  /api/groups/{id}/permissions/  → 11個の権限更新
+        """
+        group = self.get_object()
+        
+        if request.method == 'GET':
+            return self._get_permissions(group)
+        elif request.method == 'PUT':
+            return self._update_permissions(group, request.data)
+    
+    def _get_permissions(self, group):
+        """権限の取得（11個）"""
+        # DBから取得
+        group_perms = GroupPermission.objects.filter(
+            group_id=group.id
+        ).order_by('permission_code')
+        
+        # レスポンス整形
+        permissions = []
+        for gp in group_perms:
+            # "A_NONE_0" → category="A", level=0 に分解
+            parts = gp.permission_code.split('_')
+            permissions.append({
+                'category': parts[0],  # "A"
+                'level': int(parts[2])  # 0, 1, 2
+            })
+        
+        return Response({
+            'group_id': group.id,
+            'group_name': group.name,
+            'permissions': permissions
+        })
+    
+    def _update_permissions(self, group, data):
+        """権限の更新（11個）"""
+        # シリアライザーでバリデーション
+        serializer = GroupPermissionUpdateSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        
+        # シリアライザーで保存（検証＆変換はここで実施）
+        result = serializer.save_permissions(group.id)
+        
+        return Response({
+            'status': 'updated',
+            'group_id': result['group_id'],
+            'updated_count': result['updated_count']
+        }, status=status.HTTP_200_OK)
