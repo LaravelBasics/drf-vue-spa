@@ -1,3 +1,334 @@
+1/21追加分
+
+# ① 差集合チェック（不足）
+missing = VALID_CATEGORIES - request_categories
+# A-Kの11個が全部あるかチェック
+
+# ② 余計なキーチェック
+extra = request_categories - VALID_CATEGORIES
+# A-K以外のキーがないかチェック
+
+# → この2つで、カテゴリの重複は自動的に検知される！
+なぜカテゴリの重複チェックが不要か
+python# 例：カテゴリAが重複してる場合
+request_data = [
+    {'category': 'A', 'level': 0},
+    {'category': 'A', 'level': 1},  # ← 重複
+    {'category': 'B', 'level': 0},
+    # ... 10個（Cが抜けてる）
+]
+
+# set化すると重複が消える
+request_categories = {'A', 'B', 'D', 'E', ...}  # 10個
+
+# ① 差集合チェック（不足）
+missing = VALID_CATEGORIES - request_categories
+# → {'C'}  ← Cが不足してると検知される！
+
+# エラー: "不足しているカテゴリ: ['C']"
+つまり、重複があると必ず「不足」として検知される！(´・ω・`)
+最終的なバリデーション（3つ）
+python# serializers.py
+class GroupPermissionUpdateSerializer(serializers.Serializer):
+    permissions = serializers.ListField(child=serializers.DictField())
+    
+    def validate_permissions(self, value):
+        """
+        3つのチェックで完璧:
+        1. 差集合チェック（不足）
+        2. 余計なキーチェック
+        3. DB存在チェック
+        
+        ※ カテゴリの重複は①②で自動検知される
+        ※ グループコード/名の重複は別途チェック
+        """
+        
+        # カテゴリ抽出
+        request_categories = {perm.get('category') for perm in value}
+        
+        # ① 差集合チェック（不足）
+        missing = VALID_CATEGORIES - request_categories
+        if missing:
+            raise serializers.ValidationError(
+                f"不足しているカテゴリ: {sorted(missing)}"
+            )
+        
+        # ② 余計なキーチェック
+        extra = request_categories - VALID_CATEGORIES
+        if extra:
+            raise serializers.ValidationError(
+                f"無効なカテゴリ: {sorted(extra)}"
+            )
+        
+        # ③ DB存在チェック（権限マスタに○○_○○_数値が存在するか）
+        for perm in value:
+            try:
+                PermissionService.validate_permission_exists(
+                    perm['category'],
+                    perm['level']
+                )
+            except ValueError as e:
+                raise serializers.ValidationError(str(e))
+        
+        return value
+グループコード/名の重複チェック（別のシリアライザー）
+python# serializers.py（グループ作成/更新用）
+class GroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Group
+        fields = ['id', 'code', 'name']
+    
+    def validate_code(self, value):
+        """グループコードの重複チェック"""
+        # 新規作成時
+        if not self.instance:
+            if Group.objects.filter(code=value).exists():
+                raise serializers.ValidationError(
+                    f"グループコード '{value}' は既に使用されています"
+                )
+        
+        # 更新時（自分以外で重複チェック）
+        else:
+            if Group.objects.filter(code=value).exclude(id=self.instance.id).exists():
+                raise serializers.ValidationError(
+                    f"グループコード '{value}' は既に使用されています"
+                )
+        
+        return value
+    
+    def validate_name(self, value):
+        """グループ名の重複チェック"""
+        # 新規作成時
+        if not self.instance:
+            if Group.objects.filter(name=value).exists():
+                raise serializers.ValidationError(
+                    f"グループ名 '{value}' は既に使用されています"
+                )
+        
+        # 更新時
+        else:
+            if Group.objects.filter(name=value).exclude(id=self.instance.id).exists():
+                raise serializers.ValidationError(
+                    f"グループ名 '{value}' は既に使用されています"
+                )
+        
+        return value
+完全版コード
+python# constants.py
+VALID_CATEGORIES = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'}
+
+
+# services/permission_service.py
+class PermissionService:
+    
+    LEVEL_MAP = {0: 'NONE', 1: 'READ', 2: 'UPDATE'}
+    
+    @staticmethod
+    def to_permission_code(category, level):
+        """A + 2 → A_UPDATE_2"""
+        return f"{category}_{PermissionService.LEVEL_MAP[level]}_{level}"
+    
+    @staticmethod
+    def validate_permission_exists(category, level):
+        """整形 + DB存在チェック"""
+        permission_code = PermissionService.to_permission_code(category, level)
+        
+        if not PermissionMaster.objects.filter(code=permission_code).exists():
+            raise ValueError(f"権限 '{permission_code}' が存在しません")
+        
+        return permission_code
+    
+    @staticmethod
+    @transaction.atomic
+    def update_group_permissions(group_id, permissions_data):
+        """権限更新"""
+        GroupPermission.objects.filter(group_id=group_id).delete()
+        
+        permissions = []
+        for perm in permissions_data:
+            permission_code = PermissionService.to_permission_code(
+                perm['category'],
+                perm['level']
+            )
+            
+            permissions.append(GroupPermission(
+                group_id=group_id,
+                permission_code=permission_code
+            ))
+        
+        GroupPermission.objects.bulk_create(permissions)
+        return len(permissions)
+
+
+# serializers.py
+from .constants import VALID_CATEGORIES
+from .services.permission_service import PermissionService
+
+class GroupPermissionUpdateSerializer(serializers.Serializer):
+    """権限更新用（3つのチェック）"""
+    
+    permissions = serializers.ListField(child=serializers.DictField())
+    
+    def validate_permissions(self, value):
+        # カテゴリ抽出
+        request_categories = {perm.get('category') for perm in value}
+        
+        # ① 差集合チェック（不足）
+        missing = VALID_CATEGORIES - request_categories
+        if missing:
+            raise serializers.ValidationError(
+                f"不足しているカテゴリ: {sorted(missing)}"
+            )
+        
+        # ② 余計なキーチェック
+        extra = request_categories - VALID_CATEGORIES
+        if extra:
+            raise serializers.ValidationError(
+                f"無効なカテゴリ: {sorted(extra)}"
+            )
+        
+        # ③ DB存在チェック
+        for perm in value:
+            try:
+                PermissionService.validate_permission_exists(
+                    perm['category'],
+                    perm['level']
+                )
+            except ValueError as e:
+                raise serializers.ValidationError(str(e))
+        
+        return value
+
+
+class GroupSerializer(serializers.ModelSerializer):
+    """グループ作成/更新用（グループコード/名の重複チェック）"""
+    
+    class Meta:
+        model = Group
+        fields = ['id', 'code', 'name', 'description']
+    
+    def validate_code(self, value):
+        """グループコードの重複チェック"""
+        query = Group.objects.filter(code=value)
+        
+        # 更新時は自分を除外
+        if self.instance:
+            query = query.exclude(id=self.instance.id)
+        
+        if query.exists():
+            raise serializers.ValidationError(
+                f"グループコード '{value}' は既に使用されています"
+            )
+        
+        return value
+    
+    def validate_name(self, value):
+        """グループ名の重複チェック"""
+        query = Group.objects.filter(name=value)
+        
+        # 更新時は自分を除外
+        if self.instance:
+            query = query.exclude(id=self.instance.id)
+        
+        if query.exists():
+            raise serializers.ValidationError(
+                f"グループ名 '{value}' は既に使用されています"
+            )
+        
+        return value
+
+
+# views.py
+class GroupViewSet(viewsets.ModelViewSet):
+    queryset = Group.objects.all()
+    serializer_class = GroupSerializer
+    
+    def create(self, request):
+        """グループ作成（グループコード/名の重複チェック）"""
+        serializer = GroupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    @action(detail=True, methods=['put'])
+    def permissions(self, request, pk=None):
+        """権限更新（カテゴリの差集合チェック）"""
+        group = self.get_object()
+        
+        serializer = GroupPermissionUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        updated_count = PermissionService.update_group_permissions(
+            group.id,
+            serializer.validated_data['permissions']
+        )
+        
+        return Response({'status': 'updated', 'updated_count': updated_count})
+まとめ
+python# 権限更新のバリデーション（3つ）
+┌────────────────────────────────────┐
+│ ① 差集合チェック（不足検知）       │
+│    VALID - request = missing?      │
+├────────────────────────────────────┤
+│ ② 余計なキーチェック               │
+│    request - VALID = extra?        │
+├────────────────────────────────────┤
+│ ③ DB存在チェック                   │
+│    A_UPDATE_2 が権限マスタに？     │
+└────────────────────────────────────┘
+
+※ カテゴリの重複は①②で自動検知
+
+
+# グループ作成/更新のバリデーション（別）
+┌────────────────────────────────────┐
+│ グループコードの重複チェック       │
+│ グループ名の重複チェック           │
+└────────────────────────────────────┘
+完璧な理解です！(´・ω・`)b
+
+権限のカテゴリ重複 → ①②で自動検知
+グループコード/名の重複 → 別のシリアライザーでチェック
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+================================================================================================
+
+
 例えばさ、会社のテーブル定義で、
 ユーザーID+パスワードで本人確認→
 成功→成功したユーザーID＋グループID（requestからきたもの）

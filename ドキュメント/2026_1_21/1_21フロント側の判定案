@@ -1,0 +1,338 @@
+フロント側の権限はうーん(´・ω・｀)なにがええんやろうなあ
+vuerouterでrなんちゃらの判定のやつ{r:USER}とかをvue毎に11画面分設定？
+してvueないでフィルター→storeからコンプテッド1以上or2のみの関数で画面ごと判定？みたいなやついまあるんやけど、
+これってv-cardで例えばホームに遷移先カード11個あってそこがログインユーザーのstore毎に権限があって表示非表示くらいはできるけど、
+権限1以上なら閲覧、2のみなら更新可能、0は不可しか操作できないならええけど、
+実際は1が閲覧で更新可能系の操作がモーダル形式で1ファイル内にあると、
+1の権限→v-ifで2のみ判定必要になるし...(´・ω・｀)これ（1vueに検索とDB操作系処理が混合）だとvuerouterよりボタン毎に判定せざるをえないか
+
+22:34
+完全にその通りです！v-ifでボタンごとに判定するしかないです(´・ω・`)
+
+現実的な権限制御の構成
+┌─────────────────────────────────┐
+│ Vue Router（画面遷移の制御）    │
+│ - 権限1以上で画面に入れる       │
+└─────────────────────────────────┘
+          ↓ 画面内に入った後
+┌─────────────────────────────────┐
+│ v-if（要素ごとの制御）          │
+│ - 一覧表示: 権限1以上           │
+│ - 新規ボタン: 権限2のみ v-if    │
+│ - 編集ボタン: 権限2のみ v-if    │
+│ - 削除ボタン: 権限2のみ v-if    │
+└─────────────────────────────────┘
+実装例
+1. Vue Router（画面に入れるかどうか）
+javascript
+// router/index.js
+const routes = [
+  {
+    path: '/groups',
+    name: 'GroupManagement',
+    component: () => import('@/views/GroupManagement.vue'),
+    meta: {
+      requiresAuth: true,
+      permission: { category: 'G', level: 1 }  // 権限1以上で入れる
+    }
+  },
+  {
+    path: '/customers',
+    name: 'CustomerManagement',
+    component: () => import('@/views/CustomerManagement.vue'),
+    meta: {
+      requiresAuth: true,
+      permission: { category: 'A', level: 1 }
+    }
+  },
+  // ... 11画面分
+]
+
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore()
+  
+  if (to.meta.permission) {
+    const { category, level } = to.meta.permission
+    const userLevel = authStore.permissions[category] || 0
+    
+    // 権限1以上で画面に入れる
+    if (userLevel < level) {
+      next('/forbidden')
+    } else {
+      next()
+    }
+  } else {
+    next()
+  }
+})
+2. Vue内（ボタンごとに v-if）
+vue
+<!-- views/GroupManagement.vue -->
+<script setup>
+import { ref, onMounted } from 'vue'
+import { usePermission } from '@/composables/usePermission'
+import axios from 'axios'
+
+// グループ管理の権限
+const { canView, canUpdate } = usePermission('G')
+//      ↑ 1以上   ↑ 2のみ
+
+const groups = ref([])
+const searchKeyword = ref('')
+const createDialog = ref(false)
+const editDialog = ref(false)
+const selectedGroup = ref(null)
+
+const fetchGroups = async () => {
+  const { data } = await axios.get('/api/groups/')
+  groups.value = data
+}
+
+const searchGroups = () => {
+  // 検索処理（権限1以上）
+}
+
+const openCreateModal = () => {
+  createDialog.value = true
+}
+
+const openEditModal = (group) => {
+  selectedGroup.value = { ...group }
+  editDialog.value = true
+}
+
+const createGroup = async () => {
+  // 新規作成処理
+}
+
+const updateGroup = async () => {
+  // 更新処理
+}
+
+const deleteGroup = async () => {
+  // 削除処理
+}
+
+onMounted(() => {
+  if (canView.value) {
+    fetchGroups()
+  }
+})
+</script>
+
+<template>
+  <div class="group-management">
+    <!-- Vue Router で権限1以上は通過済み -->
+    <!-- ここから先は v-if で細かく制御 -->
+    
+    <v-card>
+      <v-card-title class="d-flex align-center">
+        <span>グループ管理</span>
+        <v-spacer />
+        
+        <!-- 権限2のみ表示 -->
+        <v-btn 
+          v-if="canUpdate"
+          color="primary"
+          @click="openCreateModal"
+        >
+          <v-icon>mdi-plus</v-icon>
+          新規作成
+        </v-btn>
+      </v-card-title>
+      
+      <v-card-text>
+        <!-- 検索フォーム（権限1以上で表示） -->
+        <v-row>
+          <v-col cols="12" md="6">
+            <v-text-field
+              v-model="searchKeyword"
+              label="検索"
+              prepend-inner-icon="mdi-magnify"
+              @input="searchGroups"
+            />
+          </v-col>
+        </v-row>
+        
+        <!-- 一覧表示（権限1以上で表示） -->
+        <v-data-table
+          :headers="headers"
+          :items="groups"
+        >
+          <!-- 権限2のみアクション列を表示 -->
+          <template v-if="canUpdate" #item.actions="{ item }">
+            <v-btn
+              icon
+              size="small"
+              @click="openEditModal(item)"
+            >
+              <v-icon>mdi-pencil</v-icon>
+            </v-btn>
+          </template>
+        </v-data-table>
+      </v-card-text>
+    </v-card>
+    
+    <!-- 新規作成モーダル（権限2で開ける） -->
+    <v-dialog v-model="createDialog" max-width="600">
+      <v-card>
+        <v-card-title>グループ新規作成</v-card-title>
+        <v-card-text>
+          <v-text-field label="グループコード" />
+          <v-text-field label="グループ名" />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn @click="createDialog = false">キャンセル</v-btn>
+          <v-btn color="primary" @click="createGroup">作成</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+    
+    <!-- 編集モーダル（権限2で開ける） -->
+    <v-dialog v-model="editDialog" max-width="600">
+      <v-card>
+        <v-card-title>グループ編集</v-card-title>
+        <v-card-text>
+          <v-text-field label="グループコード" />
+          <v-text-field label="グループ名" />
+        </v-card-text>
+        <v-card-actions>
+          <!-- 削除ボタン（権限2のみ） -->
+          <v-btn 
+            v-if="canUpdate"
+            color="error"
+            @click="deleteGroup"
+          >
+            削除
+          </v-btn>
+          <v-spacer />
+          <v-btn @click="editDialog = false">キャンセル</v-btn>
+          <v-btn color="primary" @click="updateGroup">更新</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </div>
+</template>
+3. Composable（権限判定ロジック）
+javascript
+// composables/usePermission.js
+import { computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+
+export const usePermission = (category) => {
+  const authStore = useAuthStore()
+  
+  const level = computed(() => authStore.permissions[category] || 0)
+  
+  const canView = computed(() => level.value >= 1)   // 1以上
+  const canUpdate = computed(() => level.value === 2) // 2のみ
+  
+  return { level, canView, canUpdate }
+}
+4. ホーム画面（v-cardの表示制御）
+vue
+<!-- views/Home.vue -->
+<script setup>
+import { useAuthStore } from '@/stores/auth'
+import { computed } from 'vue'
+
+const authStore = useAuthStore()
+
+// 11画面分の権限を取得
+const modules = computed(() => [
+  { 
+    name: '顧客管理', 
+    icon: 'mdi-account-group', 
+    route: '/customers',
+    category: 'A',
+    level: authStore.permissions.A || 0
+  },
+  { 
+    name: '商品管理', 
+    icon: 'mdi-package-variant', 
+    route: '/products',
+    category: 'B',
+    level: authStore.permissions.B || 0
+  },
+  { 
+    name: '受注管理', 
+    icon: 'mdi-cart', 
+    route: '/orders',
+    category: 'C',
+    level: authStore.permissions.C || 0
+  },
+  // ... 11個
+  { 
+    name: 'グループ管理', 
+    icon: 'mdi-account-multiple', 
+    route: '/groups',
+    category: 'G',
+    level: authStore.permissions.G || 0
+  },
+])
+
+// 権限1以上のモジュールだけ表示
+const visibleModules = computed(() => {
+  return modules.value.filter(m => m.level >= 1)
+})
+</script>
+
+<template>
+  <v-container>
+    <v-row>
+      <!-- 権限1以上のカードだけ表示 -->
+      <v-col
+        v-for="module in visibleModules"
+        :key="module.category"
+        cols="12" sm="6" md="4"
+      >
+        <v-card
+          :to="module.route"
+          hover
+        >
+          <v-card-title class="d-flex align-center">
+            <v-icon size="large" :icon="module.icon" class="mr-2" />
+            {{ module.name }}
+          </v-card-title>
+          
+          <v-card-subtitle>
+            <!-- 権限レベルを表示 -->
+            <v-chip 
+              :color="module.level === 2 ? 'success' : 'info'"
+              size="small"
+            >
+              {{ module.level === 2 ? '更新可能' : '閲覧のみ' }}
+            </v-chip>
+          </v-card-subtitle>
+        </v-card>
+      </v-col>
+    </v-row>
+  </v-container>
+</template>
+```
+
+## まとめ：権限制御の階層
+```
+┌──────────────────────────────────────┐
+│ 1. ホーム画面（v-cardの表示）        │
+│    権限1以上のカードだけ表示         │
+│    → computed で filter              │
+└──────────────────────────────────────┘
+              ↓ カードクリック
+┌──────────────────────────────────────┐
+│ 2. Vue Router（画面遷移）            │
+│    権限1以上で画面に入れる           │
+│    → meta.permission で制御          │
+└──────────────────────────────────────┘
+              ↓ 画面内
+┌──────────────────────────────────────┐
+│ 3. Vue内（要素ごと）                 │
+│    - 一覧・検索: 権限1以上で表示     │
+│    - 新規ボタン: v-if="canUpdate"    │
+│    - 編集ボタン: v-if="canUpdate"    │
+│    - 削除ボタン: v-if="canUpdate"    │
+└──────────────────────────────────────┘
+結論：Vue Router で画面遷移を制御して、v-if でボタンごとに判定 = 正解です！(´・ω・`)b
+
+1ファイルに検索とDB操作が混在してる場合は、v-ifでボタンごとに判定するしかないです(´・ω・`)
