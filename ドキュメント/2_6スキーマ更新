@@ -1,0 +1,90 @@
+# そもそも「コードがない不純物」は最初から呼ばない
+stores = Store.objects.exclude(store_code__isnull=True).exclude(store_code='')
+
+# これで辞書を作れば、100%「コードが存在する店舗」だけの綺麗なマップになる
+store_map = {s.store_code: s for s in stores}
+
+
+
+
+# 1. まず、今回の「グループ」で使われている店舗コードだけを抽出
+target_codes = [g.store_code for g in groups if g.store_code]
+
+# 2. そのコードに合致し、かつ「空じゃない」店舗だけをDBから一本釣り
+# SQLの「WHERE store_code IN (...)」になるので爆速
+stores = Store.objects.filter(
+    store_code__in=target_codes
+).exclude(store_code__isnull=True).exclude(store_code='')
+
+# 3. 辞書化
+store_map = {s.store_code: s for s in stores}
+
+===================================================================================
+
+使い方は「filterしてexists」！
+
+NULLや空文字はどうなる？
+ユーザーさんが心配してる「NULL弾き」も、これだけで完結するよ。
+
+Python
+# フロントから来た値が空っぽ（Noneとか""）でも、
+# そのまま filter に放り込んで .exists() すれば...
+is_valid = Store.objects.filter(store_code=input_code).exists()
+
+# 1. input_code が空なら、filterで1件もヒットしないから False になる。
+# 2. input_code がデタラメなら、同じくヒットしないから False になる。
+# 3. 本物のコードなら True になる。
+つまり、これ一発で**「空文字・NULL・デタラメ」の3連コンボを全部ガードできる**ってわけ！(´・ω・｀)b
+
+
+===================================================================================
+# フロントから飛んできた店舗コード
+code_from_front = request.data.get('store_code')
+
+# そのコードを持つ店舗が「1件でも」DBにあるか確認
+if Store.objects.filter(store_code=code_from_front).exists():
+    # 本物だった！保存処理へ
+    group.store_code = code_from_front
+    group.save()
+else:
+    # 偽物、または空っぽだった！エラーを返す
+    return Response({"error": "その店舗は存在しません（＾ω＾）"}, status=400)
+
+    Store.objects.get(store_code=...) の場合: データがないと DoesNotExist というエラー（例外） を吐いて、プログラムがそこで止まっちゃう。だから try-except で囲まないといけない。めんどくさい。
+
+Store.objects.filter(...).exists() の場合: データがなくてもエラーにならず、ただの False が返ってくるだけ。if 文でスッキリ書ける！
+
+3. NULLや空文字の「ろ過」も同時にやる
+ユーザーさんが心配してた「NULL弾き」も、条件を足すだけでOK。
+
+
+Python
+# 「コードが一致」かつ「名前が空じゃない」店舗がいるか？
+if Store.objects.filter(store_code=code_from_front).exclude(store_name='').exists():
+    print("本物で、しかも名前もしっかりしてる店舗や（＾ω＾）")
+4. 逆に「ないこと」を確認する
+「すでに同じコードのグループが存在しないか？」という重複チェックにも使えるよ。
+
+Python
+if Group.objects.filter(group_code="NEW_GP_001").exists():
+    print("あ、そのコードはもう使われてるわ(´・ω・｀)")
+===================================================================================
+
+# managed = False の問題
+
+class MGroup(models.Model):
+    store = models.ForeignKey('MStore', ...)
+    
+    class Meta:
+        managed = False  # ← これ
+
+
+問題：
+1. マイグレーション効かない
+2. inspectdb再実行でForeignKey消える
+3. スキーマ変更を検知できない
+4. 本番とローカルで不整合の可能性
+
+
+結果：
+select_related が安定しない(´・ω・｀)💥
